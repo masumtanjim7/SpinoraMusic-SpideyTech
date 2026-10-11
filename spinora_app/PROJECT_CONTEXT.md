@@ -54,6 +54,6 @@ Me: accounts, Firebase console, Docker, backend, flutter pub add, running on dev
 Phase 0: project created (com.spideytech.spinora), lib folder skeleton done.
 Task 0.5 DONE: dev/prod flavors in build.gradle.kts; AppFlavor enum + Riverpod provider; bootstrap;
   main_dev.dart, main_prod.dart; SpideyApp (go_router + dark theme); placeholder HomeScreen.
-Next: Task 1 – Core & UI (Track model, Drift DB, audio service, glass widget library).
+Next: Task 0.8 – Firebase init + Crashlytics (after FlutterFire CLI and google-services.json are in place).
 Roadmap: 0 Setup ✓, 1 Core and UI, 2 Streaming and audio, 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

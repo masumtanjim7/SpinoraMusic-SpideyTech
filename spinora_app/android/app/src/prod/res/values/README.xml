@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-    Prod-flavor resource overrides.
-    app_name is injected by Gradle's resValue() in build.gradle.kts,
-    so no strings.xml is needed here.
-    Add prod-only drawables, layouts, or values in this folder when required.
--->
