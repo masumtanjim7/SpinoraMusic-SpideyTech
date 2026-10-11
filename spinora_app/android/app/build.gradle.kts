@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.spideytech.spinora"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37 // permission_handler_android requires SDK 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -80,9 +80,11 @@ android {
         }
     }
 
-    // Required so Gradle generates the BuildConfig class with our custom fields.
+    // Required so Gradle generates the BuildConfig class with our custom fields
+    // and emits per-flavor resValue() strings (e.g. app_name).
     buildFeatures {
         buildConfig = true
+        resValues = true
     }
 }
 
