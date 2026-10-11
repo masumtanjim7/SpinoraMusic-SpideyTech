@@ -2,64 +2,122 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_flavor.dart';
+import '../../../app/theme.dart';
+import '../../../shared/glass_card.dart';
 
-/// Placeholder home screen shown while features are being built.
-///
-/// Displays the active [AppFlavor] so it is immediately obvious which
-/// build is running on-device. Replace the body with the real player
-/// UI once Task 1 (Core & UI) is underway.
+/// Test home screen for verifying design tokens and [GlassCard] blur.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final flavor = ref.watch(appFlavorProvider);
-    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Spinora'),
         actions: [
           _FlavorBadge(flavor: flavor),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Placeholder icon – swap for album art later.
-            Icon(
-              Icons.music_note_rounded,
-              size: 80,
-              color: cs.primary,
+      body: Stack(
+        children: [
+          // Background ambient shapes to verify blur effect clearly
+          Positioned(
+            top: 100,
+            left: 30,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: AppColors.purpleGradient,
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Spinora Music',
-              style: tt.displayLarge,
+          ),
+          Positioned(
+            bottom: 160,
+            right: 30,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.cyanAccent.withValues(alpha: 0.7),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Flavor: ${flavor.name}',
-              style: tt.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.6)),
+          ),
+
+          // Main UI
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  Text(
+                    'Good evening, Masum.',
+                    style: tt.displayLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Spinora Design System (Task 0.7)',
+                    style: tt.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Center GlassCard to verify the blur effect
+                  Center(
+                    child: GlassCard(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: AppColors.purpleGradient,
+                            ),
+                            child: const Icon(
+                              Icons.music_note_rounded,
+                              size: 40,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Glassmorphism Active',
+                            style: tt.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '18-sigma blur with frosted fill and border.',
+                            style: tt.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
             ),
-            const SizedBox(height: 48),
-            Text(
-              'Player UI coming in Task 1.',
-              style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.4)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Private helper widget
-// ---------------------------------------------------------------------------
 
 class _FlavorBadge extends StatelessWidget {
   const _FlavorBadge({required this.flavor});
@@ -68,7 +126,6 @@ class _FlavorBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only show the badge in dev so prod has a clean UI.
     if (flavor == AppFlavor.prod) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;

@@ -16,6 +16,8 @@ class SpideyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Spinora',
       theme: spideyDarkTheme,
+      darkTheme: spideyDarkTheme,
+      themeMode: ThemeMode.dark,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );
