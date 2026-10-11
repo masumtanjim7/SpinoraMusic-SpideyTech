@@ -2,14 +2,9 @@
 
 > An Android music player built with Flutter. It plays local MP3s and licensed online tracks in one queue, with synced lyrics, an equalizer, crossfade, a dark glassmorphism interface, and on-device mood and gesture control.
 
-![Platform](https://img.shields.io/badge/platform-Android-3DDC84)
-![Framework](https://img.shields.io/badge/Flutter-stable-02569B)
-![Status](https://img.shields.io/badge/status-in%20development-orange)
-![Budget](https://img.shields.io/badge/budget-zero-blue)
 
 **Author:** Md. Masum Billah, SpideyTech
-**Package ID:** `com.spideytech.spinora`
-**Status:** Early development (Phase 0: setup)
+
 
 ---
 
