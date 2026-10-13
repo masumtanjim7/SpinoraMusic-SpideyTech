@@ -57,4 +57,4 @@ Task 0.5 DONE: dev/prod flavors in build.gradle.kts; AppFlavor enum + Riverpod p
 Task 0.7 DONE: Design system tokens in theme.dart; GlassCard widget; updated HomeScreen & SpideyApp.
 Next: Task 0.8 – Firebase init + Crashlytics (after FlutterFire CLI and google-services.json are in place).
 Roadmap: 0 Setup ✓, 1 Core and UI, 2 Streaming and audio, 3 AI, 4 Local badges and themes (optional sync),
-5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
+5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.\
