@@ -26,6 +26,7 @@ class Track {
     this.artworkUri,
     required this.source,
     required this.uri,
+    this.isFavorite = false,
   });
 
   /// Unique identifier (e.g. `local_123` or online track ID).
@@ -52,6 +53,9 @@ class Track {
   /// Playable URI string (file path URI or remote audio stream URL).
   final String uri;
 
+  /// Whether this track is marked as favorite by the user.
+  final bool isFavorite;
+
   /// Creates a [Track] from a Drift [Song] record.
   factory Track.fromSong(Song song) {
     return Track(
@@ -63,6 +67,7 @@ class Track {
       artworkUri: song.albumArtPath,
       source: TrackSource.local,
       uri: Uri.file(song.filePath).toString(),
+      isFavorite: song.isFavorite,
     );
   }
 
@@ -75,6 +80,7 @@ class Track {
     String? artworkUri,
     TrackSource? source,
     String? uri,
+    bool? isFavorite,
   }) {
     return Track(
       id: id ?? this.id,
@@ -85,6 +91,7 @@ class Track {
       artworkUri: artworkUri ?? this.artworkUri,
       source: source ?? this.source,
       uri: uri ?? this.uri,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 

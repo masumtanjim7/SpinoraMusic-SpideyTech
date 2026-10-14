@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:spinora/core/audio/track.dart';
 import 'package:spinora/features/player/application/player_controller.dart';
 
@@ -11,6 +12,7 @@ void main() {
       durationMs: 180000,
       source: TrackSource.local,
       uri: 'file:///path/song1.mp3',
+      isFavorite: false,
     );
 
     const track2 = Track(
@@ -20,12 +22,15 @@ void main() {
       durationMs: 240000,
       source: TrackSource.local,
       uri: 'file:///path/song2.mp3',
+      isFavorite: true,
     );
 
     test('initial state has no track and zero progress', () {
       const state = PlayerState();
       expect(state.hasTrack, false);
       expect(state.isPlaying, false);
+      expect(state.isShuffled, false);
+      expect(state.loopMode, LoopMode.off);
       expect(state.progressRatio, 0.0);
     });
 
@@ -53,6 +58,22 @@ void main() {
       );
       expect(stateAtEnd.hasNext, false);
       expect(stateAtEnd.hasPrevious, true);
+    });
+
+    test('loopMode state updates correctly', () {
+      const stateOff = PlayerState(loopMode: LoopMode.off);
+      final stateAll = stateOff.copyWith(loopMode: LoopMode.all);
+      final stateOne = stateAll.copyWith(loopMode: LoopMode.one);
+
+      expect(stateOff.loopMode, LoopMode.off);
+      expect(stateAll.loopMode, LoopMode.all);
+      expect(stateOne.loopMode, LoopMode.one);
+    });
+
+    test('track favorite status toggles in copyWith', () {
+      final favTrack = track1.copyWith(isFavorite: true);
+      expect(favTrack.isFavorite, true);
+      expect(track2.isFavorite, true);
     });
   });
 }

@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:drift/drift.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' hide PlayerState;
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
@@ -18,9 +19,12 @@ class PlayerState {
   const PlayerState({
     this.currentTrack,
     this.queue = const [],
+    this.originalQueue,
     this.currentIndex = -1,
     this.isPlaying = false,
     this.isBuffering = false,
+    this.isShuffled = false,
+    this.loopMode = LoopMode.off,
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.errorMessage,
@@ -28,9 +32,12 @@ class PlayerState {
 
   final Track? currentTrack;
   final List<Track> queue;
+  final List<Track>? originalQueue;
   final int currentIndex;
   final bool isPlaying;
   final bool isBuffering;
+  final bool isShuffled;
+  final LoopMode loopMode;
   final Duration position;
   final Duration duration;
   final String? errorMessage;
@@ -47,9 +54,12 @@ class PlayerState {
   PlayerState copyWith({
     Track? currentTrack,
     List<Track>? queue,
+    List<Track>? originalQueue,
     int? currentIndex,
     bool? isPlaying,
     bool? isBuffering,
+    bool? isShuffled,
+    LoopMode? loopMode,
     Duration? position,
     Duration? duration,
     String? errorMessage,
@@ -58,9 +68,12 @@ class PlayerState {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
       queue: queue ?? this.queue,
+      originalQueue: originalQueue ?? this.originalQueue,
       currentIndex: currentIndex ?? this.currentIndex,
       isPlaying: isPlaying ?? this.isPlaying,
       isBuffering: isBuffering ?? this.isBuffering,
+      isShuffled: isShuffled ?? this.isShuffled,
+      loopMode: loopMode ?? this.loopMode,
       position: position ?? this.position,
       duration: duration ?? this.duration,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -132,8 +145,13 @@ class PlayerController extends Notifier<PlayerState> {
         );
 
         if (playerState.processingState == ProcessingState.completed) {
-          if (state.hasNext) {
+          if (state.loopMode == LoopMode.one) {
+            seek(Duration.zero);
+            play();
+          } else if (state.hasNext) {
             next();
+          } else if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
+            playTrack(state.queue.first);
           } else {
             pause();
             seek(Duration.zero);
@@ -220,11 +238,107 @@ class PlayerController extends Notifier<PlayerState> {
 
   Future<void> pause() => player.pause();
 
-  Future<void> seek(Duration position) => player.seek(position);
+  Future<void> seek(Duration position) async {
+    state = state.copyWith(position: position);
+    await player.seek(position);
+  }
+
+  /// Toggles queue shuffle.
+  Future<void> toggleShuffle() async {
+    final newShuffled = !state.isShuffled;
+    if (newShuffled) {
+      final original = List<Track>.from(state.queue);
+      final shuffled = List<Track>.from(state.queue)..shuffle();
+      final current = state.currentTrack;
+      final newIndex = current != null ? shuffled.indexOf(current) : 0;
+
+      state = state.copyWith(
+        isShuffled: true,
+        originalQueue: original,
+        queue: List.unmodifiable(shuffled),
+        currentIndex: newIndex,
+      );
+    } else {
+      final original = state.originalQueue ?? state.queue;
+      final current = state.currentTrack;
+      final newIndex = current != null ? original.indexOf(current) : 0;
+
+      state = state.copyWith(
+        isShuffled: false,
+        queue: List.unmodifiable(original),
+        currentIndex: newIndex,
+      );
+    }
+  }
+
+  /// Cycles repeat mode: off -> all -> one -> off.
+  Future<void> cycleLoopMode() async {
+    final LoopMode nextMode;
+    switch (state.loopMode) {
+      case LoopMode.off:
+        nextMode = LoopMode.all;
+      case LoopMode.all:
+        nextMode = LoopMode.one;
+      case LoopMode.one:
+        nextMode = LoopMode.off;
+    }
+
+    try {
+      await player.setLoopMode(nextMode);
+    } catch (_) {
+      // Handled gracefully in completed stream
+    }
+
+    state = state.copyWith(loopMode: nextMode);
+  }
+
+  /// Toggles the favorite status of the currently loaded track and updates Drift.
+  Future<void> toggleFavorite() async {
+    final track = state.currentTrack;
+    if (track == null) return;
+
+    final newFavorite = !track.isFavorite;
+    final updatedTrack = track.copyWith(isFavorite: newFavorite);
+
+    // Persist to Drift database if local song
+    if (track.source == TrackSource.local && track.id.startsWith('local_')) {
+      final songId = int.tryParse(track.id.replaceFirst('local_', ''));
+      if (songId != null) {
+        try {
+          final db = ref.read(appDatabaseProvider);
+          await (db.update(db.songs)..where((s) => s.id.equals(songId))).write(
+            SongsCompanion(isFavorite: Value(newFavorite)),
+          );
+        } catch (e, st) {
+          debugPrint('[PlayerController] Error persisting favorite: $e');
+          FirebaseCrashlytics.instance.recordError(
+            e,
+            st,
+            reason: 'Failed to update song favorite in Drift',
+            fatal: false,
+          );
+        }
+      }
+    }
+
+    final updatedQueue = state.queue.map((t) {
+      return t.id == track.id ? updatedTrack : t;
+    }).toList();
+
+    state = state.copyWith(
+      currentTrack: updatedTrack,
+      queue: List.unmodifiable(updatedQueue),
+    );
+  }
 
   /// Skips to the next song in the active queue.
   Future<void> next() async {
-    if (!state.hasNext) return;
+    if (!state.hasNext) {
+      if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
+        await playTrack(state.queue.first);
+      }
+      return;
+    }
     final nextIndex = state.currentIndex + 1;
     final nextTrack = state.queue[nextIndex];
     await playTrack(nextTrack);

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
 import '../../../shared/glass_card.dart';
 import '../application/player_controller.dart';
+import 'now_playing_screen.dart';
 
 /// Floating glassmorphic mini-player bar anchored to the bottom of the screen.
 ///
@@ -17,6 +18,16 @@ class MiniPlayer extends ConsumerWidget {
   });
 
   final double bottomPadding;
+
+  void _openNowPlaying(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const NowPlayingScreen(),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,9 +42,12 @@ class MiniPlayer extends ConsumerWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      child: GlassCard(
-        borderRadius: BorderRadius.circular(20),
-        padding: EdgeInsets.zero,
+      child: GestureDetector(
+        onTap: () => _openNowPlaying(context),
+        behavior: HitTestBehavior.opaque,
+        child: GlassCard(
+          borderRadius: BorderRadius.circular(20),
+          padding: EdgeInsets.zero,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -147,6 +161,7 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

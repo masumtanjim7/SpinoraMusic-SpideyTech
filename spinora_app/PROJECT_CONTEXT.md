@@ -80,6 +80,9 @@ Task 2.1 DONE (Audio Playback Engine & Glass Mini-Player): Canonical Track model
   AudioSession focus management; PlayerController wrapping just_audio AudioPlayer with queue, play/pause, seeking, next/prev;
   Floating Glass Mini-Player (lib/features/player/presentation/mini_player.dart) with neon progress bar, album art,
   and responsive controls; embedded into LibraryScreen and HomeScreen.
-Next: Task 2.2 – Full-Screen Player Modal & Lockscreen Controls (audio_service background notification handler, lyrics/artwork hero animation).
+Task 2.2 DONE (Full-Screen "Now Playing" Modal): Futuristic dark glassmorphic NowPlayingScreen (lib/features/player/presentation/now_playing_screen.dart)
+  with animated artwork scale/glow, interactive seek slider, live duration timestamps, shuffle toggle, repeat mode cycle (off/all/one),
+  and favorite heart toggle updating Drift database; wired to MiniPlayer on tap via transparent modal bottom sheet.
+Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
