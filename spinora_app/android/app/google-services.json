@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "763435132188",
+    "project_id": "spinora-spideytech",
+    "storage_bucket": "spinora-spideytech.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:763435132188:android:a97560e51784092bf706d9",
+        "android_client_info": {
+          "package_name": "com.spideytech.spinora"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG9F4dMCMtU4-4EUDCzI0czWPkF3IWMzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:763435132188:android:b1a5b3ddf7bf94f1f706d9",
+        "android_client_info": {
+          "package_name": "com.spideytech.spinora.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG9F4dMCMtU4-4EUDCzI0czWPkF3IWMzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

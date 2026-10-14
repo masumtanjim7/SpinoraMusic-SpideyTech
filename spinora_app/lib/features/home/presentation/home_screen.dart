@@ -5,7 +5,7 @@ import '../../../app/app_flavor.dart';
 import '../../../app/theme.dart';
 import '../../../shared/glass_card.dart';
 
-/// Test home screen for verifying design tokens and [GlassCard] blur.
+/// Home screen showing the Spinora glassmorphism design system.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 

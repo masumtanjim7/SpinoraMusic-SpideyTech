@@ -1,30 +1,34 @@
-// This is a basic Flutter widget test.
+// Smoke tests for Spinora widgets.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// These tests run without a native Firebase environment – they exercise pure
+// Flutter/Dart code only (GlassCard, theme tokens, etc.).  Firebase init is
+// intentionally NOT called here; CI runs `flutter test` without an Android
+// device or google-services.json.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:spinora/main.dart';
+import 'package:spinora/shared/glass_card.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('GlassCard renders its child without error', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: GlassCard(
+              child: Text('smoke'),
+            ),
+          ),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // The child text is present in the widget tree.
+    expect(find.text('smoke'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // GlassCard itself is present.
+    expect(find.byType(GlassCard), findsOneWidget);
   });
 }

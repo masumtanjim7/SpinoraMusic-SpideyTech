@@ -1,6 +1,11 @@
+import 'dart:ui';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../firebase_options.dart';
 import 'app_flavor.dart';
 import 'spidey_app.dart';
 
@@ -11,6 +16,24 @@ import 'spidey_app.dart';
 /// channel or BuildConfig access.
 Future<void> bootstrap(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Firebase ──────────────────────────────────────────────────────────────
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Explicitly enable collection so crashes are reported even in debug mode.
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+
+  // Catch Flutter framework errors (e.g. build exceptions).
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  // Catch async errors that escape the Flutter framework (Dart zone errors).
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   runApp(
     ProviderScope(

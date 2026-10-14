@@ -55,6 +55,12 @@ Phase 0: project created (com.spideytech.spinora), lib folder skeleton done.
 Task 0.5 DONE: dev/prod flavors in build.gradle.kts; AppFlavor enum + Riverpod provider; bootstrap;
   main_dev.dart, main_prod.dart; SpideyApp (go_router + dark theme); placeholder HomeScreen.
 Task 0.7 DONE: Design system tokens in theme.dart; GlassCard widget; updated HomeScreen & SpideyApp.
-Next: Task 0.8 – Firebase init + Crashlytics (after FlutterFire CLI and google-services.json are in place).
+Task 0.8 DONE: Firebase Core + Crashlytics init in bootstrap.dart (setCrashlyticsCollectionEnabled,
+  FlutterError.onError, PlatformDispatcher.onError); firebase_options.dart via FlutterFire CLI.
+  Temporary Test Crash button cleaned up from HomeScreen.
+Task 0.9 DONE: GitHub Actions CI workflow at .github/workflows/ci.yml (push/PR to main, ubuntu-latest,
+  subosito/flutter-action@v2 stable, flutter pub get + flutter analyze + flutter test);
+  widget_test.dart replaced with GlassCard smoke test (no native Firebase required).
+Next: Task 1.1 – Audio service scaffold (just_audio + audio_service, background play).
 Roadmap: 0 Setup ✓, 1 Core and UI, 2 Streaming and audio, 3 AI, 4 Local badges and themes (optional sync),
-5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
+5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
