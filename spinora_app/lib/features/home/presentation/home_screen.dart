@@ -5,6 +5,8 @@ import '../../../app/app_flavor.dart';
 import '../../../app/theme.dart';
 import '../../../shared/glass_card.dart';
 
+import '../../library/data/audio_scanner_service.dart';
+
 /// Home screen showing the Spinora glassmorphism design system.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -12,6 +14,9 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final flavor = ref.watch(appFlavorProvider);
+    final scanState = ref.watch(audioScannerStateProvider);
+    final songsAsync = ref.watch(localSongsStreamProvider);
+    final songCount = songsAsync.value?.length ?? 0;
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -104,6 +109,63 @@ class HomeScreen extends ConsumerWidget {
                             ),
                             textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 16),
+                          Text(
+                            songsAsync.isLoading
+                                ? 'Loading library...'
+                                : '$songCount tracks in library',
+                            style: tt.bodyMedium?.copyWith(
+                              color: AppColors.cyanAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          FilledButton.icon(
+                            onPressed: scanState.isScanning
+                                ? null
+                                : () => ref
+                                    .read(audioScannerStateProvider.notifier)
+                                    .scan(),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.surface,
+                              foregroundColor: Colors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.15),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                            ),
+                            icon: scanState.isScanning
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.sync_rounded, size: 18),
+                            label: Text(
+                              scanState.isScanning
+                                  ? 'Scanning Storage...'
+                                  : 'Scan Local Music',
+                            ),
+                          ),
+                          if (scanState.errorMessage != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              scanState.errorMessage!,
+                              style: tt.bodySmall?.copyWith(
+                                color: Colors.redAccent.withValues(alpha: 0.8),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ],
                       ),
                     ),

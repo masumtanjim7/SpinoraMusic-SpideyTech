@@ -4,37 +4,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Resolves to the correct [Permission] for reading local audio files.
-///
-/// • Android 13+ (API 33+): [Permission.audio]  → READ_MEDIA_AUDIO
-/// • Android ≤12          : [Permission.storage] → READ_EXTERNAL_STORAGE
-/// • All other platforms  : [Permission.storage] (handled gracefully by the
-///   library; will always return [PermissionStatus.granted] on iOS / desktop).
-Permission get _effectiveAudioPermission {
-  if (!Platform.isAndroid) return Permission.storage;
-  // permission_handler 11+ maps Permission.audio to READ_MEDIA_AUDIO only on
-  // API 33+, so we can safely use it unconditionally on Android and rely on
-  // the plugin to pick the right manifest entry.
-  return Permission.audio;
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /// Returns the current [PermissionStatus] without showing a system dialog.
-Future<PermissionStatus> checkAudioPermission() =>
-    _effectiveAudioPermission.status;
+///
+/// Checks both [Permission.audio] (Android 13+) and [Permission.storage] (Android <= 12).
+Future<PermissionStatus> checkAudioPermission() async {
+  if (!Platform.isAndroid) return PermissionStatus.granted;
+  final audioStatus = await Permission.audio.status;
+  if (audioStatus.isGranted) return PermissionStatus.granted;
+  final storageStatus = await Permission.storage.status;
+  if (storageStatus.isGranted) return PermissionStatus.granted;
+  return audioStatus.isPermanentlyDenied || storageStatus.isPermanentlyDenied
+      ? PermissionStatus.permanentlyDenied
+      : audioStatus;
+}
 
 /// Shows the system permission dialog if needed and returns the new status.
-///
-/// If status comes back as [PermissionStatus.permanentlyDenied], the caller
-/// should offer a button that calls [openPermissionSettings].
-Future<PermissionStatus> requestAudioPermission() =>
-    _effectiveAudioPermission.request();
+Future<PermissionStatus> requestAudioPermission() async {
+  if (!Platform.isAndroid) return PermissionStatus.granted;
+  final audioStatus = await Permission.audio.request();
+  if (audioStatus.isGranted) return PermissionStatus.granted;
+  final storageStatus = await Permission.storage.request();
+  return storageStatus.isGranted ? PermissionStatus.granted : audioStatus;
+}
 
 /// Opens the app's system-settings page so the user can manually grant the
 /// permission after "don't ask again" was chosen.

@@ -70,6 +70,9 @@ Task 1.0 DONE (Permission layer): AndroidManifest.xml updated with READ_MEDIA_AU
 Task 1.2 DONE (Drift Local Database): Defined Songs table schema (id, title, artist, album, duration,
   filePath, albumArtPath, isFavorite) in lib/core/database/app_database.dart; configured AppDatabase
   with NativeDatabase.createInBackground and appDatabaseProvider.
-Next: Task 1.3 – MediaStore audio scanner service to populate Drift database on permission grant.
+Task 1.3 DONE (Audio Scanning Service): Native MediaStore query via MethodChannel in MainActivity.kt;
+  AudioScannerService and audioScannerStateProvider in lib/features/library/data/audio_scanner_service.dart;
+  batch deduplicated upsert into Drift Songs table; reactive localSongsStreamProvider; HomeScreen UI trigger.
+Next: Task 1.4 – Library UI (Song list with Glassmorphic tiles, search, sorting, album art thumbnails).
 Roadmap: 0 Setup ✓, 1 Core and UI, 2 Streaming and audio, 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
