@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/library/data/permission_service.dart';
+import '../features/library/presentation/library_screen.dart';
 import '../features/library/presentation/permission_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/permission',
         builder: (context, state) => const PermissionScreen(),
+      ),
+      GoRoute(
+        path: '/library',
+        builder: (context, state) => const LibraryScreen(),
       ),
     ],
   );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/app_flavor.dart';
 import '../../../app/theme.dart';
@@ -24,6 +25,11 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Spinora'),
         actions: [
+          IconButton(
+            onPressed: () => context.push('/library'),
+            icon: const Icon(Icons.library_music_rounded),
+            tooltip: 'View Library',
+          ),
           _FlavorBadge(flavor: flavor),
           const SizedBox(width: 16),
         ],
@@ -155,6 +161,29 @@ class HomeScreen extends ConsumerWidget {
                                   ? 'Scanning Storage...'
                                   : 'Scan Local Music',
                             ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: () => context.push('/library'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.cyanAccent,
+                              side: BorderSide(
+                                color:
+                                    AppColors.cyanAccent.withValues(alpha: 0.3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.queue_music_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('View Music Library'),
                           ),
                           if (scanState.errorMessage != null) ...[
                             const SizedBox(height: 8),
