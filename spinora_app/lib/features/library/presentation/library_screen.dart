@@ -7,6 +7,8 @@ import '../../../app/theme.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
+import '../../player/application/player_controller.dart';
+import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
 
 /// Screen displaying all local audio tracks saved in the Drift database.
@@ -17,6 +19,7 @@ class LibraryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(localSongsStreamProvider);
     final scanState = ref.watch(audioScannerStateProvider);
+    final playerState = ref.watch(playerControllerProvider);
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -180,13 +183,21 @@ class LibraryScreen extends ConsumerWidget {
                       }
 
                       return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 80),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          playerState.hasTrack ? 110 : 80,
+                        ),
                         itemCount: songs.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final song = songs[index];
-                          return _SongListTile(song: song);
+                          return _SongListTile(
+                            song: song,
+                            songs: songs,
+                          );
                         },
                       );
                     },
@@ -212,62 +223,89 @@ class LibraryScreen extends ConsumerWidget {
               ],
             ),
           ),
+
+          // Floating Glass Mini-Player (bottom anchored)
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: MiniPlayer(bottomPadding: 16),
+            ),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: scanState.isScanning
-            ? null
-            : () => ref.read(audioScannerStateProvider.notifier).scan(),
-        backgroundColor: AppColors.purpleAccent,
-        foregroundColor: Colors.white,
-        icon: scanState.isScanning
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.refresh_rounded),
-        label: Text(
-          scanState.isScanning ? 'Scanning...' : 'Scan Music',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
+      floatingActionButton: playerState.hasTrack
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: scanState.isScanning
+                  ? null
+                  : () => ref.read(audioScannerStateProvider.notifier).scan(),
+              backgroundColor: AppColors.purpleAccent,
+              foregroundColor: Colors.white,
+              icon: scanState.isScanning
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                scanState.isScanning ? 'Scanning...' : 'Scan Music',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
     );
   }
 }
 
-/// Song item tile formatted with frosted glass styling and performance optimizations.
-class _SongListTile extends StatelessWidget {
-  const _SongListTile({required this.song});
+/// Song item tile formatted with frosted glass styling and active track highlights.
+class _SongListTile extends ConsumerWidget {
+  const _SongListTile({
+    required this.song,
+    required this.songs,
+  });
 
   final Song song;
+  final List<Song> songs;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(playerControllerProvider);
+    final isCurrent = playerState.currentTrack?.id == 'local_${song.id}';
+    final isPlaying = isCurrent && playerState.isPlaying;
     final tt = Theme.of(context).textTheme;
 
     return Material(
-      color: Colors.white.withValues(alpha: 0.05),
+      color: isCurrent
+          ? AppColors.purpleAccent.withValues(alpha: 0.15)
+          : Colors.white.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.08),
-          width: 1,
+          color: isCurrent
+              ? AppColors.cyanAccent.withValues(alpha: 0.4)
+              : Colors.white.withValues(alpha: 0.08),
+          width: isCurrent ? 1.5 : 1,
         ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: _AlbumArtThumbnail(albumArtPath: song.albumArtPath),
+        leading: _AlbumArtThumbnail(
+          albumArtPath: song.albumArtPath,
+          isCurrent: isCurrent,
+        ),
         title: Text(
           song.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: tt.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: isCurrent ? AppColors.cyanAccent : Colors.white,
           ),
         ),
         subtitle: Text(
@@ -278,15 +316,38 @@ class _SongListTile extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.6),
           ),
         ),
-        trailing: Text(
-          formatDuration(song.duration),
-          style: tt.labelSmall?.copyWith(
-            color: AppColors.cyanAccent.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w500,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isCurrent) ...[
+              Icon(
+                isPlaying
+                    ? Icons.graphic_eq_rounded
+                    : Icons.pause_circle_outline_rounded,
+                color: AppColors.cyanAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              formatDuration(song.duration),
+              style: tt.labelSmall?.copyWith(
+                color: isCurrent
+                    ? AppColors.cyanAccent
+                    : AppColors.cyanAccent.withValues(alpha: 0.8),
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
         onTap: () {
-          // Track selection will connect to the Audio player in Phase 2
+          if (isCurrent) {
+            ref.read(playerControllerProvider.notifier).togglePlayPause();
+          } else {
+            ref
+                .read(playerControllerProvider.notifier)
+                .playSong(song, songsQueue: songs);
+          }
         },
       ),
     );
@@ -295,9 +356,13 @@ class _SongListTile extends StatelessWidget {
 
 /// Thumbnail for album artwork with gradient fallback icon.
 class _AlbumArtThumbnail extends StatelessWidget {
-  const _AlbumArtThumbnail({this.albumArtPath});
+  const _AlbumArtThumbnail({
+    this.albumArtPath,
+    this.isCurrent = false,
+  });
 
   final String? albumArtPath;
+  final bool isCurrent;
 
   @override
   Widget build(BuildContext context) {
@@ -314,8 +379,7 @@ class _AlbumArtThumbnail extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                _fallbackCover(size),
+            errorBuilder: (context, error, stackTrace) => _fallbackCover(size),
           ),
         );
       }
@@ -330,10 +394,11 @@ class _AlbumArtThumbnail extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        gradient: AppColors.purpleGradient,
+        gradient: isCurrent ? null : AppColors.purpleGradient,
+        color: isCurrent ? AppColors.purpleAccent : null,
       ),
-      child: const Icon(
-        Icons.music_note_rounded,
+      child: Icon(
+        isCurrent ? Icons.music_note_rounded : Icons.music_note_outlined,
         color: Colors.white,
         size: 24,
       ),

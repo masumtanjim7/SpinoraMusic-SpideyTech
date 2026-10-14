@@ -76,6 +76,10 @@ Task 1.3 DONE (Audio Scanning Service): Native MediaStore query via MethodChanne
 Task 1.4 DONE (Local Music Library UI): Glassmorphic LibraryScreen (lib/features/library/presentation/library_screen.dart)
   with live reactive song list, duration formatting, album art fallback, empty state GlassCard, manual scan FAB/app bar trigger,
   and /library route integrated in GoRouter.
-Next: Task 2.1 – Audio Service & Player Engine (just_audio + audio_service background playback handler).
-Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio, 3 AI, 4 Local badges and themes (optional sync),
+Task 2.1 DONE (Audio Playback Engine & Glass Mini-Player): Canonical Track model (lib/core/audio/track.dart);
+  AudioSession focus management; PlayerController wrapping just_audio AudioPlayer with queue, play/pause, seeking, next/prev;
+  Floating Glass Mini-Player (lib/features/player/presentation/mini_player.dart) with neon progress bar, album art,
+  and responsive controls; embedded into LibraryScreen and HomeScreen.
+Next: Task 2.2 – Full-Screen Player Modal & Lockscreen Controls (audio_service background notification handler, lyrics/artwork hero animation).
+Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

@@ -1,0 +1,101 @@
+import 'package:flutter/foundation.dart';
+
+import '../database/app_database.dart';
+
+/// Origin of a playable track in Spinora.
+enum TrackSource {
+  local,
+  audius,
+  online,
+}
+
+/// The common, immutable track model used by the player and queues.
+///
+/// Strictly adheres to Rule 2 in `PROJECT_CONTEXT.md`:
+/// "Every track, local or online, uses the common Track model
+/// (id, title, artist, album, durationMs, artworkUri, source, uri).
+/// The player only knows Track."
+@immutable
+class Track {
+  const Track({
+    required this.id,
+    required this.title,
+    required this.artist,
+    this.album,
+    required this.durationMs,
+    this.artworkUri,
+    required this.source,
+    required this.uri,
+  });
+
+  /// Unique identifier (e.g. `local_123` or online track ID).
+  final String id;
+
+  /// Track display title.
+  final String title;
+
+  /// Artist name.
+  final String artist;
+
+  /// Optional album name.
+  final String? album;
+
+  /// Duration in milliseconds.
+  final int durationMs;
+
+  /// URI string for artwork (local file path or remote HTTP URL).
+  final String? artworkUri;
+
+  /// Source of the track (local or online provider).
+  final TrackSource source;
+
+  /// Playable URI string (file path URI or remote audio stream URL).
+  final String uri;
+
+  /// Creates a [Track] from a Drift [Song] record.
+  factory Track.fromSong(Song song) {
+    return Track(
+      id: 'local_${song.id}',
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      durationMs: song.duration,
+      artworkUri: song.albumArtPath,
+      source: TrackSource.local,
+      uri: Uri.file(song.filePath).toString(),
+    );
+  }
+
+  Track copyWith({
+    String? id,
+    String? title,
+    String? artist,
+    String? album,
+    int? durationMs,
+    String? artworkUri,
+    TrackSource? source,
+    String? uri,
+  }) {
+    return Track(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      album: album ?? this.album,
+      durationMs: durationMs ?? this.durationMs,
+      artworkUri: artworkUri ?? this.artworkUri,
+      source: source ?? this.source,
+      uri: uri ?? this.uri,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Track &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          uri == other.uri;
+
+  @override
+  int get hashCode => id.hashCode ^ uri.hashCode;
+}

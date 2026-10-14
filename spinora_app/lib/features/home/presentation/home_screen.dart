@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../shared/glass_card.dart';
 
 import '../../library/data/audio_scanner_service.dart';
+import '../../player/presentation/mini_player.dart';
 
 /// Home screen showing the Spinora glassmorphism design system.
 class HomeScreen extends ConsumerWidget {
@@ -202,6 +203,17 @@ class HomeScreen extends ConsumerWidget {
                   const Spacer(),
                 ],
               ),
+            ),
+          ),
+
+          // Floating Glass Mini-Player (bottom anchored)
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: MiniPlayer(bottomPadding: 16),
             ),
           ),
         ],
