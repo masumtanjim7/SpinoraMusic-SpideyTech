@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ── Audio / Storage permissions ────────────────────────────────────── -->
+    <!-- Android 13+ (API 33): granular media permission for audio files. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Android 9–12 (API 28–32): broad read permission for local music. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Android ≤9 (API ≤29): write needed for legacy cache/playlist export. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <!-- ─────────────────────────────────────────────────────────────────── -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
