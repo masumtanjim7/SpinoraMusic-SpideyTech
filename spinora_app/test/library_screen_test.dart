@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -282,5 +283,65 @@ void main() {
     expect(find.text('All Songs'), findsOneWidget);
     expect(find.text('Playlists'), findsOneWidget);
     expect(find.text('Favorites'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Creating playlist via dialog disposes controller cleanly without error',
+      (tester) async {
+    final memoryDb = AppDatabase(NativeDatabase.memory());
+    addTearDown(() => memoryDb.close());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(memoryDb),
+          localSongsStreamProvider.overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap Playlists tab
+    await tester.tap(find.text('Playlists'));
+    await tester.pumpAndSettle();
+
+    // Tap "Create New Playlist" card
+    await tester.tap(find.text('Create New Playlist'));
+    await tester.pumpAndSettle();
+
+    // Verify dialog is shown
+    expect(find.text('New Playlist'), findsOneWidget);
+    final dialogTextField = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    expect(dialogTextField, findsOneWidget);
+
+    // Enter playlist name
+    await tester.enterText(dialogTextField, 'Synthwave Vibes');
+    await tester.pumpAndSettle();
+
+    // Tap "Create" button
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    // Verify dialog closed with NO assertion error or crash
+    expect(tester.takeException(), isNull);
+    expect(find.text('New Playlist'), findsNothing);
+
+    // Verify playlist was inserted into database
+    final playlists = await memoryDb.select(memoryDb.playlists).get();
+    expect(playlists.length, 1);
+    expect(playlists.first.name, 'Synthwave Vibes');
+
+    // Dismiss any snackbar timer cleanly
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
   });
 }

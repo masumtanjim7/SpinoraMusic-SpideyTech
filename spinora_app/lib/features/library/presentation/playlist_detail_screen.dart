@@ -519,8 +519,11 @@ class PlaylistDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
-    showDialog<void>(
+  Future<void> _showDeleteConfirmation(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -544,23 +547,14 @@ class PlaylistDetailScreen extends ConsumerWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: Text(
                 'Cancel',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
               ),
             ),
             FilledButton(
-              onPressed: () async {
-                final db = ref.read(appDatabaseProvider);
-                await db.deletePlaylist(playlist.id);
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                }
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.redAccent,
               ),
@@ -570,5 +564,13 @@ class PlaylistDetailScreen extends ConsumerWidget {
         );
       },
     );
+
+    if (confirmed == true && context.mounted) {
+      final db = ref.read(appDatabaseProvider);
+      await db.deletePlaylist(playlist.id);
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 }
