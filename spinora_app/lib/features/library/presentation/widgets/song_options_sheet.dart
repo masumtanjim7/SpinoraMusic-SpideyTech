@@ -1,0 +1,560 @@
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../app/theme.dart';
+import '../../../../core/database/app_database.dart';
+import '../../../player/application/player_controller.dart';
+import 'song_artwork.dart';
+
+/// Shows the glassmorphic song options sheet with options to "Play Next",
+/// "Add to Playlist", and "Toggle Favorite".
+void showSongOptionsSheet({
+  required BuildContext context,
+  required Song song,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => _SongOptionsSheet(song: song),
+  );
+}
+
+class _SongOptionsSheet extends ConsumerWidget {
+  const _SongOptionsSheet({required this.song});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tt = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13111C).withValues(alpha: 0.95),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 30,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag pill handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Song Header Info
+            Row(
+              children: [
+                SongArtwork.fromSong(
+                  song,
+                  size: 52,
+                  borderRadius: BorderRadius.circular(12),
+                  iconSize: 26,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        song.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 18),
+            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            const SizedBox(height: 8),
+
+            // Option 1: Play Next
+            _SheetActionTile(
+              icon: Icons.playlist_play_rounded,
+              iconColor: AppColors.cyanAccent,
+              title: 'Play Next',
+              subtitle: 'Add as the next track in the current queue',
+              onTap: () {
+                Navigator.of(context).pop();
+                ref.read(playerControllerProvider.notifier).playSongNext(song);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF1E1A2E),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: AppColors.cyanAccent.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    content: Text(
+                      'Playing next: "${song.title}"',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+
+            // Option 2: Add to Playlist
+            _SheetActionTile(
+              icon: Icons.playlist_add_rounded,
+              iconColor: AppColors.purpleAccent,
+              title: 'Add to Playlist',
+              subtitle: 'Select or create a custom playlist',
+              onTap: () {
+                Navigator.of(context).pop();
+                showAddToPlaylistSheet(context: context, song: song);
+              },
+            ),
+
+            // Option 3: Toggle Favorite
+            _SheetActionTile(
+              icon: song.isFavorite
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              iconColor: Colors.pinkAccent,
+              title: song.isFavorite
+                  ? 'Remove from Favorites'
+                  : 'Add to Favorites',
+              subtitle: song.isFavorite
+                  ? 'Remove from your starred tracks'
+                  : 'Save to your favorites collection',
+              onTap: () async {
+                Navigator.of(context).pop();
+                final db = ref.read(appDatabaseProvider);
+                await (db.update(db.songs)..where((s) => s.id.equals(song.id)))
+                    .write(
+                  SongsCompanion(isFavorite: Value(!song.isFavorite)),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetActionTile extends StatelessWidget {
+  const _SheetActionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: iconColor.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 12,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Displays the "Add to Playlist" sheet where the user can pick a playlist
+/// or create a new one.
+void showAddToPlaylistSheet({
+  required BuildContext context,
+  required Song song,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => _AddToPlaylistModal(song: song),
+  );
+}
+
+class _AddToPlaylistModal extends ConsumerWidget {
+  const _AddToPlaylistModal({required this.song});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlistsAsync = ref.watch(allPlaylistsStreamProvider);
+    final tt = Theme.of(context).textTheme;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13111C).withValues(alpha: 0.95),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 30,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Add to Playlist',
+                  style: tt.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    showCreatePlaylistDialog(
+                      context: context,
+                      ref: ref,
+                      songIdToInsert: song.id,
+                    );
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('New Playlist'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.cyanAccent,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            Flexible(
+              child: playlistsAsync.when(
+                data: (playlists) {
+                  if (playlists.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.queue_music_rounded,
+                              size: 44,
+                              color: Colors.white.withValues(alpha: 0.35),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No Playlists Found',
+                              style: tt.titleSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Tap "+ New Playlist" to create your first playlist.',
+                              style: tt.bodySmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.55),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: playlists.length,
+                    separatorBuilder: (context, index) =>
+                        Divider(color: Colors.white.withValues(alpha: 0.05)),
+                    itemBuilder: (context, index) {
+                      final playlist = playlists[index];
+                      return ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.purpleGradient,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.queue_music_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          playlist.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: Colors.white38,
+                          size: 14,
+                        ),
+                        onTap: () async {
+                          final db = ref.read(appDatabaseProvider);
+                          await db.addSongToPlaylist(
+                            playlistId: playlist.id,
+                            songId: song.id,
+                          );
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF1E1A2E),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: AppColors.cyanAccent
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                content: Text(
+                                  'Added "${song.title}" to ${playlist.name}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(
+                      color: AppColors.purpleAccent,
+                    ),
+                  ),
+                ),
+                error: (error, stackTrace) => Center(
+                  child: Text(
+                    'Error: $error',
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Displays a glassmorphic dialog to create a new custom playlist.
+Future<int?> showCreatePlaylistDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  int? songIdToInsert,
+}) async {
+  final textController = TextEditingController();
+
+  final result = await showDialog<int>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF181528),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+            color: AppColors.purpleAccent.withValues(alpha: 0.4),
+          ),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.purpleAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.add_to_photos_rounded,
+                color: AppColors.cyanAccent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'New Playlist',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          cursorColor: AppColors.cyanAccent,
+          decoration: InputDecoration(
+            hintText: 'Enter playlist title...',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.06),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: AppColors.cyanAccent,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = textController.text.trim();
+              if (name.isEmpty) return;
+
+              final db = ref.read(appDatabaseProvider);
+              final newId = await db.createPlaylist(name);
+
+              if (songIdToInsert != null) {
+                await db.addSongToPlaylist(
+                  playlistId: newId,
+                  songId: songIdToInsert,
+                );
+              }
+
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop(newId);
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.purpleAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Create'),
+          ),
+        ],
+      );
+    },
+  );
+
+  textController.dispose();
+  return result;
+}

@@ -7,6 +7,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
+import 'widgets/up_next_queue_sheet.dart';
 
 /// Full-screen dark glassmorphic Now Playing modal sheet.
 class NowPlayingScreen extends ConsumerStatefulWidget {
@@ -117,22 +118,44 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () => ref
-                                    .read(playerControllerProvider.notifier)
-                                    .toggleFavorite(),
-                                icon: Icon(
-                                  track.isFavorite
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
-                                  color: track.isFavorite
-                                      ? AppColors.cyanAccent
-                                      : Colors.white.withValues(alpha: 0.7),
-                                  size: 26,
-                                ),
-                                tooltip: track.isFavorite
-                                    ? 'Remove from Favorites'
-                                    : 'Add to Favorites',
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      showModalBottomSheet<void>(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        isScrollControlled: true,
+                                        builder: (context) =>
+                                            const UpNextQueueSheet(),
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.queue_music_rounded,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                    tooltip: 'Up Next Queue',
+                                  ),
+                                  IconButton(
+                                    onPressed: () => ref
+                                        .read(playerControllerProvider.notifier)
+                                        .toggleFavorite(),
+                                    icon: Icon(
+                                      track.isFavorite
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      color: track.isFavorite
+                                          ? AppColors.cyanAccent
+                                          : Colors.white.withValues(alpha: 0.7),
+                                      size: 26,
+                                    ),
+                                    tooltip: track.isFavorite
+                                        ? 'Remove from Favorites'
+                                        : 'Add to Favorites',
+                                  ),
+                                ],
                               ),
                             ],
                           ),

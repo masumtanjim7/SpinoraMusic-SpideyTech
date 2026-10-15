@@ -31,4 +31,64 @@ void main() {
     expect(allSongs.first.duration, 180000);
     expect(allSongs.first.isFavorite, false);
   });
+
+  test('can create, watch, add songs, and delete custom playlists', () async {
+    // 1. Insert two songs
+    final song1Id = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Song Alpha',
+            artist: 'Artist 1',
+            duration: 120000,
+            filePath: '/music/alpha.mp3',
+          ),
+        );
+    final song2Id = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Song Beta',
+            artist: 'Artist 2',
+            duration: 150000,
+            filePath: '/music/beta.mp3',
+          ),
+        );
+
+    // 2. Create playlist
+    final playlistId = await db.createPlaylist('Gym Workout');
+    expect(playlistId, isPositive);
+
+    final playlists = await db.watchAllPlaylists().first;
+    expect(playlists.length, 1);
+    expect(playlists.first.name, 'Gym Workout');
+
+    // 3. Add songs to playlist
+    await db.addSongToPlaylist(playlistId: playlistId, songId: song1Id);
+    await db.addSongToPlaylist(playlistId: playlistId, songId: song2Id);
+
+    // Verify songs in playlist
+    final playlistSongs = await db.watchSongsInPlaylist(playlistId).first;
+    expect(playlistSongs.length, 2);
+    expect(playlistSongs.map((s) => s.title), containsAll(['Song Alpha', 'Song Beta']));
+
+    // Verify song count
+    final count = await db.watchPlaylistSongCount(playlistId).first;
+    expect(count, 2);
+
+    // 4. Remove one song from playlist
+    await db.removeSongFromPlaylist(playlistId: playlistId, songId: song1Id);
+    final remainingSongs = await db.watchSongsInPlaylist(playlistId).first;
+    expect(remainingSongs.length, 1);
+    expect(remainingSongs.first.id, song2Id);
+
+    // Verify song still exists in library
+    final allSongs = await db.select(db.songs).get();
+    expect(allSongs.length, 2);
+
+    // 5. Delete playlist
+    await db.deletePlaylist(playlistId);
+    final remainingPlaylists = await db.watchAllPlaylists().first;
+    expect(remainingPlaylists, isEmpty);
+
+    // Songs in library are intact
+    final songsAfterDelete = await db.select(db.songs).get();
+    expect(songsAfterDelete.length, 2);
+  });
 }

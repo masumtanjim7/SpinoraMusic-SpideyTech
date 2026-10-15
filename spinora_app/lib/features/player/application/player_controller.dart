@@ -262,6 +262,158 @@ class PlayerController extends Notifier<PlayerState> {
     return playTrack(track, queue: queue);
   }
 
+  /// Plays an entire list of [Song]s as a playlist, starting from [initialIndex].
+  Future<void> playPlaylist(List<Song> songs, {int initialIndex = 0}) async {
+    if (songs.isEmpty) return;
+    final tracks = songs.map(Track.fromSong).toList();
+    final safeIndex = initialIndex.clamp(0, tracks.length - 1);
+    await playTrack(tracks[safeIndex], queue: tracks);
+  }
+
+  /// Inserts a [Track] directly after the currently playing song in the queue.
+  Future<void> playNext(Track track) async {
+    if (state.queue.isEmpty) {
+      await playTrack(track);
+      return;
+    }
+
+    final newQueue = List<Track>.from(state.queue);
+    final existingIndex = newQueue.indexWhere((t) => t.id == track.id);
+    if (existingIndex == state.currentIndex) {
+      return; // Already playing this track
+    }
+
+    if (existingIndex != -1) {
+      newQueue.removeAt(existingIndex);
+    }
+
+    final currentTrack = state.currentTrack;
+    final newCurrentIndex = currentTrack != null
+        ? newQueue.indexWhere((t) => t.id == currentTrack.id)
+        : state.currentIndex;
+    final insertIndex = (newCurrentIndex + 1).clamp(0, newQueue.length);
+    newQueue.insert(insertIndex, track);
+
+    state = state.copyWith(
+      queue: List.unmodifiable(newQueue),
+      currentIndex: newCurrentIndex,
+    );
+
+    try {
+      final sources = newQueue.map(_buildAudioSource).toList();
+      await player.setAudioSources(
+        sources,
+        initialIndex: newCurrentIndex,
+        initialPosition: state.position,
+      );
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error updating audio sources on playNext: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'playNext audio sources error',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Convenience method to insert a [Song] as the next track in the queue.
+  Future<void> playSongNext(Song song) {
+    return playNext(Track.fromSong(song));
+  }
+
+  /// Directly seeks and jumps to the queued track at [index].
+  Future<void> jumpToIndex(int index) async {
+    if (index < 0 || index >= state.queue.length) return;
+    if (index == state.currentIndex) return;
+
+    final targetTrack = state.queue[index];
+    state = state.copyWith(
+      currentIndex: index,
+      currentTrack: targetTrack,
+    );
+
+    try {
+      await player.seek(Duration.zero, index: index);
+      if (!state.isPlaying) {
+        await player.play();
+      }
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error jumping to index $index: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'jumpToIndex error',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Removes the track at [index] from the active playback queue.
+  Future<void> removeFromQueue(int index) async {
+    if (index < 0 || index >= state.queue.length) return;
+
+    final newQueue = List<Track>.from(state.queue);
+    newQueue.removeAt(index);
+
+    if (newQueue.isEmpty) {
+      await stop();
+      return;
+    }
+
+    int newCurrentIndex = state.currentIndex;
+    Track? newCurrentTrack = state.currentTrack;
+
+    if (index == state.currentIndex) {
+      newCurrentIndex = index < newQueue.length ? index : newQueue.length - 1;
+      newCurrentTrack = newQueue[newCurrentIndex];
+      state = state.copyWith(
+        queue: List.unmodifiable(newQueue),
+        currentIndex: newCurrentIndex,
+        currentTrack: newCurrentTrack,
+      );
+      try {
+        final sources = newQueue.map(_buildAudioSource).toList();
+        await player.setAudioSources(sources, initialIndex: newCurrentIndex);
+        if (state.isPlaying) {
+          await player.play();
+        }
+      } catch (e, st) {
+        debugPrint('[PlayerController] Error removing active track: $e');
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          st,
+          reason: 'removeFromQueue active error',
+          fatal: false,
+        );
+      }
+    } else {
+      if (index < state.currentIndex) {
+        newCurrentIndex = state.currentIndex - 1;
+      }
+      state = state.copyWith(
+        queue: List.unmodifiable(newQueue),
+        currentIndex: newCurrentIndex,
+      );
+      try {
+        final sources = newQueue.map(_buildAudioSource).toList();
+        await player.setAudioSources(
+          sources,
+          initialIndex: newCurrentIndex,
+          initialPosition: state.position,
+        );
+      } catch (e, st) {
+        debugPrint('[PlayerController] Error updating queue sources on remove: $e');
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          st,
+          reason: 'removeFromQueue sync error',
+          fatal: false,
+        );
+      }
+    }
+  }
+
   /// Toggles between play and pause.
   Future<void> togglePlayPause() async {
     if (state.isPlaying) {

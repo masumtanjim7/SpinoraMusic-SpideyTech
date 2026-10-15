@@ -98,6 +98,8 @@ void main() {
         overrides: [
           localSongsStreamProvider
               .overrideWith((ref) => Stream.value(fakeSongs)),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
         ],
         child: const MaterialApp(
           home: LibraryScreen(),
@@ -134,5 +136,53 @@ void main() {
     expect(find.text('Cyberpunk Beat'), findsOneWidget);
     expect(find.text('Acoustic Sunrise'), findsNothing);
     expect(find.text('1 / 2'), findsOneWidget);
+
+    // 4. Switch to Playlists tab
+    await tester.tap(find.text('Playlists'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create New Playlist'), findsOneWidget);
+    expect(find.text('No Playlists Created Yet'), findsOneWidget);
+  });
+
+  testWidgets('Tapping 3-dot song options opens song options bottom sheet',
+      (tester) async {
+    final fakeSongs = [
+      const Song(
+        id: 1,
+        title: 'Action Theme',
+        artist: 'Composer X',
+        album: 'Soundtrack 1',
+        duration: 180000,
+        filePath: '/music/theme.mp3',
+        isFavorite: false,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider
+              .overrideWith((ref) => Stream.value(fakeSongs)),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Find and tap the 3-dot menu on the song tile
+    final moreButton = find.byIcon(Icons.more_vert_rounded);
+    expect(moreButton, findsOneWidget);
+
+    await tester.tap(moreButton);
+    await tester.pumpAndSettle();
+
+    // Verify sheet actions
+    expect(find.text('Play Next'), findsOneWidget);
+    expect(find.text('Add to Playlist'), findsOneWidget);
+    expect(find.text('Add to Favorites'), findsOneWidget);
   });
 }

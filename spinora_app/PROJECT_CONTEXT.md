@@ -95,6 +95,14 @@ Task 2.2c DONE (Real Album Artwork Thumbnails, Instant Search & Favorites Filter
   integrated into LibraryScreen song rows, MiniPlayer leading thumbnail, and NowPlayingScreen centerpiece card;
   Glassmorphic search bar with real-time text query filtering (title, artist, album); filter chips for "All Songs" and
   "Favorites" with track counter badge; reactive Drift update synchronization when favorite heart icon is tapped.
+Task 2.2d DONE (Custom Playlists & Up-Next Playback Queue Management):
+  Drift database schema updated to version 2 with safe `MigrationStrategy` (onCreate + onUpgrade) adding `Playlists`
+  and `PlaylistSongs` tables while preserving existing indexed tracks; reactive query streams and Riverpod providers
+  for playlists and song counts; Playlists filter tab in `LibraryScreen` with glassmorphic "+ New Playlist" creation dialog,
+  playlist collection view, and dedicated `PlaylistDetailScreen` with prominent "Play All" and "Shuffle" actions;
+  3-dot trailing menu and long-press song options sheet ("Play Next", "Add to Playlist", "Toggle Favorite");
+  dark glassmorphic "Up Next" queue modal sheet in `NowPlayingScreen` with current track highlight badge, jump-to-track tap,
+  and swipe/tap track removal; 0 warnings with `.withValues(alpha: ...)`.
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

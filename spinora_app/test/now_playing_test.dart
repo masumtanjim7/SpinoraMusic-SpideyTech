@@ -62,6 +62,15 @@ void main() {
     expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
     expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
     expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
+
+    // Verify Queue button is present
+    expect(find.byIcon(Icons.queue_music_rounded), findsOneWidget);
+
+    // Tap Queue button to open UpNextQueueSheet
+    await tester.tap(find.byIcon(Icons.queue_music_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Up Next Queue'), findsOneWidget);
   });
 }
 
