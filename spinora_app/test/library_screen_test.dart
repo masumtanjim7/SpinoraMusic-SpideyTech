@@ -185,4 +185,102 @@ void main() {
     expect(find.text('Add to Playlist'), findsOneWidget);
     expect(find.text('Add to Favorites'), findsOneWidget);
   });
+
+  testWidgets(
+      'Filter chips are selectable even when library is empty and tapping playlist opens PlaylistDetailScreen',
+      (tester) async {
+    final fakePlaylists = [
+      Playlist(
+        id: 1,
+        name: 'Cyberpunk Mix',
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider.overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value(fakePlaylists)),
+          playlistSongCountStreamProvider(1)
+              .overrideWith((ref) => Stream.value(0)),
+          playlistSongsStreamProvider(1)
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify filter bar is visible even with empty songs
+    expect(find.text('All Songs'), findsOneWidget);
+    expect(find.text('Playlists'), findsOneWidget);
+    expect(find.text('Favorites'), findsOneWidget);
+
+    // Tap 'Playlists' filter chip
+    await tester.tap(find.text('Playlists'));
+    await tester.pumpAndSettle();
+
+    // Verify playlists view is shown with the playlist card
+    expect(find.text('Create New Playlist'), findsOneWidget);
+    expect(find.text('Cyberpunk Mix'), findsOneWidget);
+    expect(find.text('0 tracks'), findsOneWidget);
+
+    // Tap the playlist card
+    await tester.tap(find.text('Cyberpunk Mix'));
+    await tester.pumpAndSettle();
+
+    // Verify PlaylistDetailScreen is pushed with "Play All" button
+    expect(find.text('Play All'), findsOneWidget);
+    expect(find.text('Shuffle'), findsOneWidget);
+    expect(find.text('Empty Playlist'), findsOneWidget);
+  });
+
+  testWidgets('LibraryScreen does not overflow on a narrow 320px screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final fakeSongs = [
+      const Song(
+        id: 1,
+        title: 'Very Long Synthwave Song Title That Could Cause Overflow Issues',
+        artist: 'Extremely Long Artist Name Feat. Collaborator',
+        album: 'Album With An Unusually Long Title To Stress Layout',
+        duration: 320000,
+        filePath: '/music/long.mp3',
+        isFavorite: true,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider
+              .overrideWith((ref) => Stream.value(fakeSongs)),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // No overflow exception should occur
+    expect(tester.takeException(), isNull);
+    expect(find.text('All Songs'), findsOneWidget);
+    expect(find.text('Playlists'), findsOneWidget);
+    expect(find.text('Favorites'), findsOneWidget);
+  });
 }

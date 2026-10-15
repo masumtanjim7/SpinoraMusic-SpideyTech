@@ -257,8 +257,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                   ),
 
-                // Search Bar and Filter Chips (shown when library has songs or was already loaded)
-                if (allSongs.isNotEmpty || isSearchingOrFiltering) ...[
+                // Search Bar (shown when library has songs, searching, or on playlists tab)
+                if (allSongs.isNotEmpty ||
+                    isSearchingOrFiltering ||
+                    selectedFilter == LibraryFilter.playlists) ...[
                   _GlassSearchBar(
                     controller: _searchController,
                     onChanged: (val) {
@@ -271,16 +273,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ref.read(librarySearchQueryProvider.notifier).clear();
                     },
                   ),
-                  _LibraryFilterBar(
-                    selectedFilter: selectedFilter,
-                    onFilterSelected: (f) {
-                      ref.read(libraryFilterProvider.notifier).setFilter(f);
-                    },
-                    totalCount: allSongs.length,
-                    filteredCount: filteredSongs.length,
-                    isSearchingOrFiltering: isSearchingOrFiltering,
-                  ),
                 ],
+
+                // Filter Bar (always visible so user can freely switch tabs)
+                _LibraryFilterBar(
+                  selectedFilter: selectedFilter,
+                  onFilterSelected: (f) {
+                    setState(() {
+                      ref.read(libraryFilterProvider.notifier).setFilter(f);
+                    });
+                  },
+                  totalCount: allSongs.length,
+                  filteredCount: filteredSongs.length,
+                  isSearchingOrFiltering: isSearchingOrFiltering,
+                ),
 
                 // Songs List, Playlists, or State Placeholders
                 Expanded(
@@ -288,7 +294,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ? const _PlaylistsView()
                       : allSongsAsync.when(
                     data: (songs) {
-                      if (songs.isEmpty) {
+                      if (songs.isEmpty && selectedFilter == LibraryFilter.all) {
                         return _EmptyLibraryView(
                           isScanning: scanState.isScanning,
                           onScanPressed: () => ref
@@ -307,9 +313,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             ref
                                 .read(librarySearchQueryProvider.notifier)
                                 .clear();
-                            ref
-                                .read(libraryFilterProvider.notifier)
-                                .setFilter(LibraryFilter.all);
+                            setState(() {
+                              ref
+                                  .read(libraryFilterProvider.notifier)
+                                  .setFilter(LibraryFilter.all);
+                            });
                           },
                         );
                       }
@@ -477,83 +485,94 @@ class _LibraryFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
-      child: Row(
-        children: [
-          _FilterChip(
-            label: 'All Songs',
-            icon: Icons.music_note_rounded,
-            isSelected: selectedFilter == LibraryFilter.all,
-            onTap: () => onFilterSelected(LibraryFilter.all),
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: 'Playlists',
-            icon: Icons.queue_music_rounded,
-            isSelected: selectedFilter == LibraryFilter.playlists,
-            onTap: () => onFilterSelected(LibraryFilter.playlists),
-            activeColor: AppColors.purpleAccent,
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: 'Favorites',
-            icon: Icons.favorite_rounded,
-            isSelected: selectedFilter == LibraryFilter.favorites,
-            onTap: () => onFilterSelected(LibraryFilter.favorites),
-            activeColor: Colors.pinkAccent,
-          ),
-          const Spacer(),
-          // Counter badge
-          if (selectedFilter == LibraryFilter.playlists)
-            Consumer(
-              builder: (context, ref, _) {
-                final playlists =
-                    ref.watch(allPlaylistsStreamProvider).asData?.value ?? [];
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.purpleAccent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.purpleAccent.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    '${playlists.length} playlists',
-                    style: const TextStyle(
-                      color: AppColors.purpleAccent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                );
-              },
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.cyanAccent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.cyanAccent.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                isSearchingOrFiltering
-                    ? '$filteredCount / $totalCount'
-                    : '$totalCount tracks',
-                style: const TextStyle(
-                  color: AppColors.cyanAccent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
-              ),
+      padding: const EdgeInsets.only(top: 6, bottom: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _FilterChip(
+              label: 'All Songs',
+              icon: Icons.music_note_rounded,
+              isSelected: selectedFilter == LibraryFilter.all,
+              onTap: () => onFilterSelected(LibraryFilter.all),
             ),
-        ],
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'Playlists',
+              icon: Icons.queue_music_rounded,
+              isSelected: selectedFilter == LibraryFilter.playlists,
+              onTap: () => onFilterSelected(LibraryFilter.playlists),
+              activeColor: AppColors.purpleAccent,
+            ),
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'Favorites',
+              icon: Icons.favorite_rounded,
+              isSelected: selectedFilter == LibraryFilter.favorites,
+              onTap: () => onFilterSelected(LibraryFilter.favorites),
+              activeColor: Colors.pinkAccent,
+            ),
+            const SizedBox(width: 12),
+            // Counter badge
+            if (selectedFilter == LibraryFilter.playlists)
+              Consumer(
+                builder: (context, ref, _) {
+                  final playlists =
+                      ref.watch(allPlaylistsStreamProvider).asData?.value ?? [];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.purpleAccent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.purpleAccent.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      '${playlists.length} playlists',
+                      style: const TextStyle(
+                        color: AppColors.purpleAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  );
+                },
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  isSearchingOrFiltering
+                      ? '$filteredCount / $totalCount'
+                      : '$totalCount tracks',
+                  style: const TextStyle(
+                    color: AppColors.cyanAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -578,57 +597,54 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveColor = activeColor ?? AppColors.cyanAccent;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? effectiveColor.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
             color: isSelected
-                ? effectiveColor.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
+                ? effectiveColor.withValues(alpha: 0.7)
+                : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 1.4 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: effectiveColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
               color: isSelected
-                  ? effectiveColor.withValues(alpha: 0.7)
-                  : Colors.white.withValues(alpha: 0.08),
-              width: isSelected ? 1.4 : 1.0,
+                  ? effectiveColor
+                  : Colors.white.withValues(alpha: 0.6),
             ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: effectiveColor.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? effectiveColor
-                    : Colors.white.withValues(alpha: 0.6),
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.7),
               ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -669,96 +685,8 @@ class _SongListTile extends ConsumerWidget {
           width: isCurrent ? 1.5 : 1,
         ),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: SongArtwork.fromSong(
-          song,
-          size: 48,
-          borderRadius: BorderRadius.circular(12),
-          isCurrent: isCurrent,
-          iconSize: 24,
-        ),
-        title: Text(
-          song.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: tt.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: isCurrent ? AppColors.cyanAccent : Colors.white,
-          ),
-        ),
-        subtitle: Text(
-          '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: tt.bodySmall?.copyWith(
-            color: Colors.white.withValues(alpha: 0.6),
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isCurrent) ...[
-              Icon(
-                isPlaying
-                    ? Icons.graphic_eq_rounded
-                    : Icons.pause_circle_outline_rounded,
-                color: AppColors.cyanAccent,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-            ],
-            IconButton(
-              icon: Icon(
-                song.isFavorite
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-                color: song.isFavorite
-                    ? Colors.pinkAccent
-                    : Colors.white.withValues(alpha: 0.35),
-                size: 20,
-              ),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              tooltip: song.isFavorite
-                  ? 'Remove from Favorites'
-                  : 'Add to Favorites',
-              onPressed: () async {
-                final db = ref.read(appDatabaseProvider);
-                await (db.update(db.songs)..where((s) => s.id.equals(song.id)))
-                    .write(
-                  SongsCompanion(isFavorite: Value(!song.isFavorite)),
-                );
-              },
-            ),
-            const SizedBox(width: 6),
-            Text(
-              formatDuration(song.duration),
-              style: tt.labelSmall?.copyWith(
-                color: isCurrent
-                    ? AppColors.cyanAccent
-                    : AppColors.cyanAccent.withValues(alpha: 0.8),
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.more_vert_rounded,
-                size: 20,
-              ),
-              color: Colors.white.withValues(alpha: 0.5),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              tooltip: 'Song Options',
-              onPressed: () => showSongOptionsSheet(
-                context: context,
-                song: song,
-              ),
-            ),
-          ],
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           if (isCurrent) {
             ref.read(playerControllerProvider.notifier).togglePlayPause();
@@ -771,6 +699,116 @@ class _SongListTile extends ConsumerWidget {
         onLongPress: () => showSongOptionsSheet(
           context: context,
           song: song,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            children: [
+              SongArtwork.fromSong(
+                song,
+                size: 48,
+                borderRadius: BorderRadius.circular(12),
+                isCurrent: isCurrent,
+                iconSize: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isCurrent) ...[
+                    Icon(
+                      isPlaying
+                          ? Icons.graphic_eq_rounded
+                          : Icons.pause_circle_outline_rounded,
+                      color: AppColors.cyanAccent,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    icon: Icon(
+                      song.isFavorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: song.isFavorite
+                          ? Colors.pinkAccent
+                          : Colors.white.withValues(alpha: 0.35),
+                      size: 18,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
+                    tooltip: song.isFavorite
+                        ? 'Remove from Favorites'
+                        : 'Add to Favorites',
+                    onPressed: () async {
+                      final db = ref.read(appDatabaseProvider);
+                      await (db.update(db.songs)
+                            ..where((s) => s.id.equals(song.id)))
+                          .write(
+                        SongsCompanion(isFavorite: Value(!song.isFavorite)),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    formatDuration(song.duration),
+                    style: tt.labelSmall?.copyWith(
+                      color: isCurrent
+                          ? AppColors.cyanAccent
+                          : AppColors.cyanAccent.withValues(alpha: 0.8),
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      size: 18,
+                    ),
+                    color: Colors.white.withValues(alpha: 0.5),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 26, minHeight: 28),
+                    tooltip: 'Song Options',
+                    onPressed: () => showSongOptionsSheet(
+                      context: context,
+                      song: song,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -968,42 +1006,8 @@ class _PlaylistTile extends ConsumerWidget {
           color: Colors.white.withValues(alpha: 0.08),
         ),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: AppColors.purpleGradient,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.queue_music_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
-        ),
-        title: Text(
-          playlist.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: tt.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        subtitle: Text(
-          '$count ${count == 1 ? 'track' : 'tracks'}',
-          style: tt.bodySmall?.copyWith(
-            color: AppColors.cyanAccent.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios_rounded,
-          color: Colors.white38,
-          size: 14,
-        ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -1011,6 +1015,59 @@ class _PlaylistTile extends ConsumerWidget {
             ),
           );
         },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: AppColors.purpleGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.queue_music_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      playlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$count ${count == 1 ? 'track' : 'tracks'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodySmall?.copyWith(
+                        color: AppColors.cyanAccent.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white38,
+                size: 14,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

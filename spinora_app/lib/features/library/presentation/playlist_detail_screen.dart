@@ -367,89 +367,121 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                 width: isCurrent ? 1.5 : 1,
                               ),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 2,
-                              ),
-                              leading: SongArtwork.fromSong(
-                                song,
-                                size: 48,
-                                borderRadius: BorderRadius.circular(12),
-                                isCurrent: isCurrent,
-                                iconSize: 24,
-                              ),
-                              title: Text(
-                                song.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: tt.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: isCurrent
-                                      ? AppColors.cyanAccent
-                                      : Colors.white,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: tt.bodySmall?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    formatDuration(song.duration),
-                                    style: tt.labelSmall?.copyWith(
-                                      color: isCurrent
-                                          ? AppColors.cyanAccent
-                                          : AppColors.cyanAccent
-                                              .withValues(alpha: 0.8),
-                                      fontWeight: isCurrent
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline_rounded,
-                                      color: Colors.white38,
-                                      size: 20,
-                                    ),
-                                    tooltip: 'Remove from Playlist',
-                                    onPressed: () async {
-                                      final db = ref.read(appDatabaseProvider);
-                                      await db.removeSongFromPlaylist(
-                                        playlistId: playlist.id,
-                                        songId: song.id,
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.more_vert_rounded,
-                                      color: Colors.white54,
-                                      size: 20,
-                                    ),
-                                    tooltip: 'Track Options',
-                                    onPressed: () {
-                                      showSongOptionsSheet(
-                                        context: context,
-                                        song: song,
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
                               onTap: () {
                                 ref
                                     .read(playerControllerProvider.notifier)
                                     .playPlaylist(songs, initialIndex: index);
                               },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    SongArtwork.fromSong(
+                                      song,
+                                      size: 48,
+                                      borderRadius: BorderRadius.circular(12),
+                                      isCurrent: isCurrent,
+                                      iconSize: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            song.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: tt.bodyLarge?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: isCurrent
+                                                  ? AppColors.cyanAccent
+                                                  : Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: tt.bodySmall?.copyWith(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          formatDuration(song.duration),
+                                          style: tt.labelSmall?.copyWith(
+                                            color: isCurrent
+                                                ? AppColors.cyanAccent
+                                                : AppColors.cyanAccent
+                                                    .withValues(alpha: 0.8),
+                                            fontWeight: isCurrent
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.remove_circle_outline_rounded,
+                                            color: Colors.white38,
+                                            size: 18,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 28,
+                                            minHeight: 28,
+                                          ),
+                                          tooltip: 'Remove from Playlist',
+                                          onPressed: () async {
+                                            final db =
+                                                ref.read(appDatabaseProvider);
+                                            await db.removeSongFromPlaylist(
+                                              playlistId: playlist.id,
+                                              songId: song.id,
+                                            );
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.more_vert_rounded,
+                                            color: Colors.white54,
+                                            size: 18,
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 26,
+                                            minHeight: 28,
+                                          ),
+                                          tooltip: 'Track Options',
+                                          onPressed: () {
+                                            showSongOptionsSheet(
+                                              context: context,
+                                              song: song,
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },
