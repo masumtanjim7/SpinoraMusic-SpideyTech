@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/glass_card.dart';
+import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
 import 'now_playing_screen.dart';
 
@@ -72,7 +71,14 @@ class MiniPlayer extends ConsumerWidget {
               child: Row(
                 children: [
                   // Album Art Thumbnail
-                  _MiniPlayerArtwork(artworkUri: track.artworkUri),
+                  SongArtwork.fromTrack(
+                    track,
+                    size: 44,
+                    borderRadius: BorderRadius.circular(10),
+                    isCurrent: playerState.isPlaying,
+                    iconSize: 22,
+                    heroTag: 'mini_player_art_${track.id}',
+                  ),
                   const SizedBox(width: 12),
 
                   // Track Title and Artist
@@ -162,52 +168,6 @@ class MiniPlayer extends ConsumerWidget {
           ],
         ),
       ),
-      ),
-    );
-  }
-}
-
-class _MiniPlayerArtwork extends StatelessWidget {
-  const _MiniPlayerArtwork({this.artworkUri});
-
-  final String? artworkUri;
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 44.0;
-
-    if (artworkUri != null && artworkUri!.isNotEmpty) {
-      if (artworkUri!.startsWith('content://') ||
-          artworkUri!.startsWith('file://') ||
-          artworkUri!.startsWith('/')) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.file(
-            File(artworkUri!),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallbackCover(size),
-          ),
-        );
-      }
-    }
-
-    return _fallbackCover(size);
-  }
-
-  Widget _fallbackCover(double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        gradient: AppColors.purpleGradient,
-      ),
-      child: const Icon(
-        Icons.music_note_rounded,
-        color: Colors.white,
-        size: 22,
       ),
     );
   }

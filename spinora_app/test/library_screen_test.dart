@@ -69,4 +69,70 @@ void main() {
     expect(find.text('3:05'), findsOneWidget); // 185s = 3m 05s
     expect(find.text('4:00'), findsOneWidget); // 240s = 4m 00s
   });
+
+  testWidgets('LibraryScreen filters tracks in real time by search query and favorites',
+      (tester) async {
+    final fakeSongs = [
+      const Song(
+        id: 1,
+        title: 'Cyberpunk Beat',
+        artist: 'Spidey Producer',
+        album: 'Neon City',
+        duration: 180000,
+        filePath: '/music/cyber.mp3',
+        isFavorite: true,
+      ),
+      const Song(
+        id: 2,
+        title: 'Acoustic Sunrise',
+        artist: 'Morning Artist',
+        album: 'Calm Day',
+        duration: 210000,
+        filePath: '/music/acoustic.mp3',
+        isFavorite: false,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider
+              .overrideWith((ref) => Stream.value(fakeSongs)),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify initial state shows both songs and track counter badge
+    expect(find.text('Cyberpunk Beat'), findsOneWidget);
+    expect(find.text('Acoustic Sunrise'), findsOneWidget);
+    expect(find.text('2 tracks'), findsOneWidget);
+
+    // 1. Search for "Cyber"
+    await tester.enterText(find.byType(TextField), 'Cyber');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cyberpunk Beat'), findsOneWidget);
+    expect(find.text('Acoustic Sunrise'), findsNothing);
+    expect(find.text('1 / 2'), findsOneWidget);
+
+    // 2. Clear search
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cyberpunk Beat'), findsOneWidget);
+    expect(find.text('Acoustic Sunrise'), findsOneWidget);
+
+    // 3. Filter by Favorites chip
+    await tester.tap(find.text('Favorites'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cyberpunk Beat'), findsOneWidget);
+    expect(find.text('Acoustic Sunrise'), findsNothing);
+    expect(find.text('1 / 2'), findsOneWidget);
+  });
 }

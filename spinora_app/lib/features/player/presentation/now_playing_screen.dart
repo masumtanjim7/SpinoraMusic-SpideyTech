@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
@@ -7,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
+import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
 
 /// Full-screen dark glassmorphic Now Playing modal sheet.
@@ -164,11 +163,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   height: artSize,
                                   borderRadius: BorderRadius.circular(32),
                                   padding: const EdgeInsets.all(12),
-                                  child: ClipRRect(
+                                  child: SongArtwork.fromTrack(
+                                    track,
+                                    width: double.infinity,
+                                    height: double.infinity,
                                     borderRadius: BorderRadius.circular(24),
-                                    child: _NowPlayingArtwork(
-                                      artworkUri: track.artworkUri,
-                                    ),
+                                    isCurrent: playerState.isPlaying,
+                                    iconSize: 72,
+                                    heroTag: 'now_playing_art_${track.id}',
                                   ),
                                 ),
                               ),
@@ -398,48 +400,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NowPlayingArtwork extends StatelessWidget {
-  const _NowPlayingArtwork({this.artworkUri});
-
-  final String? artworkUri;
-
-  @override
-  Widget build(BuildContext context) {
-    if (artworkUri != null && artworkUri!.isNotEmpty) {
-      if (artworkUri!.startsWith('content://') ||
-          artworkUri!.startsWith('file://') ||
-          artworkUri!.startsWith('/')) {
-        return Image.file(
-          File(artworkUri!),
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _fallbackArtwork(),
-        );
-      }
-    }
-
-    return _fallbackArtwork();
-  }
-
-  Widget _fallbackArtwork() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: AppColors.purpleGradient,
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.music_note_rounded,
-          color: Colors.white,
-          size: 72,
-        ),
       ),
     );
   }

@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,17 +9,105 @@ import '../../../shared/glass_card.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
+import 'widgets/song_artwork.dart';
 
-/// Screen displaying all local audio tracks saved in the Drift database.
-class LibraryScreen extends ConsumerWidget {
+// ---------------------------------------------------------------------------
+// Library Filter State & Providers
+// ---------------------------------------------------------------------------
+
+enum LibraryFilter { all, favorites }
+
+class SearchQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void setQuery(String query) => state = query;
+  void clear() => state = '';
+}
+
+final librarySearchQueryProvider =
+    NotifierProvider<SearchQueryNotifier, String>(SearchQueryNotifier.new);
+
+class LibraryFilterNotifier extends Notifier<LibraryFilter> {
+  @override
+  LibraryFilter build() => LibraryFilter.all;
+
+  void setFilter(LibraryFilter filter) => state = filter;
+}
+
+final libraryFilterProvider =
+    NotifierProvider<LibraryFilterNotifier, LibraryFilter>(
+  LibraryFilterNotifier.new,
+);
+
+/// Filters the loaded songs according to the active search text and favorites filter.
+final filteredSongsProvider = Provider<AsyncValue<List<Song>>>((ref) {
+  final songsAsync = ref.watch(localSongsStreamProvider);
+  final query = ref.watch(librarySearchQueryProvider).trim().toLowerCase();
+  final filter = ref.watch(libraryFilterProvider);
+
+  return songsAsync.whenData((songs) {
+    return songs.where((song) {
+      if (filter == LibraryFilter.favorites && !song.isFavorite) {
+        return false;
+      }
+      if (query.isNotEmpty) {
+        final matchesTitle = song.title.toLowerCase().contains(query);
+        final matchesArtist = song.artist.toLowerCase().contains(query);
+        final matchesAlbum = song.album?.toLowerCase().contains(query) ?? false;
+        if (!matchesTitle && !matchesArtist && !matchesAlbum) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Library Screen Widget
+// ---------------------------------------------------------------------------
+
+/// Screen displaying local audio tracks with instant search, favorites filter,
+/// and embedded cover artwork.
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final songsAsync = ref.watch(localSongsStreamProvider);
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(
+      text: ref.read(librarySearchQueryProvider),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allSongsAsync = ref.watch(localSongsStreamProvider);
+    final filteredSongsAsync = ref.watch(filteredSongsProvider);
     final scanState = ref.watch(audioScannerStateProvider);
     final playerState = ref.watch(playerControllerProvider);
+    final selectedFilter = ref.watch(libraryFilterProvider);
+    final searchQuery = ref.watch(librarySearchQueryProvider);
     final tt = Theme.of(context).textTheme;
+
+    final allSongs = allSongsAsync.asData?.value ?? [];
+    final filteredSongs = filteredSongsAsync.asData?.value ?? [];
+    final isSearchingOrFiltering =
+        searchQuery.isNotEmpty || selectedFilter != LibraryFilter.all;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -91,12 +178,11 @@ class LibraryScreen extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              songsAsync.when(
+                              allSongsAsync.when(
                                 data: (songs) =>
                                     '${songs.length} tracks available',
                                 loading: () => 'Loading library...',
-                                error: (error, stackTrace) =>
-                                    'Error loading library',
+                                error: (error, _) => 'Error loading library',
                               ),
                               style: tt.bodySmall?.copyWith(
                                 color: AppColors.cyanAccent,
@@ -169,9 +255,34 @@ class LibraryScreen extends ConsumerWidget {
                     ),
                   ),
 
+                // Search Bar and Filter Chips (shown when library has songs or was already loaded)
+                if (allSongs.isNotEmpty || isSearchingOrFiltering) ...[
+                  _GlassSearchBar(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      ref
+                          .read(librarySearchQueryProvider.notifier)
+                          .setQuery(val);
+                    },
+                    onClear: () {
+                      _searchController.clear();
+                      ref.read(librarySearchQueryProvider.notifier).clear();
+                    },
+                  ),
+                  _LibraryFilterBar(
+                    selectedFilter: selectedFilter,
+                    onFilterSelected: (f) {
+                      ref.read(libraryFilterProvider.notifier).setFilter(f);
+                    },
+                    totalCount: allSongs.length,
+                    filteredCount: filteredSongs.length,
+                    isSearchingOrFiltering: isSearchingOrFiltering,
+                  ),
+                ],
+
                 // Songs List or State Placeholders
                 Expanded(
-                  child: songsAsync.when(
+                  child: allSongsAsync.when(
                     data: (songs) {
                       if (songs.isEmpty) {
                         return _EmptyLibraryView(
@@ -182,6 +293,23 @@ class LibraryScreen extends ConsumerWidget {
                         );
                       }
 
+                      if (filteredSongs.isEmpty) {
+                        return _NoSearchResultsView(
+                          query: searchQuery,
+                          isFavoritesOnly:
+                              selectedFilter == LibraryFilter.favorites,
+                          onReset: () {
+                            _searchController.clear();
+                            ref
+                                .read(librarySearchQueryProvider.notifier)
+                                .clear();
+                            ref
+                                .read(libraryFilterProvider.notifier)
+                                .setFilter(LibraryFilter.all);
+                          },
+                        );
+                      }
+
                       return ListView.separated(
                         padding: EdgeInsets.fromLTRB(
                           20,
@@ -189,14 +317,14 @@ class LibraryScreen extends ConsumerWidget {
                           20,
                           playerState.hasTrack ? 110 : 80,
                         ),
-                        itemCount: songs.length,
+                        itemCount: filteredSongs.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          final song = songs[index];
+                          final song = filteredSongs[index];
                           return _SongListTile(
                             song: song,
-                            songs: songs,
+                            songs: filteredSongs,
                           );
                         },
                       );
@@ -263,6 +391,214 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Search Bar Widget
+// ---------------------------------------------------------------------------
+
+class _GlassSearchBar extends StatelessWidget {
+  const _GlassSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        cursorColor: AppColors.cyanAccent,
+        decoration: InputDecoration(
+          hintText: 'Search songs, artists, albums...',
+          hintStyle: TextStyle(
+            color: Colors.white.withValues(alpha: 0.4),
+            fontSize: 14,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.cyanAccent,
+            size: 20,
+          ),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: Colors.white.withValues(alpha: 0.6),
+                  onPressed: onClear,
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filter Chips & Counter Bar
+// ---------------------------------------------------------------------------
+
+class _LibraryFilterBar extends StatelessWidget {
+  const _LibraryFilterBar({
+    required this.selectedFilter,
+    required this.onFilterSelected,
+    required this.totalCount,
+    required this.filteredCount,
+    required this.isSearchingOrFiltering,
+  });
+
+  final LibraryFilter selectedFilter;
+  final ValueChanged<LibraryFilter> onFilterSelected;
+  final int totalCount;
+  final int filteredCount;
+  final bool isSearchingOrFiltering;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
+      child: Row(
+        children: [
+          _FilterChip(
+            label: 'All Songs',
+            icon: Icons.music_note_rounded,
+            isSelected: selectedFilter == LibraryFilter.all,
+            onTap: () => onFilterSelected(LibraryFilter.all),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Favorites',
+            icon: Icons.favorite_rounded,
+            isSelected: selectedFilter == LibraryFilter.favorites,
+            onTap: () => onFilterSelected(LibraryFilter.favorites),
+            activeColor: Colors.pinkAccent,
+          ),
+          const Spacer(),
+          // Track counter badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.cyanAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.cyanAccent.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Text(
+              isSearchingOrFiltering
+                  ? '$filteredCount / $totalCount'
+                  : '$totalCount tracks',
+              style: const TextStyle(
+                color: AppColors.cyanAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+    this.activeColor,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color? activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = activeColor ?? AppColors.cyanAccent;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? effectiveColor.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? effectiveColor.withValues(alpha: 0.7)
+                  : Colors.white.withValues(alpha: 0.08),
+              width: isSelected ? 1.4 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: effectiveColor.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected
+                    ? effectiveColor
+                    : Colors.white.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Song List Tile Widget
+// ---------------------------------------------------------------------------
+
 /// Song item tile formatted with frosted glass styling and active track highlights.
 class _SongListTile extends ConsumerWidget {
   const _SongListTile({
@@ -295,9 +631,12 @@ class _SongListTile extends ConsumerWidget {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        leading: _AlbumArtThumbnail(
-          albumArtPath: song.albumArtPath,
+        leading: SongArtwork.fromSong(
+          song,
+          size: 48,
+          borderRadius: BorderRadius.circular(12),
           isCurrent: isCurrent,
+          iconSize: 24,
         ),
         title: Text(
           song.title,
@@ -329,6 +668,31 @@ class _SongListTile extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
             ],
+            IconButton(
+              icon: Icon(
+                song.isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                color: song.isFavorite
+                    ? Colors.pinkAccent
+                    : Colors.white.withValues(alpha: 0.35),
+                size: 20,
+              ),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              tooltip: song.isFavorite
+                  ? 'Remove from Favorites'
+                  : 'Add to Favorites',
+              onPressed: () async {
+                final db = ref.read(appDatabaseProvider);
+                await (db.update(db.songs)..where((s) => s.id.equals(song.id)))
+                    .write(
+                  SongsCompanion(isFavorite: Value(!song.isFavorite)),
+                );
+              },
+            ),
+            const SizedBox(width: 6),
             Text(
               formatDuration(song.duration),
               style: tt.labelSmall?.copyWith(
@@ -354,59 +718,85 @@ class _SongListTile extends ConsumerWidget {
   }
 }
 
-/// Thumbnail for album artwork with gradient fallback icon.
-class _AlbumArtThumbnail extends StatelessWidget {
-  const _AlbumArtThumbnail({
-    this.albumArtPath,
-    this.isCurrent = false,
+// ---------------------------------------------------------------------------
+// Placeholders & Empty Views
+// ---------------------------------------------------------------------------
+
+/// Displayed when a search or filter produces 0 results.
+class _NoSearchResultsView extends StatelessWidget {
+  const _NoSearchResultsView({
+    required this.query,
+    required this.isFavoritesOnly,
+    required this.onReset,
   });
 
-  final String? albumArtPath;
-  final bool isCurrent;
+  final String query;
+  final bool isFavoritesOnly;
+  final VoidCallback onReset;
 
   @override
   Widget build(BuildContext context) {
-    const size = 48.0;
+    final tt = Theme.of(context).textTheme;
 
-    if (albumArtPath != null && albumArtPath!.isNotEmpty) {
-      if (albumArtPath!.startsWith('content://') ||
-          albumArtPath!.startsWith('file://') ||
-          albumArtPath!.startsWith('/')) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.file(
-            File(albumArtPath!),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallbackCover(size),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: GlassCard(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isFavoritesOnly
+                    ? Icons.favorite_border_rounded
+                    : Icons.search_off_rounded,
+                size: 48,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                isFavoritesOnly && query.isEmpty
+                    ? 'No Favorites Yet'
+                    : 'No Tracks Found',
+                style: tt.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                isFavoritesOnly && query.isEmpty
+                    ? 'Tap the heart icon on any track to add it to your favorites list.'
+                    : 'No songs matched your search criteria. Try a different keyword.',
+                style: tt.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: onReset,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.cyanAccent,
+                  side: BorderSide(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Reset Filters'),
+              ),
+            ],
           ),
-        );
-      }
-    }
-
-    return _fallbackCover(size);
-  }
-
-  Widget _fallbackCover(double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        gradient: isCurrent ? null : AppColors.purpleGradient,
-        color: isCurrent ? AppColors.purpleAccent : null,
-      ),
-      child: Icon(
-        isCurrent ? Icons.music_note_rounded : Icons.music_note_outlined,
-        color: Colors.white,
-        size: 24,
+        ),
       ),
     );
   }
 }
 
-/// Displayed when no tracks have been indexed yet.
+/// Displayed when no tracks have been indexed yet in the database.
 class _EmptyLibraryView extends StatelessWidget {
   const _EmptyLibraryView({
     required this.isScanning,
@@ -429,29 +819,33 @@ class _EmptyLibraryView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: AppColors.purpleGradient,
+                  color: AppColors.purpleAccent.withValues(alpha: 0.15),
                 ),
                 child: const Icon(
-                  Icons.library_music_outlined,
-                  size: 40,
-                  color: Colors.white,
+                  Icons.library_music_rounded,
+                  size: 36,
+                  color: AppColors.purpleAccent,
                 ),
               ),
               const SizedBox(height: 18),
               Text(
                 'No Songs Found',
-                style: tt.titleLarge?.copyWith(color: Colors.white),
+                style: tt.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Your local library is empty. Tap below to scan your device storage for music tracks.',
-                style: tt.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
+                'Scan your local storage to index MP3s and audio files into your Spinora library.',
                 textAlign: TextAlign.center,
+                style: tt.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
@@ -461,7 +855,7 @@ class _EmptyLibraryView extends StatelessWidget {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
-                    vertical: 12,
+                    vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -469,16 +863,16 @@ class _EmptyLibraryView extends StatelessWidget {
                 ),
                 icon: isScanning
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.sync_rounded),
+                    : const Icon(Icons.refresh_rounded),
                 label: Text(
-                  isScanning ? 'Scanning...' : 'Scan Storage Now',
+                  isScanning ? 'Scanning Storage...' : 'Scan Storage Now',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),

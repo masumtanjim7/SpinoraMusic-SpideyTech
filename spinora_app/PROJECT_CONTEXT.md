@@ -89,6 +89,12 @@ Task 2.2b DONE (Background Audio Playback & Lock-Screen Media Notifications for 
   MainActivity extends AudioServiceActivity; JustAudioBackground.init configured in bootstrap.dart
   (com.spideytech.spinora.channel.audio / 'Spinora Playback'); PlayerController attaches MediaItem tags to AudioSource.uri,
   keeps queue synced via setAudioSources, and handles lock-screen & notification shade media buttons (Play/Pause/Next/Previous).
+Task 2.2c DONE (Real Album Artwork Thumbnails, Instant Search & Favorites Filtering):
+  Reusable SongArtwork widget (lib/features/library/presentation/widgets/song_artwork.dart) with native ID3/MediaStore
+  embedded artwork extraction via MainActivity.kt MethodChannel, in-memory caching, and dark glassmorphic glowing fallback;
+  integrated into LibraryScreen song rows, MiniPlayer leading thumbnail, and NowPlayingScreen centerpiece card;
+  Glassmorphic search bar with real-time text query filtering (title, artist, album); filter chips for "All Songs" and
+  "Favorites" with track counter badge; reactive Drift update synchronization when favorite heart icon is tapped.
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

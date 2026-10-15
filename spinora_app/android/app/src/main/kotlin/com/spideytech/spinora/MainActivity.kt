@@ -20,10 +20,70 @@ class MainActivity : AudioServiceActivity() {
                 } catch (e: Exception) {
                     result.error("MEDIA_STORE_ERROR", e.localizedMessage, null)
                 }
+            } else if (call.method == "getArtwork") {
+                val songId = call.argument<Number>("songId")?.toLong()
+                val filePath = call.argument<String>("filePath")
+                val uriStr = call.argument<String>("uri")
+                try {
+                    val bytes = getSongArtwork(songId, filePath, uriStr)
+                    result.success(bytes)
+                } catch (e: Exception) {
+                    result.success(null)
+                }
             } else {
                 result.notImplemented()
             }
         }
+    }
+
+    private fun getSongArtwork(songId: Long?, filePath: String?, uriStr: String?): ByteArray? {
+        if (!filePath.isNullOrEmpty()) {
+            var retriever: android.media.MediaMetadataRetriever? = null
+            try {
+                retriever = android.media.MediaMetadataRetriever()
+                retriever.setDataSource(filePath)
+                val picture = retriever.embeddedPicture
+                if (picture != null && picture.isNotEmpty()) {
+                    return picture
+                }
+            } catch (_: Exception) {
+            } finally {
+                try {
+                    retriever?.release()
+                } catch (_: Exception) {}
+            }
+        }
+
+        if (!uriStr.isNullOrEmpty() && uriStr.startsWith("content://")) {
+            try {
+                contentResolver.openInputStream(Uri.parse(uriStr))?.use { input ->
+                    val bytes = input.readBytes()
+                    if (bytes.isNotEmpty()) return bytes
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (songId != null && songId >= 0) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, songId)
+                    val bitmap = contentResolver.loadThumbnail(contentUri, android.util.Size(512, 512), null)
+                    val stream = java.io.ByteArrayOutputStream()
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream)
+                    val bytes = stream.toByteArray()
+                    if (bytes.isNotEmpty()) return bytes
+                } else {
+                    val artBaseUri = Uri.parse("content://media/external/audio/albumart")
+                    val albumArtUri = ContentUris.withAppendedId(artBaseUri, songId)
+                    contentResolver.openInputStream(albumArtUri)?.use { input ->
+                        val bytes = input.readBytes()
+                        if (bytes.isNotEmpty()) return bytes
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        return null
     }
 
     private fun queryAudioMediaStore(): List<Map<String, Any?>> {
