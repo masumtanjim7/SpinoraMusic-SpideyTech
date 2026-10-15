@@ -6,6 +6,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
+import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
@@ -173,6 +174,44 @@ class PlayerController extends Notifier<PlayerState> {
         }
       }),
     );
+
+    _subscriptions.add(
+      player.currentIndexStream.listen((index) {
+        if (index != null &&
+            index >= 0 &&
+            index < state.queue.length &&
+            index != state.currentIndex) {
+          state = state.copyWith(
+            currentIndex: index,
+            currentTrack: state.queue[index],
+          );
+        }
+      }),
+    );
+  }
+
+  AudioSource _buildAudioSource(Track track) {
+    final sourceUri = Uri.parse(track.uri);
+    return AudioSource.uri(
+      sourceUri,
+      tag: MediaItem(
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        duration: Duration(milliseconds: track.durationMs),
+        artUri: _parseArtUri(track.artworkUri),
+      ),
+    );
+  }
+
+  static Uri? _parseArtUri(String? uriString) {
+    if (uriString == null || uriString.isEmpty) return null;
+    final parsed = Uri.tryParse(uriString);
+    if (parsed != null && (parsed.hasScheme || uriString.startsWith('content://'))) {
+      return parsed;
+    }
+    return Uri.file(uriString);
   }
 
   /// Plays a given [Track], optionally initializing a new track [queue].
@@ -192,10 +231,14 @@ class PlayerController extends Notifier<PlayerState> {
     );
 
     try {
-      final sourceUri = Uri.parse(track.uri);
-      final audioSource = AudioSource.uri(sourceUri);
+      if (activeQueue.length > 1) {
+        final sources = activeQueue.map(_buildAudioSource).toList();
+        await player.setAudioSources(sources, initialIndex: index);
+      } else {
+        final audioSource = _buildAudioSource(track);
+        await player.setAudioSource(audioSource);
+      }
 
-      await player.setAudioSource(audioSource);
       await player.play();
     } catch (e, st) {
       debugPrint('[PlayerController] Error playing track "${track.title}": $e');
@@ -258,6 +301,17 @@ class PlayerController extends Notifier<PlayerState> {
         queue: List.unmodifiable(shuffled),
         currentIndex: newIndex,
       );
+
+      if (shuffled.length > 1) {
+        try {
+          final sources = shuffled.map(_buildAudioSource).toList();
+          await player.setAudioSources(
+            sources,
+            initialIndex: newIndex,
+            initialPosition: state.position,
+          );
+        } catch (_) {}
+      }
     } else {
       final original = state.originalQueue ?? state.queue;
       final current = state.currentTrack;
@@ -268,6 +322,17 @@ class PlayerController extends Notifier<PlayerState> {
         queue: List.unmodifiable(original),
         currentIndex: newIndex,
       );
+
+      if (original.length > 1) {
+        try {
+          final sources = original.map(_buildAudioSource).toList();
+          await player.setAudioSources(
+            sources,
+            initialIndex: newIndex,
+            initialPosition: state.position,
+          );
+        } catch (_) {}
+      }
     }
   }
 
@@ -339,9 +404,14 @@ class PlayerController extends Notifier<PlayerState> {
       }
       return;
     }
-    final nextIndex = state.currentIndex + 1;
-    final nextTrack = state.queue[nextIndex];
-    await playTrack(nextTrack);
+
+    if (player.hasNext) {
+      await player.seekToNext();
+    } else {
+      final nextIndex = state.currentIndex + 1;
+      final nextTrack = state.queue[nextIndex];
+      await playTrack(nextTrack);
+    }
   }
 
   /// Skips to the previous song, or restarts the track if > 3s played.
@@ -356,9 +426,13 @@ class PlayerController extends Notifier<PlayerState> {
       return;
     }
 
-    final prevIndex = state.currentIndex - 1;
-    final prevTrack = state.queue[prevIndex];
-    await playTrack(prevTrack);
+    if (player.hasPrevious) {
+      await player.seekToPrevious();
+    } else {
+      final prevIndex = state.currentIndex - 1;
+      final prevTrack = state.queue[prevIndex];
+      await playTrack(prevTrack);
+    }
   }
 
   Future<void> stop() async {

@@ -3,11 +3,11 @@ package com.spideytech.spinora
 import android.content.ContentUris
 import android.net.Uri
 import android.provider.MediaStore
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : AudioServiceActivity() {
     private val CHANNEL = "com.spideytech.spinora/media_store"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

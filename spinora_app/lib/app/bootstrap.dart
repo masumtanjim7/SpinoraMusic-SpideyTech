@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import '../firebase_options.dart';
 import 'app_flavor.dart';
@@ -16,6 +17,14 @@ import 'spidey_app.dart';
 /// channel or BuildConfig access.
 Future<void> bootstrap(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Background Audio ───────────────────────────────────────────────────────
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.spideytech.spinora.channel.audio',
+    androidNotificationChannelName: 'Spinora Playback',
+    androidNotificationOngoing: true,
+  );
+  // ──────────────────────────────────────────────────────────────────────────
 
   // ── Firebase ──────────────────────────────────────────────────────────────
   await Firebase.initializeApp(

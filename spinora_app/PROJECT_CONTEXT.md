@@ -83,6 +83,12 @@ Task 2.1 DONE (Audio Playback Engine & Glass Mini-Player): Canonical Track model
 Task 2.2 DONE (Full-Screen "Now Playing" Modal): Futuristic dark glassmorphic NowPlayingScreen (lib/features/player/presentation/now_playing_screen.dart)
   with animated artwork scale/glow, interactive seek slider, live duration timestamps, shuffle toggle, repeat mode cycle (off/all/one),
   and favorite heart toggle updating Drift database; wired to MiniPlayer on tap via transparent modal bottom sheet.
+Task 2.2b DONE (Background Audio Playback & Lock-Screen Media Notifications for Android 14):
+  just_audio_background integrated in pubspec.yaml; Android 14 permissions (FOREGROUND_SERVICE,
+  FOREGROUND_SERVICE_MEDIA_PLAYBACK, WAKE_LOCK) and AudioService / MediaButtonReceiver declared in AndroidManifest.xml;
+  MainActivity extends AudioServiceActivity; JustAudioBackground.init configured in bootstrap.dart
+  (com.spideytech.spinora.channel.audio / 'Spinora Playback'); PlayerController attaches MediaItem tags to AudioSource.uri,
+  keeps queue synced via setAudioSources, and handles lock-screen & notification shade media buttons (Play/Pause/Next/Previous).
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
