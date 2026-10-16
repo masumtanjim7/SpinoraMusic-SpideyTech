@@ -39,11 +39,10 @@ class LiveLyricsCard extends ConsumerStatefulWidget {
 
 class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   final ScrollController _scrollController = ScrollController();
+  final Map<int, GlobalKey> _lineKeys = {};
   int _lastActiveIndex = -1;
   bool _userIsScrolling = false;
   Timer? _userScrollDebounce;
-
-  static const double _lineEstimatedHeight = 44.0;
 
   @override
   void initState() {
@@ -58,9 +57,19 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   }
 
   @override
+  void didUpdateWidget(covariant LiveLyricsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track.id != widget.track.id) {
+      _lineKeys.clear();
+      _lastActiveIndex = -1;
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     _userScrollDebounce?.cancel();
+    _lineKeys.clear();
     super.dispose();
   }
 
@@ -103,19 +112,18 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     }
   }
 
-  void _scrollToIndex(int index, int totalLines) {
-    if (_userIsScrolling || !_scrollController.hasClients) return;
-
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final viewportHeight = widget.height;
-    final targetOffset = (index * _lineEstimatedHeight - (viewportHeight / 2) + (_lineEstimatedHeight / 2))
-        .clamp(0.0, maxScroll);
-
-    _scrollController.animateTo(
-      targetOffset,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
+  void _scrollToActiveLine(int index) {
+    if (!mounted || _userIsScrolling) return;
+    final key = _lineKeys[index];
+    final targetContext = key?.currentContext;
+    if (targetContext != null && targetContext.mounted) {
+      Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _onUserScrollStart() {
@@ -303,11 +311,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: Icon(
                     Icons.refresh_rounded,
                     color: isFetchingThis ? Colors.white24 : Colors.white70,
-                    size: 16,
                   ),
                   tooltip: 'Auto-Fetch / Refresh',
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(4),
+                  iconSize: 18,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -317,11 +325,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.travel_explore_rounded,
                     color: Colors.white70,
-                    size: 16,
                   ),
                   tooltip: 'Search Online (LRCLIB)',
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(4),
+                  iconSize: 18,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -331,11 +339,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.edit_note_rounded,
                     color: Colors.white70,
-                    size: 17,
                   ),
                   tooltip: 'Edit / Paste Lyrics',
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(4),
+                  iconSize: 18,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -345,11 +353,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.photo_rounded,
                     color: Colors.white70,
-                    size: 16,
                   ),
                   tooltip: 'Show Artwork',
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(4),
+                  iconSize: 18,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -370,113 +378,174 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                             isFetching: false,
                             onAutoFetchPressed: () => _triggerRefresh(context),
                             onPastePressed: () => _openEditDialog(context),
-                            onSearchOnlinePressed: () => _openSearchDialog(context),
+                            onSearchOnlinePressed: () =>
+                                _openSearchDialog(context),
                           );
                         }
 
-                  final activeIndex = lyrics.isSynced
-                      ? lyrics.activeIndexForPosition(playerState.position)
-                      : -1;
+                        final activeIndex = lyrics.isSynced
+                            ? lyrics.activeIndexForPosition(playerState.position)
+                            : -1;
 
-                  // Trigger auto-scroll smoothly on active line advance
-                  if (lyrics.isSynced &&
-                      activeIndex != _lastActiveIndex &&
-                      activeIndex >= 0) {
-                    _lastActiveIndex = activeIndex;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _scrollToIndex(activeIndex, lyrics.lines.length);
-                    });
-                  }
+                        // Trigger auto-scroll smoothly to dead-center on active line advance
+                        if (lyrics.isSynced &&
+                            activeIndex != _lastActiveIndex &&
+                            activeIndex >= 0) {
+                          _lastActiveIndex = activeIndex;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _scrollToActiveLine(activeIndex);
+                          });
+                        }
 
-                  return NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (notification is UserScrollNotification) {
-                        _onUserScrollStart();
-                      }
-                      return false;
-                    },
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      itemCount: lyrics.lines.length,
-                      itemBuilder: (context, index) {
-                        final line = lyrics.lines[index];
-                        final isActive = index == activeIndex;
-
-                        return InkWell(
-                          onTap: line.isSynced
-                              ? () => ref
-                                  .read(playerControllerProvider.notifier)
-                                  .seek(line.timestamp)
-                              : null,
-                          borderRadius: BorderRadius.circular(12),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOutCubic,
-                            margin: const EdgeInsets.symmetric(
-                              vertical: 4,
-                              horizontal: 6,
-                            ),
+                        return NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            if (notification is UserScrollNotification) {
+                              _onUserScrollStart();
+                            }
+                            return false;
+                          },
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.symmetric(
-                              vertical: 6,
+                              vertical: 120,
                               horizontal: 8,
                             ),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? AppColors.cyanAccent.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    line.text,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children:
+                                  List.generate(lyrics.lines.length, (index) {
+                                final line = lyrics.lines[index];
+                                final isActive = index == activeIndex;
+                                final lineKey = _lineKeys.putIfAbsent(
+                                  index,
+                                  () => GlobalKey(),
+                                );
+
+                                return InkWell(
+                                  key: lineKey,
+                                  onTap: line.isSynced
+                                      ? () {
+                                          _userScrollDebounce?.cancel();
+                                          _userIsScrolling = false;
+                                          ref
+                                              .read(
+                                                  playerControllerProvider.notifier)
+                                              .seek(line.timestamp);
+                                          _scrollToActiveLine(index);
+                                        }
+                                      : null,
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 300),
+                                    curve: Curves.easeOutCubic,
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 5,
+                                      horizontal: 4,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: isActive
                                           ? AppColors.cyanAccent
-                                          : (lyrics.isSynced
-                                              ? Colors.white.withValues(alpha: 0.45)
-                                              : Colors.white.withValues(alpha: 0.85)),
-                                      fontSize: isActive ? 17 : 14.5,
-                                      fontWeight: isActive
-                                          ? FontWeight.w800
-                                          : FontWeight.w500,
-                                      letterSpacing: isActive ? 0.2 : 0.0,
-                                      height: 1.4,
-                                      shadows: isActive
+                                              .withValues(alpha: 0.14)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isActive
+                                            ? AppColors.cyanAccent
+                                                .withValues(alpha: 0.35)
+                                            : Colors.transparent,
+                                        width: 1.0,
+                                      ),
+                                      boxShadow: isActive
                                           ? [
-                                              Shadow(
+                                              BoxShadow(
                                                 color: AppColors.cyanAccent
-                                                    .withValues(alpha: 0.7),
-                                                blurRadius: 14,
+                                                    .withValues(alpha: 0.20),
+                                                blurRadius: 18,
+                                                spreadRadius: 1,
                                               ),
                                             ]
                                           : null,
                                     ),
-                                  ),
-                                ),
-                                if (line.isSynced && isActive) ...[
-                                  Text(
-                                    formatDuration(line.timestamp.inMilliseconds),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.cyanAccent
-                                          .withValues(alpha: 0.8),
-                                      fontWeight: FontWeight.bold,
+                                    child: AnimatedDefaultTextStyle(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeOutCubic,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? AppColors.cyanAccent
+                                            : (lyrics.isSynced
+                                                ? Colors.white
+                                                    .withValues(alpha: 0.35)
+                                                : Colors.white
+                                                    .withValues(alpha: 0.85)),
+                                        fontSize: isActive ? 18.5 : 14.5,
+                                        fontWeight: isActive
+                                            ? FontWeight.w800
+                                            : FontWeight.w500,
+                                        letterSpacing: isActive ? 0.3 : 0.0,
+                                        height: 1.45,
+                                        shadows: isActive
+                                            ? [
+                                                Shadow(
+                                                  color: AppColors.cyanAccent
+                                                      .withValues(alpha: 0.75),
+                                                  blurRadius: 14,
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              line.text,
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                          if (line.isSynced && isActive) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.cyanAccent
+                                                    .withValues(alpha: 0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                formatDuration(
+                                                  line.timestamp.inMilliseconds,
+                                                ),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: AppColors.cyanAccent
+                                                      .withValues(alpha: 0.9),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ],
+                                );
+                              }),
                             ),
                           ),
                         );
                       },
-                    ),
-                  );
-                },
                 loading: () => const Center(
                   child: SizedBox(
                     width: 24,

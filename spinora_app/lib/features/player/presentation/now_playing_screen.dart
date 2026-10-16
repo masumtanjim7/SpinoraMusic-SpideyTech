@@ -148,103 +148,112 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 12),
+                          SizedBox(height: _showLyrics ? 8 : 12),
 
                           // Centerpiece: Deeper layered glassmorphic artwork card or Live scrolling lyrics card
                           Center(
-                            child: AnimatedSwitcher(
+                            child: AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: ScaleTransition(
-                                    scale: Tween<double>(begin: 0.95, end: 1.0)
-                                        .animate(animation),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: _showLyrics
-                                  ? LiveLyricsCard(
-                                      key: const ValueKey('live_lyrics_card'),
-                                      track: track,
-                                      width: artSize,
-                                      height: artSize,
-                                      onClose: () =>
-                                          setState(() => _showLyrics = false),
-                                    )
-                                  : GestureDetector(
-                                      key: const ValueKey('artwork_card'),
-                                      onTap: () =>
-                                          setState(() => _showLyrics = true),
-                                      child: AnimatedScale(
-                                        scale: playerState.isPlaying ? 1.02 : 0.96,
-                                        duration:
-                                            const Duration(milliseconds: 400),
-                                        curve: Curves.easeOutCubic,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(36),
-                                            border: Border.all(
-                                              color: Colors.white.withValues(
-                                                alpha: playerState.isPlaying
-                                                    ? 0.22
-                                                    : 0.10,
-                                              ),
-                                              width: 1.5,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: AppColors.purpleAccent
-                                                    .withValues(
+                              curve: Curves.easeOutCubic,
+                              width: _showLyrics ? constraints.maxWidth : artSize,
+                              height: _showLyrics
+                                  ? (screenSize.height * 0.42).clamp(340.0, 380.0)
+                                  : artSize,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(begin: 0.95, end: 1.0)
+                                          .animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _showLyrics
+                                    ? LiveLyricsCard(
+                                        key: const ValueKey('live_lyrics_card'),
+                                        track: track,
+                                        width: constraints.maxWidth,
+                                        height: (screenSize.height * 0.42)
+                                            .clamp(340.0, 380.0),
+                                        onClose: () =>
+                                            setState(() => _showLyrics = false),
+                                      )
+                                    : GestureDetector(
+                                        key: const ValueKey('artwork_card'),
+                                        onTap: () =>
+                                            setState(() => _showLyrics = true),
+                                        child: AnimatedScale(
+                                          scale: playerState.isPlaying ? 1.02 : 0.96,
+                                          duration:
+                                              const Duration(milliseconds: 400),
+                                          curve: Curves.easeOutCubic,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(36),
+                                              border: Border.all(
+                                                color: Colors.white.withValues(
                                                   alpha: playerState.isPlaying
-                                                      ? 0.40
-                                                      : 0.18,
-                                                ),
-                                                blurRadius: 44,
-                                                spreadRadius: 2,
-                                              ),
-                                              BoxShadow(
-                                                color: AppColors.cyanAccent
-                                                    .withValues(
-                                                  alpha: playerState.isPlaying
-                                                      ? 0.25
+                                                      ? 0.22
                                                       : 0.10,
                                                 ),
-                                                blurRadius: 28,
-                                                offset: const Offset(0, 10),
+                                                width: 1.5,
                                               ),
-                                            ],
-                                          ),
-                                          child: GlassCard(
-                                            width: artSize,
-                                            height: artSize,
-                                            borderRadius:
-                                                BorderRadius.circular(32),
-                                            padding: const EdgeInsets.all(12),
-                                            child: SongArtwork.fromTrack(
-                                              track,
-                                              width: double.infinity,
-                                              height: double.infinity,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: AppColors.purpleAccent
+                                                      .withValues(
+                                                    alpha: playerState.isPlaying
+                                                        ? 0.40
+                                                        : 0.18,
+                                                  ),
+                                                  blurRadius: 44,
+                                                  spreadRadius: 2,
+                                                ),
+                                                BoxShadow(
+                                                  color: AppColors.cyanAccent
+                                                      .withValues(
+                                                    alpha: playerState.isPlaying
+                                                        ? 0.25
+                                                        : 0.10,
+                                                  ),
+                                                  blurRadius: 28,
+                                                  offset: const Offset(0, 10),
+                                                ),
+                                              ],
+                                            ),
+                                            child: GlassCard(
+                                              width: artSize,
+                                              height: artSize,
                                               borderRadius:
+                                                  BorderRadius.circular(32),
+                                              padding: const EdgeInsets.all(12),
+                                              child: SongArtwork.fromTrack(
+                                                track,
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                borderRadius:
                                                   BorderRadius.circular(24),
-                                              isCurrent: playerState.isPlaying,
-                                              iconSize: 72,
-                                              heroTag:
-                                                  'now_playing_art_${track.id}',
+                                                isCurrent: playerState.isPlaying,
+                                                iconSize: 72,
+                                                heroTag:
+                                                    'now_playing_art_${track.id}',
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
+                              ),
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: _showLyrics ? 12 : 20),
 
                           // Track Info & Inline Status Badges
                           Column(
@@ -420,7 +429,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 14),
+                          SizedBox(height: _showLyrics ? 8 : 14),
 
                           // Interactive Seek Slider & Timestamps
                           Column(
@@ -489,7 +498,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 12),
+                          SizedBox(height: _showLyrics ? 8 : 12),
 
                           // Refined Pill-Shaped Transport Control Bar
                           Container(
@@ -623,7 +632,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 16),
+                          SizedBox(height: _showLyrics ? 10 : 16),
 
                           // Compact Glassmorphic Audio Tools Action Row (Sleep Timer, Playback Speed, Lyrics, Queue, Info)
                           AudioToolsActionRow(
@@ -642,7 +651,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             },
                           ),
 
-                          const SizedBox(height: 16),
+                          SizedBox(height: _showLyrics ? 10 : 16),
                         ],
                       ),
                     ),

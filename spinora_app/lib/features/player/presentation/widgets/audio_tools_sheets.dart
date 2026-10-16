@@ -832,7 +832,7 @@ class AudioToolsActionRow extends ConsumerWidget {
             _ToolButton(
               icon: Icons.queue_music_rounded,
               label: 'Queue',
-              isActive: playerState.queue.isNotEmpty,
+              isActive: false,
               activeColor: Colors.white70,
               onTap: onOpenQueue,
               tooltip: 'Up Next Queue (${playerState.queue.length})',
