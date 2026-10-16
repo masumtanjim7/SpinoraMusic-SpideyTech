@@ -8,7 +8,9 @@ import '../../../../core/audio/track.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/glass_card.dart';
+import '../../application/lyrics_controller.dart';
 import '../../application/player_controller.dart';
+import '../../data/online_lyrics_service.dart';
 import '../../domain/lrc_parser.dart';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,13 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   Widget build(BuildContext context) {
     final lyricsAsync = ref.watch(trackLyricsProvider(widget.track));
     final playerState = ref.watch(playerControllerProvider);
+    final lyricsFetchState = ref.watch(lyricsControllerProvider);
+    final songId = widget.track.id.startsWith('local_')
+        ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
+        : null;
+    final isFetchingThis = lyricsFetchState.isFetching &&
+        (lyricsFetchState.activeSongId == null ||
+            lyricsFetchState.activeSongId == songId);
     final tt = Theme.of(context).textTheme;
 
     return Container(
@@ -111,72 +120,131 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
         width: widget.width,
         height: widget.height,
         borderRadius: BorderRadius.circular(32),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           children: [
-            // Header Bar: Lyrics Tag, Synced Badge, and Actions (Edit, Close)
+            // Header Bar: Lyrics Tag, Synced Badge, and Actions (Search, Edit, Close)
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.cyanAccent.withValues(alpha: 0.15),
                   ),
                   child: const Icon(
                     Icons.lyrics_rounded,
-                    size: 15,
+                    size: 14,
                     color: AppColors.cyanAccent,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
                   'LYRICS',
                   style: tt.labelMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.2,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
-                // Synced / Plain format badge
-                lyricsAsync.when(
-                  data: (lyrics) {
-                    if (lyrics.isEmpty) return const SizedBox.shrink();
-                    final isSynced = lyrics.isSynced;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
+                // Searching status or Synced / Plain format badge
+                if (isFetchingThis) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyanAccent.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.cyanAccent.withValues(alpha: 0.5),
                       ),
-                      decoration: BoxDecoration(
-                        color: isSynced
-                            ? AppColors.cyanAccent.withValues(alpha: 0.18)
-                            : Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 8,
+                          height: 8,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            value: 0.75,
+                            color: AppColors.cyanAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'SEARCHING...',
+                          style: TextStyle(
+                            color: AppColors.cyanAccent,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  lyricsAsync.when(
+                    data: (lyrics) {
+                      if (lyrics.isEmpty) return const SizedBox.shrink();
+                      final isSynced = lyrics.isSynced;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
                           color: isSynced
-                              ? AppColors.cyanAccent.withValues(alpha: 0.5)
-                              : Colors.white.withValues(alpha: 0.15),
+                              ? AppColors.cyanAccent.withValues(alpha: 0.18)
+                              : Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSynced
+                                ? AppColors.cyanAccent.withValues(alpha: 0.5)
+                                : Colors.white.withValues(alpha: 0.15),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        isSynced ? 'SYNCED' : 'PLAIN',
-                        style: TextStyle(
-                          color: isSynced ? AppColors.cyanAccent : Colors.white70,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
+                        child: Text(
+                          isSynced ? 'SYNCED' : 'PLAIN',
+                          style: TextStyle(
+                            color: isSynced
+                                ? AppColors.cyanAccent
+                                : Colors.white70,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (e, st) => const SizedBox.shrink(),
-                ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (e, st) => const SizedBox.shrink(),
+                  ),
+                ],
 
                 const Spacer(),
+
+                // Online Search Button
+                IconButton(
+                  onPressed: () => _openSearchDialog(context),
+                  icon: const Icon(
+                    Icons.travel_explore_rounded,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
+                  tooltip: 'Search Online (LRCLIB)',
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(28, 28),
+                    padding: EdgeInsets.zero,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
 
                 // Edit / Paste Lyrics Button
                 IconButton(
@@ -184,9 +252,14 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.edit_note_rounded,
                     color: Colors.white70,
-                    size: 22,
+                    size: 19,
                   ),
                   tooltip: 'Edit / Paste Lyrics',
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(28, 28),
+                    padding: EdgeInsets.zero,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -196,9 +269,14 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.photo_rounded,
                     color: Colors.white70,
-                    size: 20,
+                    size: 18,
                   ),
                   tooltip: 'Show Artwork',
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(28, 28),
+                    padding: EdgeInsets.zero,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -214,7 +292,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                 data: (lyrics) {
                   if (lyrics.isEmpty) {
                     return _NoLyricsPlaceholder(
+                      isFetching: isFetchingThis,
                       onPastePressed: () => _openEditDialog(context),
+                      onSearchOnlinePressed: () => _openSearchDialog(context),
                     );
                   }
 
@@ -353,6 +433,63 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     );
   }
 
+  void _openSearchDialog(BuildContext context) async {
+    final songId = widget.track.id.startsWith('local_')
+        ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
+        : null;
+
+    if (songId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Online lyrics search is available for local library songs.',
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final db = ref.read(appDatabaseProvider);
+    final song = await db.getSongById(songId);
+    if (song == null || !context.mounted) return;
+
+    final cleaned = cleanSongMetadata(
+      rawTitle: song.title,
+      rawArtist: song.artist,
+    );
+    final initialQuery = cleaned.artist.isNotEmpty
+        ? '${cleaned.artist} - ${cleaned.title}'
+        : cleaned.title;
+
+    final query = await showSearchLyricsDialog(
+      context: context,
+      initialQuery: initialQuery,
+    );
+
+    if (query != null && query.trim().isNotEmpty && context.mounted) {
+      final success = await ref
+          .read(lyricsControllerProvider.notifier)
+          .refetchLyrics(song, customQuery: query.trim());
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Lyrics downloaded and saved offline!'
+                  : 'No lyrics found for "$query".',
+            ),
+            duration: const Duration(seconds: 3),
+            backgroundColor: success
+                ? AppColors.cyanAccent.withValues(alpha: 0.9)
+                : Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
   void _openEditDialog(BuildContext context) async {
     final songId = widget.track.id.startsWith('local_')
         ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
@@ -389,71 +526,156 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
 class _NoLyricsPlaceholder extends StatelessWidget {
   const _NoLyricsPlaceholder({
     required this.onPastePressed,
+    required this.onSearchOnlinePressed,
+    this.isFetching = false,
   });
 
   final VoidCallback onPastePressed;
+  final VoidCallback onSearchOnlinePressed;
+  final bool isFetching;
 
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.lyrics_outlined,
-              size: 46,
-              color: Colors.white.withValues(alpha: 0.25),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No Lyrics Available',
-              style: tt.titleSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Add synced (.lrc) or plain text lyrics to sing along with this track.',
-              textAlign: TextAlign.center,
-              style: tt.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 11.5,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: onPastePressed,
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-              label: const Text(
-                'Paste Lyrics',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.cyanAccent.withValues(alpha: 0.3),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.6),
+    if (isFetching) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.35),
                   ),
                 ),
+                child: const Icon(
+                  Icons.cloud_sync_rounded,
+                  size: 32,
+                  color: AppColors.cyanAccent,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              Text(
+                'Searching Synced Lyrics Online...',
+                style: tt.titleSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Querying LRCLIB & community sources for timestamped lines...',
+                textAlign: TextAlign.center,
+                style: tt.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.lyrics_outlined,
+                size: 32,
+                color: Colors.white.withValues(alpha: 0.25),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'No Lyrics Available',
+                style: tt.titleSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Search online or paste synced (.lrc) / plain lyrics for this track.',
+                textAlign: TextAlign.center,
+                style: tt.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: onSearchOnlinePressed,
+                    icon: const Icon(
+                      Icons.travel_explore_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    label: const Text(
+                      'Search Online',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.cyanAccent.withValues(alpha: 0.3),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: AppColors.cyanAccent.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onPastePressed,
+                    icon: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white70,
+                      size: 14,
+                    ),
+                    label: const Text(
+                      'Paste Lyrics',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -694,6 +916,190 @@ class _EditLyricsDialogState extends ConsumerState<EditLyricsDialog> {
                   'Save',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Safe Online Lyrics Search Dialog
+// ---------------------------------------------------------------------------
+
+/// Opens a safe dialog to query LRCLIB or custom search query.
+Future<String?> showSearchLyricsDialog({
+  required BuildContext context,
+  required String initialQuery,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.75),
+    builder: (dialogContext) => SearchLyricsDialog(
+      initialQuery: initialQuery,
+    ),
+  );
+}
+
+/// Fully lifecycle-safe [StatefulWidget] dialog for entering a custom search query.
+/// Disposes [TextEditingController] strictly in [dispose()] to prevent route animation crashes.
+class SearchLyricsDialog extends StatefulWidget {
+  const SearchLyricsDialog({
+    super.key,
+    required this.initialQuery,
+  });
+
+  final String initialQuery;
+
+  @override
+  State<SearchLyricsDialog> createState() => _SearchLyricsDialogState();
+}
+
+class _SearchLyricsDialogState extends State<SearchLyricsDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialQuery);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      backgroundColor: AppColors.surface.withValues(alpha: 0.96),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: Colors.white.withValues(alpha: 0.15),
+        ),
+      ),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.cyanAccent.withValues(alpha: 0.15),
+            ),
+            child: const Icon(
+              Icons.travel_explore_rounded,
+              size: 20,
+              color: AppColors.cyanAccent,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Search Lyrics Online',
+                  style: tt.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Query LRCLIB & community sources',
+                  style: tt.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Search Query (Artist - Song Title):',
+              style: tt.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+              ),
+              decoration: InputDecoration(
+                hintText: 'e.g. Ed Sheeran - Shape of You',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 12.5,
+                ),
+                filled: true,
+                fillColor: Colors.black.withValues(alpha: 0.4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppColors.cyanAccent,
+                    width: 1.4,
+                  ),
+                ),
+              ),
+              onSubmitted: (val) {
+                if (val.trim().isNotEmpty) {
+                  Navigator.of(context).pop(val.trim());
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+            ),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            final query = _controller.text.trim();
+            if (query.isNotEmpty) {
+              Navigator.of(context).pop(query);
+            }
+          },
+          icon: const Icon(Icons.search_rounded, size: 16),
+          label: const Text(
+            'Search',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.cyanAccent,
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       ],
     );

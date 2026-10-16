@@ -10,6 +10,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
+import 'lyrics_controller.dart';
 
 // ---------------------------------------------------------------------------
 // Player State Model
@@ -213,8 +214,33 @@ class PlayerController extends Notifier<PlayerState> {
           );
         }
       }
+      // Auto-fetch lyrics online in background if not already cached
+      try {
+        ref.read(lyricsControllerProvider.notifier).triggerAutoFetchForTrack(track);
+      } catch (e) {
+        debugPrint('[PlayerController] Error triggering auto lyrics fetch: $e');
+      }
     }
     _persistCurrentSession(immediate: true);
+  }
+
+  /// Manually triggers an online lyrics search/refetch for the active track.
+  Future<bool> refetchLyrics({String? customQuery}) async {
+    final track = state.currentTrack;
+    if (track == null) return false;
+    if (track.source != TrackSource.local || !track.id.startsWith('local_')) {
+      return false;
+    }
+    final songId = int.tryParse(track.id.replaceFirst('local_', ''));
+    if (songId == null) return false;
+
+    final db = ref.read(appDatabaseProvider);
+    final song = await db.getSongById(songId);
+    if (song == null) return false;
+
+    return ref
+        .read(lyricsControllerProvider.notifier)
+        .refetchLyrics(song, customQuery: customQuery);
   }
 
   /// Persists active playback session state to Drift database.

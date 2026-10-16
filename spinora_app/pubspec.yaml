@@ -45,6 +45,7 @@ dependencies:
   path_provider: ^2.1.6
   permission_handler: ^13.0.2
   dio: ^5.11.1
+  http: ^1.2.2
   flutter_secure_storage: ^11.2.0
   cached_network_image: ^4.0.4
   firebase_core: ^4.15.0

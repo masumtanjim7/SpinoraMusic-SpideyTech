@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- ── Network permissions for online streaming & lyrics ─────────── -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- ── Audio / Storage permissions ────────────────────────────────────── -->
     <!-- Android 13+ (API 33): granular media permission for audio files. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />

@@ -133,6 +133,16 @@ Task 2.3 DONE (Synced & Offline Lyrics Engine - .lrc & Custom Stored Lyrics):
   real-time active line highlighting in glowing neon cyan with larger bold typography, auto-scroll smoothly as track advances,
   and tap-to-seek directly to timestamped moment; safe `EditLyricsDialog` for pasting or modifying `.lrc` and plain lyrics offline;
   Lyrics toggle button added to `AudioToolsActionRow` on `NowPlayingScreen`; 0 analyzer issues and all 39 tests passing.
-Next: Task 2.4 / Online Lyrics Client (LRCLIB API) or Task 2.5 Audio Equalizer.
+Task 2.3b DONE (Automatic Online Synced Lyrics Fetching & Offline Drift Caching - Step 1):
+  Added `http: ^1.2.2` and declared `INTERNET` + `ACCESS_NETWORK_STATE` permissions in `AndroidManifest.xml`;
+  created `OnlineLyricsService` (lib/features/player/data/online_lyrics_service.dart) with smart metadata cleaner `cleanQueryText`
+  and `cleanSongMetadata` (stripping noise, parenthesized tags, extensions, bitrates, website watermarks like PagalWorld/DJPunjab,
+  and splitting unknown artist `Artist - Title` automatically); queries LRCLIB API (`lrclib.net`) prioritizing synced lyrics and closest
+  duration with custom `SpinoraMusic/1.0.0` User-Agent and fallback search with 6-second timeout;
+  background auto-fetch integration in `LyricsController` and `PlayerController`: automatically triggers when a track starts playing or
+  when lyrics are viewed if lyrics are missing, caching results permanently into Drift database via `updateSongLyrics`;
+  exposed `isFetchingLyricsProvider`, manual `refetchLyrics({String? customQuery})`, and glassmorphic online search dialog (`SearchLyricsDialog`);
+  0 analyzer issues and all 50 tests passing.
+Next: Step 2 / Full-Screen Immersive Lyrics Mode or Task 2.5 Audio Equalizer.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

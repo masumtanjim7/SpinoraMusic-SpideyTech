@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
+import '../application/lyrics_controller.dart';
+import '../data/online_lyrics_service.dart';
 
 // ---------------------------------------------------------------------------
 // Lyric Line & Parsed Lyrics Models
@@ -237,45 +239,70 @@ class LrcParser {
 // ---------------------------------------------------------------------------
 
 /// Resolves lyrics for a [Song] by checking:
+/// Resolves lyrics for a [Song] using a multi-tier fallback system:
 /// 1) `song.lyrics` in the database.
 /// 2) If empty, checks for a matching `.lrc` or `.txt` file at `song.filePath`.
+/// 3) If empty and [onlineLyricsService] is provided, fetches online via LRCLIB / fallback.
 /// Automatically caches discovered lyrics into the database for future instant loads.
 Future<String?> resolveSongLyrics({
   required Song song,
   required AppDatabase db,
+  OnlineLyricsService? onlineLyricsService,
+  String? customQuery,
 }) async {
-  // 1) Database check
-  if (song.lyrics != null && song.lyrics!.trim().isNotEmpty) {
+  // 1) Database check (unless customQuery was supplied)
+  if (customQuery == null &&
+      song.lyrics != null &&
+      song.lyrics!.trim().isNotEmpty) {
     return song.lyrics;
   }
 
   // 2) File lookup (.lrc or .txt alongside audio file)
-  try {
-    final filePath = song.filePath;
-    final dotIndex = filePath.lastIndexOf('.');
-    final basePath = dotIndex != -1 ? filePath.substring(0, dotIndex) : filePath;
+  if (customQuery == null) {
+    try {
+      final filePath = song.filePath;
+      final dotIndex = filePath.lastIndexOf('.');
+      final basePath =
+          dotIndex != -1 ? filePath.substring(0, dotIndex) : filePath;
 
-    final lrcFile = File('$basePath.lrc');
-    if (lrcFile.existsSync()) {
-      final bytes = lrcFile.readAsBytesSync();
-      final content = utf8.decode(bytes, allowMalformed: true).trim();
-      if (content.isNotEmpty) {
-        await db.updateSongLyrics(song.id, content);
-        return content;
+      final lrcFile = File('$basePath.lrc');
+      if (lrcFile.existsSync()) {
+        final bytes = lrcFile.readAsBytesSync();
+        final content = utf8.decode(bytes, allowMalformed: true).trim();
+        if (content.isNotEmpty) {
+          await db.updateSongLyrics(song.id, content);
+          return content;
+        }
       }
-    }
 
-    final txtFile = File('$basePath.txt');
-    if (txtFile.existsSync()) {
-      final bytes = txtFile.readAsBytesSync();
-      final content = utf8.decode(bytes, allowMalformed: true).trim();
-      if (content.isNotEmpty) {
-        await db.updateSongLyrics(song.id, content);
-        return content;
+      final txtFile = File('$basePath.txt');
+      if (txtFile.existsSync()) {
+        final bytes = txtFile.readAsBytesSync();
+        final content = utf8.decode(bytes, allowMalformed: true).trim();
+        if (content.isNotEmpty) {
+          await db.updateSongLyrics(song.id, content);
+          return content;
+        }
       }
+    } catch (e) {
+      // Non-fatal if filesystem lookup fails (e.g. test environment)
     }
-  } catch (e) {
-    // Non-fatal if filesystem lookup fails (e.g. test environment)
+  }
+
+  // 3) Online lyrics fetch via LRCLIB / fallback
+  if (onlineLyricsService != null) {
+    try {
+      final onlineLyrics = await onlineLyricsService.fetchLyricsForSong(
+        song,
+        customQuery: customQuery,
+      );
+      if (onlineLyrics != null && onlineLyrics.trim().isNotEmpty) {
+        await db.updateSongLyrics(song.id, onlineLyrics.trim());
+        return onlineLyrics.trim();
+      }
+    } catch (e) {
+      debugPrint('[resolveSongLyrics] Online fetch failed: $e');
+    }
   }
 
   return null;
@@ -305,6 +332,9 @@ final trackLyricsProvider =
       final raw = await resolveSongLyrics(song: song, db: db);
       if (raw != null && raw.trim().isNotEmpty) {
         return LrcParser.parse(raw);
+      } else {
+        // Auto-trigger background online fetch if lyrics are missing
+        ref.read(lyricsControllerProvider.notifier).triggerAutoFetch(song);
       }
     }
     return const ParsedLyrics(lines: [], isSynced: false);
