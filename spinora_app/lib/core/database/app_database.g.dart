@@ -119,6 +119,15 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _lyricsMeta = const VerificationMeta('lyrics');
+  @override
+  late final GeneratedColumn<String> lyrics = GeneratedColumn<String>(
+    'lyrics',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -131,6 +140,7 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     isFavorite,
     lastPlayedAt,
     playCount,
+    lyrics,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -215,6 +225,12 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta),
       );
     }
+    if (data.containsKey('lyrics')) {
+      context.handle(
+        _lyricsMeta,
+        lyrics.isAcceptableOrUnknown(data['lyrics']!, _lyricsMeta),
+      );
+    }
     return context;
   }
 
@@ -264,6 +280,10 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         DriftSqlType.int,
         data['${effectivePrefix}play_count'],
       )!,
+      lyrics: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lyrics'],
+      ),
     );
   }
 
@@ -284,6 +304,7 @@ class Song extends DataClass implements Insertable<Song> {
   final bool isFavorite;
   final DateTime? lastPlayedAt;
   final int playCount;
+  final String? lyrics;
   const Song({
     required this.id,
     required this.title,
@@ -295,6 +316,7 @@ class Song extends DataClass implements Insertable<Song> {
     required this.isFavorite,
     this.lastPlayedAt,
     required this.playCount,
+    this.lyrics,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -315,6 +337,9 @@ class Song extends DataClass implements Insertable<Song> {
       map['last_played_at'] = Variable<DateTime>(lastPlayedAt);
     }
     map['play_count'] = Variable<int>(playCount);
+    if (!nullToAbsent || lyrics != null) {
+      map['lyrics'] = Variable<String>(lyrics);
+    }
     return map;
   }
 
@@ -336,6 +361,9 @@ class Song extends DataClass implements Insertable<Song> {
           ? const Value.absent()
           : Value(lastPlayedAt),
       playCount: Value(playCount),
+      lyrics: lyrics == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lyrics),
     );
   }
 
@@ -355,6 +383,7 @@ class Song extends DataClass implements Insertable<Song> {
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       lastPlayedAt: serializer.fromJson<DateTime?>(json['lastPlayedAt']),
       playCount: serializer.fromJson<int>(json['playCount']),
+      lyrics: serializer.fromJson<String?>(json['lyrics']),
     );
   }
   @override
@@ -371,6 +400,7 @@ class Song extends DataClass implements Insertable<Song> {
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'lastPlayedAt': serializer.toJson<DateTime?>(lastPlayedAt),
       'playCount': serializer.toJson<int>(playCount),
+      'lyrics': serializer.toJson<String?>(lyrics),
     };
   }
 
@@ -385,6 +415,7 @@ class Song extends DataClass implements Insertable<Song> {
     bool? isFavorite,
     Value<DateTime?> lastPlayedAt = const Value.absent(),
     int? playCount,
+    Value<String?> lyrics = const Value.absent(),
   }) => Song(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -396,6 +427,7 @@ class Song extends DataClass implements Insertable<Song> {
     isFavorite: isFavorite ?? this.isFavorite,
     lastPlayedAt: lastPlayedAt.present ? lastPlayedAt.value : this.lastPlayedAt,
     playCount: playCount ?? this.playCount,
+    lyrics: lyrics.present ? lyrics.value : this.lyrics,
   );
   Song copyWithCompanion(SongsCompanion data) {
     return Song(
@@ -415,6 +447,7 @@ class Song extends DataClass implements Insertable<Song> {
           ? data.lastPlayedAt.value
           : this.lastPlayedAt,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
+      lyrics: data.lyrics.present ? data.lyrics.value : this.lyrics,
     );
   }
 
@@ -430,7 +463,8 @@ class Song extends DataClass implements Insertable<Song> {
           ..write('albumArtPath: $albumArtPath, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
-          ..write('playCount: $playCount')
+          ..write('playCount: $playCount, ')
+          ..write('lyrics: $lyrics')
           ..write(')'))
         .toString();
   }
@@ -447,6 +481,7 @@ class Song extends DataClass implements Insertable<Song> {
     isFavorite,
     lastPlayedAt,
     playCount,
+    lyrics,
   );
   @override
   bool operator ==(Object other) =>
@@ -461,7 +496,8 @@ class Song extends DataClass implements Insertable<Song> {
           other.albumArtPath == this.albumArtPath &&
           other.isFavorite == this.isFavorite &&
           other.lastPlayedAt == this.lastPlayedAt &&
-          other.playCount == this.playCount);
+          other.playCount == this.playCount &&
+          other.lyrics == this.lyrics);
 }
 
 class SongsCompanion extends UpdateCompanion<Song> {
@@ -475,6 +511,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
   final Value<bool> isFavorite;
   final Value<DateTime?> lastPlayedAt;
   final Value<int> playCount;
+  final Value<String?> lyrics;
   const SongsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -486,6 +523,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.isFavorite = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
     this.playCount = const Value.absent(),
+    this.lyrics = const Value.absent(),
   });
   SongsCompanion.insert({
     this.id = const Value.absent(),
@@ -498,6 +536,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.isFavorite = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
     this.playCount = const Value.absent(),
+    this.lyrics = const Value.absent(),
   }) : title = Value(title),
        artist = Value(artist),
        duration = Value(duration),
@@ -513,6 +552,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Expression<bool>? isFavorite,
     Expression<DateTime>? lastPlayedAt,
     Expression<int>? playCount,
+    Expression<String>? lyrics,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -525,6 +565,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
       if (isFavorite != null) 'is_favorite': isFavorite,
       if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
       if (playCount != null) 'play_count': playCount,
+      if (lyrics != null) 'lyrics': lyrics,
     });
   }
 
@@ -539,6 +580,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Value<bool>? isFavorite,
     Value<DateTime?>? lastPlayedAt,
     Value<int>? playCount,
+    Value<String?>? lyrics,
   }) {
     return SongsCompanion(
       id: id ?? this.id,
@@ -551,6 +593,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
       isFavorite: isFavorite ?? this.isFavorite,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       playCount: playCount ?? this.playCount,
+      lyrics: lyrics ?? this.lyrics,
     );
   }
 
@@ -587,6 +630,9 @@ class SongsCompanion extends UpdateCompanion<Song> {
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
     }
+    if (lyrics.present) {
+      map['lyrics'] = Variable<String>(lyrics.value);
+    }
     return map;
   }
 
@@ -602,7 +648,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
           ..write('albumArtPath: $albumArtPath, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
-          ..write('playCount: $playCount')
+          ..write('playCount: $playCount, ')
+          ..write('lyrics: $lyrics')
           ..write(')'))
         .toString();
   }
@@ -1572,6 +1619,7 @@ typedef $$SongsTableCreateCompanionBuilder = SongsCompanion Function({
   Value<bool> isFavorite,
   Value<DateTime?> lastPlayedAt,
   Value<int> playCount,
+  Value<String?> lyrics,
 });
 typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
   Value<int> id,
@@ -1584,6 +1632,7 @@ typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
   Value<bool> isFavorite,
   Value<DateTime?> lastPlayedAt,
   Value<int> playCount,
+  Value<String?> lyrics,
 });
 
 final class $$SongsTableReferences
@@ -1664,6 +1713,11 @@ class $$SongsTableFilterComposer extends Composer<_$AppDatabase, $SongsTable> {
 
   ColumnFilters<int> get playCount => $composableBuilder(
     column: $table.playCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lyrics => $composableBuilder(
+    column: $table.lyrics,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1751,6 +1805,11 @@ class $$SongsTableOrderingComposer
     column: $table.playCount,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get lyrics => $composableBuilder(
+    column: $table.lyrics,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SongsTableAnnotationComposer
@@ -1797,6 +1856,9 @@ class $$SongsTableAnnotationComposer
 
   GeneratedColumn<int> get playCount =>
       $composableBuilder(column: $table.playCount, builder: (column) => column);
+
+  GeneratedColumn<String> get lyrics =>
+      $composableBuilder(column: $table.lyrics, builder: (column) => column);
 
   Expression<T> playlistSongsRefs<T extends Object>(
     Expression<T> Function($$PlaylistSongsTableAnnotationComposer a) f,
@@ -1862,6 +1924,7 @@ class $$SongsTableTableManager
                 Value<bool> isFavorite = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
+                Value<String?> lyrics = const Value.absent(),
               }) => SongsCompanion(
                 id: id,
                 title: title,
@@ -1873,6 +1936,7 @@ class $$SongsTableTableManager
                 isFavorite: isFavorite,
                 lastPlayedAt: lastPlayedAt,
                 playCount: playCount,
+                lyrics: lyrics,
               ),
           createCompanionCallback:
               ({
@@ -1886,6 +1950,7 @@ class $$SongsTableTableManager
                 Value<bool> isFavorite = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
+                Value<String?> lyrics = const Value.absent(),
               }) => SongsCompanion.insert(
                 id: id,
                 title: title,
@@ -1897,6 +1962,7 @@ class $$SongsTableTableManager
                 isFavorite: isFavorite,
                 lastPlayedAt: lastPlayedAt,
                 playCount: playCount,
+                lyrics: lyrics,
               ),
           withReferenceMapper: (p0) => p0
               .map(

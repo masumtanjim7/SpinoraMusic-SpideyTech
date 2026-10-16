@@ -19,6 +19,7 @@ class Songs extends Table {
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lastPlayedAt => dateTime().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
+  TextColumn get lyrics => text().nullable()();
 }
 
 /// Drift table storing active playback state to support app reload / resume.
@@ -56,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -72,6 +73,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(songs, songs.lastPlayedAt);
             await m.addColumn(songs, songs.playCount);
             await m.createTable(playbackSessions);
+          }
+          if (from < 4) {
+            await m.addColumn(songs, songs.lyrics);
           }
         },
         beforeOpen: (details) async {
@@ -202,6 +206,21 @@ class AppDatabase extends _$AppDatabase {
     return (select(songs)..where((s) => s.id.equals(songId))).getSingleOrNull();
   }
 
+  /// Watches a single [Song] by its [id] reactively.
+  Stream<Song?> watchSongById(int songId) {
+    return (select(songs)..where((s) => s.id.equals(songId)))
+        .watchSingleOrNull();
+  }
+
+  /// Updates stored lyrics for a specific song.
+  Future<void> updateSongLyrics(int songId, String? lyrics) async {
+    await (update(songs)..where((s) => s.id.equals(songId))).write(
+      SongsCompanion(
+        lyrics: Value(lyrics),
+      ),
+    );
+  }
+
   /// Fetches the last saved playback session state.
   Future<SavedPlaybackSession?> getPlaybackSession() {
     return (select(playbackSessions)..where((p) => p.id.equals(1)))
@@ -276,4 +295,11 @@ final recentlyPlayedSongsStreamProvider =
 final songByIdProvider = FutureProvider.family<Song?, int>((ref, songId) {
   final db = ref.watch(appDatabaseProvider);
   return db.getSongById(songId);
+});
+
+/// Reactive stream of a single [Song] by its ID.
+final songStreamByIdProvider =
+    StreamProvider.family<Song?, int>((ref, songId) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchSongById(songId);
 });

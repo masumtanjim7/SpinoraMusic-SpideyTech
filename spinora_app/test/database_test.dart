@@ -91,4 +91,34 @@ void main() {
     final songsAfterDelete = await db.select(db.songs).get();
     expect(songsAfterDelete.length, 2);
   });
+
+  test('can update and watch song lyrics in database', () async {
+    final songId = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Lyrics Test Song',
+            artist: 'Spidey',
+            duration: 120000,
+            filePath: '/music/lyrics.mp3',
+          ),
+        );
+
+    // Initial lyrics is null
+    final initialSong = await db.getSongById(songId);
+    expect(initialSong?.lyrics, isNull);
+
+    // Update lyrics
+    await db.updateSongLyrics(songId, '[00:10.00]First line of lyrics\n[00:20.00]Second line');
+
+    final updatedSong = await db.getSongById(songId);
+    expect(updatedSong?.lyrics, '[00:10.00]First line of lyrics\n[00:20.00]Second line');
+
+    // Watch stream emits updated song
+    final streamedSong = await db.watchSongById(songId).first;
+    expect(streamedSong?.lyrics, contains('First line of lyrics'));
+
+    // Clear lyrics
+    await db.updateSongLyrics(songId, null);
+    final clearedSong = await db.getSongById(songId);
+    expect(clearedSong?.lyrics, isNull);
+  });
 }

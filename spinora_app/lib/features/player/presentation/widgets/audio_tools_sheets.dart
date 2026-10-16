@@ -759,11 +759,15 @@ class AudioToolsActionRow extends ConsumerWidget {
     required this.playerState,
     required this.track,
     required this.onOpenQueue,
+    this.isLyricsActive = false,
+    this.onToggleLyrics,
   });
 
   final PlayerState playerState;
   final Track track;
   final VoidCallback onOpenQueue;
+  final bool isLyricsActive;
+  final VoidCallback? onToggleLyrics;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -772,7 +776,7 @@ class AudioToolsActionRow extends ConsumerWidget {
     final speed = playerState.playbackSpeed;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
@@ -807,7 +811,17 @@ class AudioToolsActionRow extends ConsumerWidget {
             tooltip: 'Playback Speed (${speed}x)',
           ),
 
-          // 3. Up Next Queue Quick Button
+          // 3. Lyrics Quick Button
+          _ToolButton(
+            icon: Icons.lyrics_rounded,
+            label: 'Lyrics',
+            isActive: isLyricsActive,
+            activeColor: AppColors.cyanAccent,
+            onTap: onToggleLyrics ?? () {},
+            tooltip: isLyricsActive ? 'Hide Lyrics' : 'Show Synced Lyrics',
+          ),
+
+          // 4. Up Next Queue Quick Button
           _ToolButton(
             icon: Icons.queue_music_rounded,
             label: 'Queue',
@@ -817,7 +831,7 @@ class AudioToolsActionRow extends ConsumerWidget {
             tooltip: 'Up Next Queue (${playerState.queue.length})',
           ),
 
-          // 4. Song Info Quick Button
+          // 5. Song Info Quick Button
           _ToolButton(
             icon: Icons.info_outline_rounded,
             label: 'Info',
