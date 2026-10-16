@@ -12,14 +12,34 @@ import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
 import 'playlist_detail_screen.dart';
+import 'widgets/library_group_views.dart';
 import 'widgets/song_artwork.dart';
 import 'widgets/song_options_sheet.dart';
 
 // ---------------------------------------------------------------------------
-// Library Filter State & Providers
+// Library Filter & Sort State & Providers
 // ---------------------------------------------------------------------------
 
-enum LibraryFilter { all, playlists, favorites }
+enum SongSortOption {
+  titleAsc('Title', Icons.sort_by_alpha_rounded),
+  artistAsc('Artist', Icons.person_rounded),
+  mostPlayed('Most Played', Icons.local_fire_department_rounded),
+  recentlyPlayed('Recently Played', Icons.history_rounded),
+  durationDesc('Duration', Icons.timer_outlined);
+
+  const SongSortOption(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
+enum LibraryFilter {
+  all,
+  favorites,
+  mostPlayed,
+  playlists,
+  artists,
+  albums,
+}
 
 class SearchQueryNotifier extends Notifier<String> {
   @override
@@ -44,15 +64,42 @@ final libraryFilterProvider =
   LibraryFilterNotifier.new,
 );
 
-/// Filters the loaded songs according to the active search text and favorites filter.
+class SongSortNotifier extends Notifier<SongSortOption> {
+  @override
+  SongSortOption build() => SongSortOption.titleAsc;
+
+  void setSort(SongSortOption option) => state = option;
+}
+
+final librarySortOptionProvider =
+    NotifierProvider<SongSortNotifier, SongSortOption>(SongSortNotifier.new);
+
+class SortAscendingNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void toggle() => state = !state;
+  void setAscending(bool asc) => state = asc;
+}
+
+final librarySortAscendingProvider =
+    NotifierProvider<SortAscendingNotifier, bool>(SortAscendingNotifier.new);
+
+/// Filters and sorts the loaded songs according to the active search text,
+/// category filter, and sort preference.
 final filteredSongsProvider = Provider<AsyncValue<List<Song>>>((ref) {
   final songsAsync = ref.watch(localSongsStreamProvider);
   final query = ref.watch(librarySearchQueryProvider).trim().toLowerCase();
   final filter = ref.watch(libraryFilterProvider);
+  final sortOption = ref.watch(librarySortOptionProvider);
+  final isAsc = ref.watch(librarySortAscendingProvider);
 
   return songsAsync.whenData((songs) {
-    return songs.where((song) {
+    final filtered = songs.where((song) {
       if (filter == LibraryFilter.favorites && !song.isFavorite) {
+        return false;
+      }
+      if (filter == LibraryFilter.mostPlayed && song.playCount <= 0) {
         return false;
       }
       if (query.isNotEmpty) {
@@ -65,6 +112,44 @@ final filteredSongsProvider = Provider<AsyncValue<List<Song>>>((ref) {
       }
       return true;
     }).toList();
+
+    filtered.sort((a, b) {
+      if (filter == LibraryFilter.mostPlayed) {
+        final countCmp = b.playCount.compareTo(a.playCount);
+        if (countCmp != 0) return countCmp;
+      }
+
+      int cmp;
+      switch (sortOption) {
+        case SongSortOption.titleAsc:
+          cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case SongSortOption.artistAsc:
+          cmp = a.artist.toLowerCase().compareTo(b.artist.toLowerCase());
+          if (cmp == 0) {
+            cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          }
+        case SongSortOption.mostPlayed:
+          cmp = b.playCount.compareTo(a.playCount);
+          if (cmp == 0) {
+            cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          }
+        case SongSortOption.recentlyPlayed:
+          final aTime =
+              a.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime =
+              b.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          cmp = bTime.compareTo(aTime);
+        case SongSortOption.durationDesc:
+          cmp = b.duration.compareTo(a.duration);
+      }
+
+      if (!isAsc) {
+        cmp = -cmp;
+      }
+      return cmp;
+    });
+
+    return filtered;
   });
 });
 
@@ -287,101 +372,114 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ref.read(libraryFilterProvider.notifier).setFilter(f);
                     });
                   },
+                  allSongs: allSongs,
                   totalCount: allSongs.length,
                   filteredCount: filteredSongs.length,
                   isSearchingOrFiltering: isSearchingOrFiltering,
                 ),
 
-                // Songs List, Playlists, or State Placeholders
+                // Songs List, Playlists, Artists, Albums, or State Placeholders
                 Expanded(
-                  child: selectedFilter == LibraryFilter.playlists
-                      ? const _PlaylistsView()
-                      : allSongsAsync.when(
-                    data: (songs) {
-                      if (songs.isEmpty && selectedFilter == LibraryFilter.all) {
-                        return _EmptyLibraryView(
-                          isScanning: scanState.isScanning,
-                          onScanPressed: () => ref
-                              .read(audioScannerStateProvider.notifier)
-                              .scan(),
-                        );
-                      }
-
-                      if (filteredSongs.isEmpty) {
-                        return _NoSearchResultsView(
-                          query: searchQuery,
-                          isFavoritesOnly:
-                              selectedFilter == LibraryFilter.favorites,
-                          onReset: () {
-                            _searchController.clear();
-                            ref
-                                .read(librarySearchQueryProvider.notifier)
-                                .clear();
-                            setState(() {
-                              ref
-                                  .read(libraryFilterProvider.notifier)
-                                  .setFilter(LibraryFilter.all);
-                            });
-                          },
-                        );
-                      }
-
-                      final showRecentlyPlayed =
-                          selectedFilter == LibraryFilter.all &&
-                              searchQuery.isEmpty &&
-                              recentSongs.isNotEmpty;
-
-                      return CustomScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          if (showRecentlyPlayed) ...[
-                            SliverToBoxAdapter(
-                              child: _RecentlyPlayedSection(
-                                recentSongs: recentSongs,
-                              ),
-                            ),
-                          ],
-                          SliverPadding(
-                            padding: EdgeInsets.fromLTRB(
-                              20,
-                              showRecentlyPlayed ? 4 : 8,
-                              20,
-                              playerState.hasTrack ? 110 : 80,
-                            ),
-                            sliver: SliverList.separated(
-                              itemCount: filteredSongs.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, index) {
-                                final song = filteredSongs[index];
-                                return _SongListTile(
-                                  song: song,
-                                  songs: filteredSongs,
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                    loading: () => const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.purpleAccent,
+                  child: switch (selectedFilter) {
+                    LibraryFilter.playlists => const _PlaylistsView(),
+                    LibraryFilter.artists => ArtistsGroupedView(
+                        songs: allSongs,
+                        searchQuery: searchQuery,
                       ),
-                    ),
-                    error: (error, _) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Failed to load songs: $error',
-                          style: tt.bodyMedium?.copyWith(
-                            color: Colors.redAccent,
+                    LibraryFilter.albums => AlbumsGroupedView(
+                        songs: allSongs,
+                        searchQuery: searchQuery,
+                      ),
+                    _ => allSongsAsync.when(
+                        data: (songs) {
+                          if (songs.isEmpty &&
+                              selectedFilter == LibraryFilter.all) {
+                            return _EmptyLibraryView(
+                              isScanning: scanState.isScanning,
+                              onScanPressed: () => ref
+                                  .read(audioScannerStateProvider.notifier)
+                                  .scan(),
+                            );
+                          }
+
+                          if (filteredSongs.isEmpty) {
+                            return _NoSearchResultsView(
+                              query: searchQuery,
+                              isFavoritesOnly:
+                                  selectedFilter == LibraryFilter.favorites,
+                              isMostPlayedOnly:
+                                  selectedFilter == LibraryFilter.mostPlayed,
+                              onReset: () {
+                                _searchController.clear();
+                                ref
+                                    .read(librarySearchQueryProvider.notifier)
+                                    .clear();
+                                setState(() {
+                                  ref
+                                      .read(libraryFilterProvider.notifier)
+                                      .setFilter(LibraryFilter.all);
+                                });
+                              },
+                            );
+                          }
+
+                          final showRecentlyPlayed =
+                              selectedFilter == LibraryFilter.all &&
+                                  searchQuery.isEmpty &&
+                                  recentSongs.isNotEmpty;
+
+                          return CustomScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            slivers: [
+                              if (showRecentlyPlayed) ...[
+                                SliverToBoxAdapter(
+                                  child: _RecentlyPlayedSection(
+                                    recentSongs: recentSongs,
+                                  ),
+                                ),
+                              ],
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(
+                                  20,
+                                  showRecentlyPlayed ? 4 : 8,
+                                  20,
+                                  playerState.hasTrack ? 110 : 80,
+                                ),
+                                sliver: SliverList.separated(
+                                  itemCount: filteredSongs.length,
+                                  separatorBuilder: (context, index) =>
+                                      const SizedBox(height: 8),
+                                  itemBuilder: (context, index) {
+                                    final song = filteredSongs[index];
+                                    return _SongListTile(
+                                      song: song,
+                                      songs: filteredSongs,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.purpleAccent,
                           ),
-                          textAlign: TextAlign.center,
+                        ),
+                        error: (error, _) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'Failed to load songs: $error',
+                              style: tt.bodyMedium?.copyWith(
+                                color: Colors.redAccent,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                  },
                 ),
               ],
             ),
@@ -494,6 +592,7 @@ class _LibraryFilterBar extends StatelessWidget {
   const _LibraryFilterBar({
     required this.selectedFilter,
     required this.onFilterSelected,
+    required this.allSongs,
     required this.totalCount,
     required this.filteredCount,
     required this.isSearchingOrFiltering,
@@ -501,12 +600,21 @@ class _LibraryFilterBar extends StatelessWidget {
 
   final LibraryFilter selectedFilter;
   final ValueChanged<LibraryFilter> onFilterSelected;
+  final List<Song> allSongs;
   final int totalCount;
   final int filteredCount;
   final bool isSearchingOrFiltering;
 
   @override
   Widget build(BuildContext context) {
+    final uniqueArtists = allSongs.map((s) => s.artist.trim()).toSet();
+    final uniqueAlbums =
+        allSongs.map((s) => s.album?.trim() ?? 'Unknown Album').toSet();
+
+    final showSortButton = selectedFilter == LibraryFilter.all ||
+        selectedFilter == LibraryFilter.favorites ||
+        selectedFilter == LibraryFilter.mostPlayed;
+
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 8),
       child: SingleChildScrollView(
@@ -524,6 +632,22 @@ class _LibraryFilterBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _FilterChip(
+              label: 'Favorites',
+              icon: Icons.favorite_rounded,
+              isSelected: selectedFilter == LibraryFilter.favorites,
+              onTap: () => onFilterSelected(LibraryFilter.favorites),
+              activeColor: Colors.pinkAccent,
+            ),
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'Most Played',
+              icon: Icons.local_fire_department_rounded,
+              isSelected: selectedFilter == LibraryFilter.mostPlayed,
+              onTap: () => onFilterSelected(LibraryFilter.mostPlayed),
+              activeColor: Colors.orangeAccent,
+            ),
+            const SizedBox(width: 8),
+            _FilterChip(
               label: 'Playlists',
               icon: Icons.queue_music_rounded,
               isSelected: selectedFilter == LibraryFilter.playlists,
@@ -532,14 +656,23 @@ class _LibraryFilterBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _FilterChip(
-              label: 'Favorites',
-              icon: Icons.favorite_rounded,
-              isSelected: selectedFilter == LibraryFilter.favorites,
-              onTap: () => onFilterSelected(LibraryFilter.favorites),
-              activeColor: Colors.pinkAccent,
+              label: 'Artists',
+              icon: Icons.person_rounded,
+              isSelected: selectedFilter == LibraryFilter.artists,
+              onTap: () => onFilterSelected(LibraryFilter.artists),
+              activeColor: AppColors.cyanAccent,
+            ),
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'Albums',
+              icon: Icons.album_rounded,
+              isSelected: selectedFilter == LibraryFilter.albums,
+              onTap: () => onFilterSelected(LibraryFilter.albums),
+              activeColor: Colors.tealAccent,
             ),
             const SizedBox(width: 12),
-            // Counter badge
+
+            // Counter badge according to active tab
             if (selectedFilter == LibraryFilter.playlists)
               Consumer(
                 builder: (context, ref, _) {
@@ -569,6 +702,52 @@ class _LibraryFilterBar extends StatelessWidget {
                   );
                 },
               )
+            else if (selectedFilter == LibraryFilter.artists)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  '${uniqueArtists.length} artists',
+                  style: const TextStyle(
+                    color: AppColors.cyanAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              )
+            else if (selectedFilter == LibraryFilter.albums)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.tealAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.tealAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  '${uniqueAlbums.length} albums',
+                  style: const TextStyle(
+                    color: Colors.tealAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              )
             else
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -594,6 +773,65 @@ class _LibraryFilterBar extends StatelessWidget {
                   ),
                 ),
               ),
+
+            // Sleek glassmorphic Sort Chip button
+            if (showSortButton) ...[
+              const SizedBox(width: 8),
+              Consumer(
+                builder: (context, ref, _) {
+                  final sortOption = ref.watch(librarySortOptionProvider);
+                  final isAsc = ref.watch(librarySortAscendingProvider);
+
+                  return Tooltip(
+                    message: 'Change sorting order',
+                    child: InkWell(
+                      onTap: () => showSortBottomSheet(context),
+                      borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            sortOption.icon,
+                            size: 13,
+                            color: AppColors.cyanAccent,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            sortOption.label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            isAsc
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
+                            size: 12,
+                            color: AppColors.cyanAccent,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              ),
+            ],
           ],
         ),
       ),
@@ -1462,17 +1700,40 @@ class _PlaylistTile extends ConsumerWidget {
 class _NoSearchResultsView extends StatelessWidget {
   const _NoSearchResultsView({
     required this.query,
-    required this.isFavoritesOnly,
+    this.isFavoritesOnly = false,
+    this.isMostPlayedOnly = false,
     required this.onReset,
   });
 
   final String query;
   final bool isFavoritesOnly;
+  final bool isMostPlayedOnly;
   final VoidCallback onReset;
 
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+
+    final IconData icon;
+    final String title;
+    final String message;
+
+    if (isMostPlayedOnly && query.isEmpty) {
+      icon = Icons.local_fire_department_outlined;
+      title = 'No Most Played Tracks Yet';
+      message =
+          'Play songs from your library to see them ranked here by play count.';
+    } else if (isFavoritesOnly && query.isEmpty) {
+      icon = Icons.favorite_border_rounded;
+      title = 'No Favorites Yet';
+      message =
+          'Tap the heart icon on any track to add it to your favorites list.';
+    } else {
+      icon = Icons.search_off_rounded;
+      title = 'No Tracks Found';
+      message =
+          'No songs matched your search criteria. Try a different keyword.';
+    }
 
     return Center(
       child: Padding(
@@ -1483,17 +1744,13 @@ class _NoSearchResultsView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isFavoritesOnly
-                    ? Icons.favorite_border_rounded
-                    : Icons.search_off_rounded,
+                icon,
                 size: 48,
                 color: Colors.white.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 14),
               Text(
-                isFavoritesOnly && query.isEmpty
-                    ? 'No Favorites Yet'
-                    : 'No Tracks Found',
+                title,
                 style: tt.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -1501,9 +1758,7 @@ class _NoSearchResultsView extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                isFavoritesOnly && query.isEmpty
-                    ? 'Tap the heart icon on any track to add it to your favorites list.'
-                    : 'No songs matched your search criteria. Try a different keyword.',
+                message,
                 style: tt.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.6),
                 ),

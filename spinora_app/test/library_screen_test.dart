@@ -410,4 +410,289 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+      'LibraryScreen filters by Most Played tab and orders by playCount desc',
+      (tester) async {
+    final songs = [
+      const Song(
+        id: 1,
+        title: 'Unplayed Track',
+        artist: 'Artist Zero',
+        album: 'Album 0',
+        duration: 180000,
+        filePath: '/music/zero.mp3',
+        isFavorite: false,
+        playCount: 0,
+      ),
+      const Song(
+        id: 2,
+        title: 'Popular Track 10',
+        artist: 'Artist Ten',
+        album: 'Album 10',
+        duration: 200000,
+        filePath: '/music/ten.mp3',
+        isFavorite: false,
+        playCount: 10,
+      ),
+      const Song(
+        id: 3,
+        title: 'Medium Track 5',
+        artist: 'Artist Five',
+        album: 'Album 5',
+        duration: 210000,
+        filePath: '/music/five.mp3',
+        isFavorite: false,
+        playCount: 5,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider.overrideWith((ref) => Stream.value(songs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify all 3 songs shown in All tab
+    expect(find.text('Unplayed Track'), findsOneWidget);
+    expect(find.text('Popular Track 10'), findsOneWidget);
+    expect(find.text('Medium Track 5'), findsOneWidget);
+
+    // Tap Most Played tab
+    await tester.tap(find.text('Most Played'));
+    await tester.pumpAndSettle();
+
+    // Unplayed track with playCount == 0 should be filtered out
+    expect(find.text('Unplayed Track'), findsNothing);
+    expect(find.text('Popular Track 10'), findsOneWidget);
+    expect(find.text('Medium Track 5'), findsOneWidget);
+  });
+
+  testWidgets(
+      'LibraryScreen opens Sort Bottom Sheet and switches sort options',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final songs = [
+      const Song(
+        id: 1,
+        title: 'Alpha Song',
+        artist: 'Zulu Artist',
+        album: 'Album A',
+        duration: 180000,
+        filePath: '/music/a.mp3',
+        isFavorite: false,
+        playCount: 1,
+      ),
+      const Song(
+        id: 2,
+        title: 'Beta Song',
+        artist: 'Alpha Artist',
+        album: 'Album B',
+        duration: 240000,
+        filePath: '/music/b.mp3',
+        isFavorite: false,
+        playCount: 2,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider.overrideWith((ref) => Stream.value(songs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap sort chip button in the filter bar
+    final sortButton = find.byTooltip('Change sorting order');
+    expect(sortButton, findsOneWidget);
+    await tester.tap(sortButton);
+    await tester.pumpAndSettle();
+
+    // Verify Sort Bottom Sheet header and options are displayed
+    expect(find.text('SORT SONGS'), findsOneWidget);
+    expect(find.text('Ascending'), findsOneWidget);
+    expect(find.text('Descending'), findsOneWidget);
+    expect(find.text('Title'), findsWidgets);
+    expect(find.text('Artist'), findsWidgets);
+    expect(find.text('Most Played'), findsWidgets);
+    expect(find.text('Recently Played'), findsWidgets);
+    expect(find.text('Duration'), findsWidgets);
+
+    // Select Descending order
+    await tester.tap(find.text('Descending'));
+    await tester.pumpAndSettle();
+
+    // Select sort by Artist (which updates sort and automatically dismisses sheet)
+    await tester.tap(find.text('Artist').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('SORT SONGS'), findsNothing);
+  });
+
+  testWidgets(
+      'LibraryScreen groups songs by Artists and displays tracks in bottom sheet',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final songs = [
+      const Song(
+        id: 1,
+        title: 'Around the World',
+        artist: 'Daft Punk',
+        album: 'Homework',
+        duration: 240000,
+        filePath: '/music/daft1.mp3',
+        isFavorite: false,
+        playCount: 4,
+      ),
+      const Song(
+        id: 2,
+        title: 'One More Time',
+        artist: 'Daft Punk',
+        album: 'Discovery',
+        duration: 320000,
+        filePath: '/music/daft2.mp3',
+        isFavorite: true,
+        playCount: 12,
+      ),
+      const Song(
+        id: 3,
+        title: 'Time',
+        artist: 'Hans Zimmer',
+        album: 'Inception',
+        duration: 275000,
+        filePath: '/music/zimmer.mp3',
+        isFavorite: false,
+        playCount: 1,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider.overrideWith((ref) => Stream.value(songs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap Artists filter chip
+    await tester.tap(find.text('Artists'));
+    await tester.pumpAndSettle();
+
+    // Verify grouped artist cards
+    expect(find.text('Daft Punk'), findsOneWidget);
+    expect(find.text('Hans Zimmer'), findsOneWidget);
+    expect(find.text('2 tracks'), findsOneWidget);
+    expect(find.text('1 track'), findsOneWidget);
+
+    // Tap on Daft Punk artist card to open artist detail sheet
+    await tester.tap(find.text('Daft Punk'));
+    await tester.pumpAndSettle();
+
+    // Verify detail sheet shows artist name, action buttons, and tracks
+    expect(find.text('Play All'), findsOneWidget);
+    expect(find.text('Shuffle'), findsOneWidget);
+    expect(find.text('Around the World'), findsOneWidget);
+    expect(find.text('One More Time'), findsOneWidget);
+  });
+
+  testWidgets(
+      'LibraryScreen groups songs by Albums and displays album tracks sheet',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final songs = [
+      const Song(
+        id: 1,
+        title: 'Harder, Better, Faster, Stronger',
+        artist: 'Daft Punk',
+        album: 'Discovery',
+        duration: 224000,
+        filePath: '/music/daft_hbfs.mp3',
+        isFavorite: false,
+        playCount: 6,
+      ),
+      const Song(
+        id: 2,
+        title: 'Dream is Collapsing',
+        artist: 'Hans Zimmer',
+        album: 'Inception',
+        duration: 143000,
+        filePath: '/music/zimmer_dream.mp3',
+        isFavorite: false,
+        playCount: 2,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider.overrideWith((ref) => Stream.value(songs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap Albums filter chip
+    await tester.tap(find.text('Albums'));
+    await tester.pumpAndSettle();
+
+    // Verify albums in grid
+    expect(find.text('Discovery'), findsOneWidget);
+    expect(find.text('Inception'), findsOneWidget);
+
+    // Tap on Discovery album card to open album detail sheet
+    await tester.tap(find.text('Discovery'));
+    await tester.pumpAndSettle();
+
+    // Verify album detail sheet shows album title, action buttons, and track
+    expect(find.text('Play All'), findsOneWidget);
+    expect(find.text('Shuffle'), findsOneWidget);
+    expect(find.text('Harder, Better, Faster, Stronger'), findsOneWidget);
+  });
 }

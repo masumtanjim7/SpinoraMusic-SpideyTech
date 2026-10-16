@@ -116,6 +116,14 @@ Task 2.2f DONE (Sleep Timer, Playback Speed Control, and Song Information Sheet)
   compact glassmorphic bottom audio tools row on `NowPlayingScreen` with glowing active timer badge, speed badge, queue trigger,
   and track info trigger; dark glassmorphic modal bottom sheets for Sleep Timer, Playback Speed, and Song Info (title, artist, album,
   duration, play count, last played date/time, and file path); 0 analyzer issues and all 26 tests passing.
+Task 2.2g DONE (Library Sorting, Artists & Albums Grouped Views, and "Most Played" Filtering):
+  Added `SongSortOption` enum (`titleAsc`, `artistAsc`, `mostPlayed`, `recentlyPlayed`, `durationDesc`) with state notifiers
+  `librarySortOptionProvider` and `librarySortAscendingProvider`; dynamic sorting with ascending/descending order support;
+  category filter row in horizontal `SingleChildScrollView` expanded to `All Songs`, `Favorites`, `Most Played` (`playCount > 0`),
+  `Playlists`, `Artists`, and `Albums`; glassmorphic Sort button opening dark glassmorphic `SortBottomSheet`;
+  `ArtistsGroupedView` grouping library tracks by artist with glass cards and detail bottom sheet with "Play All" & "Shuffle";
+  `AlbumsGroupedView` grouping library tracks by album in a 2-column grid with detail bottom sheet with "Play All" & "Shuffle";
+  0 analyzer issues with `.withValues(alpha: ...)` and all 30 tests passing.
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
