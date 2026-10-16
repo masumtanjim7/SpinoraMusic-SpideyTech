@@ -146,7 +146,7 @@ Task 2.3b DONE (Automatic Online Synced Lyrics Fetching, Offline Drift Caching &
   - Instant reactive UI update from Drift database stream as soon as online lyrics are cached, without closing the lyrics view;
   - Compact glowing neon pill badge in header indicating `SYNCED LRC` (when timestamped `[mm:ss.xx]` lines are present), `PLAIN TEXT`, or `SEARCHING...`;
   - Lyrics header actions: Auto-Fetch / Refresh (`Icons.refresh_rounded`), Custom Online Search dialog (`Icons.travel_explore_rounded` pre-filled with cleaned metadata), Manual Edit / Paste (`Icons.edit_note_rounded`), and Return to Artwork (`Icons.photo_rounded`);
-  - Safe lifecycle state management with controllers disposed strictly in `State.dispose()` and zero `RenderFlex` overflows with `Expanded`/`Flexible`;
+  - Fixed layout overflow & clipping issues: wrapped `AudioToolsActionRow` in a horizontal `SingleChildScrollView` with `ConstrainedBox` + tight button padding eliminating the 56px bottom overflow; made `LiveLyricsCard` header icon buttons compact (32x32) and hid `LYRICS` title during `SEARCHING...` state; reduced vertical spacing and wrapped `_NoLyricsPlaceholder` in centered `SingleChildScrollView` preventing button clipping;
   0 analyzer issues and all 50 tests passing.
 Next: Step 3 / Full-Screen Immersive Lyrics Mode or Task 2.5 Audio Equalizer.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),

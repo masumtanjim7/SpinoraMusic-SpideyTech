@@ -194,56 +194,61 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'LYRICS',
-                        style: tt.labelMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
+                      if (!isFetchingThis) ...[
+                        Text(
+                          'LYRICS',
+                          style: tt.labelMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 5),
+                      ],
 
                       // Searching status or Synced / Plain format badge
                       if (isFetchingThis) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.cyanAccent.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(
-                                width: 8,
-                                height: 8,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 1.5,
-                                  value: 0.75,
-                                  color: AppColors.cyanAccent,
-                                ),
+                            decoration: BoxDecoration(
+                              color: AppColors.cyanAccent.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.cyanAccent.withValues(alpha: 0.5),
                               ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  'SEARCHING...',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 8,
+                                  height: 8,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    value: 0.75,
                                     color: AppColors.cyanAccent,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
                                   ),
                                 ),
-                              ),
-                            ],
+                                SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'SEARCHING...',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      color: AppColors.cyanAccent,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ] else ...[
@@ -251,31 +256,35 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                           data: (lyrics) {
                             if (lyrics.isEmpty) return const SizedBox.shrink();
                             final isSynced = lyrics.isSynced;
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSynced
-                                    ? AppColors.cyanAccent.withValues(alpha: 0.18)
-                                    : Colors.white.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSynced
-                                      ? AppColors.cyanAccent.withValues(alpha: 0.5)
-                                      : Colors.white.withValues(alpha: 0.15),
+                            return Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
                                 ),
-                              ),
-                              child: Text(
-                                isSynced ? 'SYNCED LRC' : 'PLAIN TEXT',
-                                style: TextStyle(
+                                decoration: BoxDecoration(
                                   color: isSynced
-                                      ? AppColors.cyanAccent
-                                      : Colors.white70,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                                      ? AppColors.cyanAccent.withValues(alpha: 0.18)
+                                      : Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSynced
+                                        ? AppColors.cyanAccent.withValues(alpha: 0.5)
+                                        : Colors.white.withValues(alpha: 0.15),
+                                  ),
+                                ),
+                                child: Text(
+                                  isSynced ? 'SYNCED LRC' : 'PLAIN TEXT',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: isSynced
+                                        ? AppColors.cyanAccent
+                                        : Colors.white70,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                               ),
                             );
@@ -294,14 +303,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: Icon(
                     Icons.refresh_rounded,
                     color: isFetchingThis ? Colors.white24 : Colors.white70,
-                    size: 17,
+                    size: 16,
                   ),
                   tooltip: 'Auto-Fetch / Refresh',
-                  style: IconButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(26, 26),
-                    padding: EdgeInsets.zero,
-                  ),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(4),
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -311,14 +317,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.travel_explore_rounded,
                     color: Colors.white70,
-                    size: 17,
+                    size: 16,
                   ),
                   tooltip: 'Search Online (LRCLIB)',
-                  style: IconButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(26, 26),
-                    padding: EdgeInsets.zero,
-                  ),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(4),
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -328,14 +331,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.edit_note_rounded,
                     color: Colors.white70,
-                    size: 18,
+                    size: 17,
                   ),
                   tooltip: 'Edit / Paste Lyrics',
-                  style: IconButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(26, 26),
-                    padding: EdgeInsets.zero,
-                  ),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(4),
                   visualDensity: VisualDensity.compact,
                 ),
 
@@ -345,14 +345,11 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.photo_rounded,
                     color: Colors.white70,
-                    size: 17,
+                    size: 16,
                   ),
                   tooltip: 'Show Artwork',
-                  style: IconButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(26, 26),
-                    padding: EdgeInsets.zero,
-                  ),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(4),
                   visualDensity: VisualDensity.compact,
                 ),
               ],
@@ -698,129 +695,135 @@ class _NoLyricsPlaceholder extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.lyrics_outlined,
-                size: 32,
-                color: Colors.white.withValues(alpha: 0.25),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lyrics_outlined,
+              size: 26,
+              color: Colors.white.withValues(alpha: 0.25),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No Lyrics Available',
+              style: tt.titleSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
-              const SizedBox(height: 6),
-              Text(
-                'No Lyrics Available',
-                style: tt.titleSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Search online or paste synced (.lrc) / plain lyrics for this track.',
+              textAlign: TextAlign.center,
+              style: tt.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 10.5,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Search online or paste synced (.lrc) / plain lyrics for this track.',
-                textAlign: TextAlign.center,
-                style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (onAutoFetchPressed != null)
-                    ElevatedButton.icon(
-                      onPressed: onAutoFetchPressed,
-                      icon: const Icon(
-                        Icons.refresh_rounded,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                      label: const Text(
-                        'Auto-Fetch',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            AppColors.purpleAccent.withValues(alpha: 0.35),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(
-                            color: AppColors.purpleAccent.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                    ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (onAutoFetchPressed != null)
                   ElevatedButton.icon(
-                    onPressed: onSearchOnlinePressed,
+                    onPressed: onAutoFetchPressed,
                     icon: const Icon(
-                      Icons.travel_explore_rounded,
+                      Icons.refresh_rounded,
                       color: Colors.white,
-                      size: 14,
+                      size: 13,
                     ),
                     label: const Text(
-                      'Search Online',
+                      'Auto-Fetch',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 11.5,
+                        fontSize: 11,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor:
-                          AppColors.cyanAccent.withValues(alpha: 0.3),
+                          AppColors.purpleAccent.withValues(alpha: 0.35),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                          horizontal: 10, vertical: 5),
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: AppColors.cyanAccent.withValues(alpha: 0.6),
+                          color: AppColors.purpleAccent.withValues(alpha: 0.6),
                         ),
                       ),
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: onPastePressed,
-                    icon: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white70,
-                      size: 14,
+                ElevatedButton.icon(
+                  onPressed: onSearchOnlinePressed,
+                  icon: const Icon(
+                    Icons.travel_explore_rounded,
+                    color: Colors.white,
+                    size: 13,
+                  ),
+                  label: const Text(
+                    'Search Online',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
                     ),
-                    label: const Text(
-                      'Paste Lyrics',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        AppColors.cyanAccent.withValues(alpha: 0.3),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                       side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.cyanAccent.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onPastePressed,
+                  icon: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white70,
+                    size: 13,
+                  ),
+                  label: const Text(
+                    'Paste Lyrics',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

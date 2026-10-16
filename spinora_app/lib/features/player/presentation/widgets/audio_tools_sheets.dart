@@ -776,7 +776,7 @@ class AudioToolsActionRow extends ConsumerWidget {
     final speed = playerState.playbackSpeed;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
@@ -784,63 +784,74 @@ class AudioToolsActionRow extends ConsumerWidget {
           color: Colors.white.withValues(alpha: 0.08),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // 1. Sleep Timer Quick Button
-          _ToolButton(
-            icon: isTimerActive ? Icons.bedtime_rounded : Icons.bedtime_outlined,
-            label: isTimerActive
-                ? (playerState.stopAtEndOfTrack
-                    ? 'End Track'
-                    : formatCountdown(remainingTimer ?? Duration.zero))
-                : 'Timer',
-            isActive: isTimerActive,
-            activeColor: AppColors.cyanAccent,
-            onTap: () => showSleepTimerSheet(context),
-            tooltip: isTimerActive ? 'Sleep Timer Active' : 'Set Sleep Timer',
-          ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // 1. Sleep Timer Quick Button
+                  _ToolButton(
+                    icon: isTimerActive ? Icons.bedtime_rounded : Icons.bedtime_outlined,
+                    label: isTimerActive
+                        ? (playerState.stopAtEndOfTrack
+                            ? 'End Track'
+                            : formatCountdown(remainingTimer ?? Duration.zero))
+                        : 'Timer',
+                    isActive: isTimerActive,
+                    activeColor: AppColors.cyanAccent,
+                    onTap: () => showSleepTimerSheet(context),
+                    tooltip: isTimerActive ? 'Sleep Timer Active' : 'Set Sleep Timer',
+                  ),
 
-          // 2. Playback Speed Quick Button
-          _ToolButton(
-            icon: Icons.speed_rounded,
-            label: '${speed}x',
-            isActive: (speed - 1.0).abs() > 0.01,
-            activeColor: AppColors.purpleAccent,
-            onTap: () => showPlaybackSpeedSheet(context),
-            tooltip: 'Playback Speed (${speed}x)',
-          ),
+                  // 2. Playback Speed Quick Button
+                  _ToolButton(
+                    icon: Icons.speed_rounded,
+                    label: '${speed}x',
+                    isActive: (speed - 1.0).abs() > 0.01,
+                    activeColor: AppColors.purpleAccent,
+                    onTap: () => showPlaybackSpeedSheet(context),
+                    tooltip: 'Playback Speed (${speed}x)',
+                  ),
 
-          // 3. Lyrics Quick Button
-          _ToolButton(
-            icon: Icons.lyrics_rounded,
-            label: 'Lyrics',
-            isActive: isLyricsActive,
-            activeColor: AppColors.cyanAccent,
-            onTap: onToggleLyrics ?? () {},
-            tooltip: isLyricsActive ? 'Hide Lyrics' : 'Show Synced Lyrics',
-          ),
+                  // 3. Lyrics Quick Button
+                  _ToolButton(
+                    icon: Icons.lyrics_rounded,
+                    label: 'Lyrics',
+                    isActive: isLyricsActive,
+                    activeColor: AppColors.cyanAccent,
+                    onTap: onToggleLyrics ?? () {},
+                    tooltip: isLyricsActive ? 'Hide Lyrics' : 'Show Synced Lyrics',
+                  ),
 
-          // 4. Up Next Queue Quick Button
-          _ToolButton(
-            icon: Icons.queue_music_rounded,
-            label: 'Queue',
-            isActive: playerState.queue.isNotEmpty,
-            activeColor: Colors.white70,
-            onTap: onOpenQueue,
-            tooltip: 'Up Next Queue (${playerState.queue.length})',
-          ),
+                  // 4. Up Next Queue Quick Button
+                  _ToolButton(
+                    icon: Icons.queue_music_rounded,
+                    label: 'Queue',
+                    isActive: playerState.queue.isNotEmpty,
+                    activeColor: Colors.white70,
+                    onTap: onOpenQueue,
+                    tooltip: 'Up Next Queue (${playerState.queue.length})',
+                  ),
 
-          // 5. Song Info Quick Button
-          _ToolButton(
-            icon: Icons.info_outline_rounded,
-            label: 'Info',
-            isActive: false,
-            activeColor: Colors.white70,
-            onTap: () => showTrackInfoSheet(context, track),
-            tooltip: 'Song Information',
-          ),
-        ],
+                  // 5. Song Info Quick Button
+                  _ToolButton(
+                    icon: Icons.info_outline_rounded,
+                    label: 'Info',
+                    isActive: false,
+                    activeColor: Colors.white70,
+                    onTap: () => showTrackInfoSheet(context, track),
+                    tooltip: 'Song Information',
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -872,7 +883,7 @@ class _ToolButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             color: isActive
                 ? activeColor.withValues(alpha: 0.18)
@@ -889,17 +900,17 @@ class _ToolButton extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 16,
+                size: 15,
                 color: isActive ? activeColor : Colors.white.withValues(alpha: 0.7),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
                   color: isActive ? activeColor : Colors.white.withValues(alpha: 0.8),
-                  letterSpacing: 0.3,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
