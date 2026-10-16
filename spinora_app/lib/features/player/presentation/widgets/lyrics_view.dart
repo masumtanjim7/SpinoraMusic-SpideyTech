@@ -46,10 +46,61 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   static const double _lineEstimatedHeight = 44.0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref
+            .read(lyricsControllerProvider.notifier)
+            .triggerAutoFetchForTrack(widget.track);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     _userScrollDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _triggerRefresh(BuildContext context) async {
+    final songId = widget.track.id.startsWith('local_')
+        ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
+        : null;
+    if (songId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lyrics auto-fetch is only supported for local library tracks.'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+      return;
+    }
+
+    final db = ref.read(appDatabaseProvider);
+    final song = await db.getSongById(songId);
+    if (song == null || !context.mounted) return;
+
+    final success = await ref
+        .read(lyricsControllerProvider.notifier)
+        .refetchLyrics(song);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Synced lyrics fetched & saved offline!'
+                : 'No online lyrics found for "${song.title}".',
+          ),
+          duration: const Duration(seconds: 3),
+          backgroundColor: success
+              ? AppColors.cyanAccent.withValues(alpha: 0.9)
+              : Colors.redAccent,
+        ),
+      );
+    }
   }
 
   void _scrollToIndex(int index, int totalLines) {
@@ -123,7 +174,7 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           children: [
-            // Header Bar: Lyrics Tag, Synced Badge, and Actions (Search, Edit, Close)
+            // Header Bar: Lyrics Tag, Synced Badge, and Actions (Refresh, Search, Edit, Close)
             Row(
               children: [
                 Container(
@@ -139,95 +190,120 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  'LYRICS',
-                  style: tt.labelMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(width: 6),
-
-                // Searching status or Synced / Plain format badge
-                if (isFetchingThis) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.cyanAccent.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'LYRICS',
+                        style: tt.labelMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                          width: 8,
-                          height: 8,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            value: 0.75,
-                            color: AppColors.cyanAccent,
+                      const SizedBox(width: 6),
+
+                      // Searching status or Synced / Plain format badge
+                      if (isFetchingThis) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyanAccent.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                width: 8,
+                                height: 8,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  value: 0.75,
+                                  color: AppColors.cyanAccent,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'SEARCHING...',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.cyanAccent,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'SEARCHING...',
-                          style: TextStyle(
-                            color: AppColors.cyanAccent,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
-                          ),
+                      ] else ...[
+                        lyricsAsync.when(
+                          data: (lyrics) {
+                            if (lyrics.isEmpty) return const SizedBox.shrink();
+                            final isSynced = lyrics.isSynced;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSynced
+                                    ? AppColors.cyanAccent.withValues(alpha: 0.18)
+                                    : Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSynced
+                                      ? AppColors.cyanAccent.withValues(alpha: 0.5)
+                                      : Colors.white.withValues(alpha: 0.15),
+                                ),
+                              ),
+                              child: Text(
+                                isSynced ? 'SYNCED LRC' : 'PLAIN TEXT',
+                                style: TextStyle(
+                                  color: isSynced
+                                      ? AppColors.cyanAccent
+                                      : Colors.white70,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (e, st) => const SizedBox.shrink(),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ] else ...[
-                  lyricsAsync.when(
-                    data: (lyrics) {
-                      if (lyrics.isEmpty) return const SizedBox.shrink();
-                      final isSynced = lyrics.isSynced;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSynced
-                              ? AppColors.cyanAccent.withValues(alpha: 0.18)
-                              : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSynced
-                                ? AppColors.cyanAccent.withValues(alpha: 0.5)
-                                : Colors.white.withValues(alpha: 0.15),
-                          ),
-                        ),
-                        child: Text(
-                          isSynced ? 'SYNCED' : 'PLAIN',
-                          style: TextStyle(
-                            color: isSynced
-                                ? AppColors.cyanAccent
-                                : Colors.white70,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      );
-                    },
-                    loading: () => const SizedBox.shrink(),
-                    error: (e, st) => const SizedBox.shrink(),
-                  ),
-                ],
+                ),
 
-                const Spacer(),
+                // Auto-Fetch / Refresh Button
+                IconButton(
+                  onPressed: isFetchingThis ? null : () => _triggerRefresh(context),
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: isFetchingThis ? Colors.white24 : Colors.white70,
+                    size: 17,
+                  ),
+                  tooltip: 'Auto-Fetch / Refresh',
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(26, 26),
+                    padding: EdgeInsets.zero,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
 
                 // Online Search Button
                 IconButton(
@@ -235,12 +311,12 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.travel_explore_rounded,
                     color: Colors.white70,
-                    size: 18,
+                    size: 17,
                   ),
                   tooltip: 'Search Online (LRCLIB)',
                   style: IconButton.styleFrom(
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(28, 28),
+                    minimumSize: const Size(26, 26),
                     padding: EdgeInsets.zero,
                   ),
                   visualDensity: VisualDensity.compact,
@@ -252,12 +328,12 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.edit_note_rounded,
                     color: Colors.white70,
-                    size: 19,
+                    size: 18,
                   ),
                   tooltip: 'Edit / Paste Lyrics',
                   style: IconButton.styleFrom(
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(28, 28),
+                    minimumSize: const Size(26, 26),
                     padding: EdgeInsets.zero,
                   ),
                   visualDensity: VisualDensity.compact,
@@ -269,12 +345,12 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   icon: const Icon(
                     Icons.photo_rounded,
                     color: Colors.white70,
-                    size: 18,
+                    size: 17,
                   ),
                   tooltip: 'Show Artwork',
                   style: IconButton.styleFrom(
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: const Size(28, 28),
+                    minimumSize: const Size(26, 26),
                     padding: EdgeInsets.zero,
                   ),
                   visualDensity: VisualDensity.compact,
@@ -288,15 +364,18 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
 
             // Lyrics Body View
             Expanded(
-              child: lyricsAsync.when(
-                data: (lyrics) {
-                  if (lyrics.isEmpty) {
-                    return _NoLyricsPlaceholder(
-                      isFetching: isFetchingThis,
-                      onPastePressed: () => _openEditDialog(context),
-                      onSearchOnlinePressed: () => _openSearchDialog(context),
-                    );
-                  }
+              child: isFetchingThis
+                  ? const _LyricsLoadingView()
+                  : lyricsAsync.when(
+                      data: (lyrics) {
+                        if (lyrics.isEmpty) {
+                          return _NoLyricsPlaceholder(
+                            isFetching: false,
+                            onAutoFetchPressed: () => _triggerRefresh(context),
+                            onPastePressed: () => _openEditDialog(context),
+                            onSearchOnlinePressed: () => _openSearchDialog(context),
+                          );
+                        }
 
                   final activeIndex = lyrics.isSynced
                       ? lyrics.activeIndexForPosition(playerState.position)
@@ -520,6 +599,78 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
 }
 
 // ---------------------------------------------------------------------------
+// Sleek Glassmorphic Lyrics Loading View
+// ---------------------------------------------------------------------------
+
+class _LyricsLoadingView extends StatelessWidget {
+  const _LyricsLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
+    return Center(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.4),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cyanAccent.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    value: 0.75,
+                    color: AppColors.cyanAccent,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Fetching synced lyrics...',
+                style: tt.titleSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Querying LRCLIB & community sources for timestamped lines...',
+                textAlign: TextAlign.center,
+                style: tt.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Empty / No Lyrics Placeholder
 // ---------------------------------------------------------------------------
 
@@ -527,11 +678,13 @@ class _NoLyricsPlaceholder extends StatelessWidget {
   const _NoLyricsPlaceholder({
     required this.onPastePressed,
     required this.onSearchOnlinePressed,
+    this.onAutoFetchPressed,
     this.isFetching = false,
   });
 
   final VoidCallback onPastePressed;
   final VoidCallback onSearchOnlinePressed;
+  final VoidCallback? onAutoFetchPressed;
   final bool isFetching;
 
   @override
@@ -539,48 +692,7 @@ class _NoLyricsPlaceholder extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     if (isFetching) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.cloud_sync_rounded,
-                  size: 32,
-                  color: AppColors.cyanAccent,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Searching Synced Lyrics Online...',
-                style: tt.titleSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Querying LRCLIB & community sources for timestamped lines...',
-                textAlign: TextAlign.center,
-                style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const _LyricsLoadingView();
     }
 
     return Center(
@@ -619,6 +731,36 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  if (onAutoFetchPressed != null)
+                    ElevatedButton.icon(
+                      onPressed: onAutoFetchPressed,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      label: const Text(
+                        'Auto-Fetch',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            AppColors.purpleAccent.withValues(alpha: 0.35),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(
+                            color: AppColors.purpleAccent.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ),
                   ElevatedButton.icon(
                     onPressed: onSearchOnlinePressed,
                     icon: const Icon(
@@ -635,9 +777,11 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.cyanAccent.withValues(alpha: 0.3),
+                      backgroundColor:
+                          AppColors.cyanAccent.withValues(alpha: 0.3),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                         side: BorderSide(
@@ -663,7 +807,8 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       side: BorderSide(
                         color: Colors.white.withValues(alpha: 0.2),
                       ),

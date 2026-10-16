@@ -212,7 +212,7 @@ void main() {
 
     // Verify LiveLyricsCard is displayed
     expect(find.text('LYRICS'), findsOneWidget);
-    expect(find.text('SYNCED'), findsOneWidget);
+    expect(find.text('SYNCED LRC'), findsOneWidget);
     expect(find.text('First line of lyrics'), findsOneWidget);
     expect(find.text('Active synced second line'), findsOneWidget);
     expect(find.text('Third line coming up'), findsOneWidget);
@@ -296,7 +296,9 @@ void main() {
     expect(find.text('Paste Lyrics'), findsOneWidget);
 
     // Tap Paste Lyrics button
-    await tester.tap(find.text('Paste Lyrics'));
+    final pasteLyricsBtn = find.text('Paste Lyrics');
+    await tester.ensureVisible(pasteLyricsBtn);
+    await tester.tap(pasteLyricsBtn);
     await tester.pumpAndSettle();
 
     // Verify dialog opened
