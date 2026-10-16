@@ -29,6 +29,9 @@ class PlayerState {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.errorMessage,
+    this.playbackSpeed = 1.0,
+    this.remainingSleepDuration,
+    this.stopAtEndOfTrack = false,
   });
 
   final Track? currentTrack;
@@ -42,10 +45,15 @@ class PlayerState {
   final Duration position;
   final Duration duration;
   final String? errorMessage;
+  final double playbackSpeed;
+  final Duration? remainingSleepDuration;
+  final bool stopAtEndOfTrack;
 
   bool get hasTrack => currentTrack != null;
   bool get hasNext => queue.isNotEmpty && currentIndex < queue.length - 1;
   bool get hasPrevious => queue.isNotEmpty && currentIndex > 0;
+  bool get isSleepTimerActive =>
+      remainingSleepDuration != null || stopAtEndOfTrack;
 
   double get progressRatio {
     if (duration.inMilliseconds <= 0) return 0.0;
@@ -65,6 +73,10 @@ class PlayerState {
     Duration? duration,
     String? errorMessage,
     bool clearError = false,
+    double? playbackSpeed,
+    Duration? remainingSleepDuration,
+    bool clearSleepTimer = false,
+    bool? stopAtEndOfTrack,
   }) {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -78,6 +90,13 @@ class PlayerState {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      remainingSleepDuration: clearSleepTimer
+          ? null
+          : (remainingSleepDuration ?? this.remainingSleepDuration),
+      stopAtEndOfTrack: clearSleepTimer
+          ? false
+          : (stopAtEndOfTrack ?? this.stopAtEndOfTrack),
     );
   }
 }
@@ -95,6 +114,7 @@ class PlayerController extends Notifier<PlayerState> {
   AudioPlayer get player => _player ??= playerInstance ?? AudioPlayer();
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
+  Timer? _sleepTimer;
   String? _lastRecordedTrackId;
   DateTime? _lastRecordedTime;
   DateTime? _lastPersistedTime;
@@ -106,6 +126,8 @@ class PlayerController extends Notifier<PlayerState> {
     _restoreSavedSession();
 
     ref.onDispose(() {
+      _sleepTimer?.cancel();
+      _sleepTimer = null;
       for (final sub in _subscriptions) {
         sub.cancel();
       }
@@ -266,6 +288,13 @@ class PlayerController extends Notifier<PlayerState> {
         }
 
         if (playerState.processingState == ProcessingState.completed) {
+          if (state.stopAtEndOfTrack) {
+            cancelSleepTimer();
+            pause();
+            seek(Duration.zero);
+            return;
+          }
+
           if (state.loopMode == LoopMode.one) {
             seek(Duration.zero);
             play();
@@ -718,8 +747,108 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   Future<void> stop() async {
+    cancelSleepTimer();
     await player.stop();
     state = const PlayerState();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sleep Timer Management
+  // ---------------------------------------------------------------------------
+
+  /// Sets a countdown sleep timer. When expired, playback pauses cleanly.
+  void setSleepTimer(Duration duration) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+
+    if (duration <= Duration.zero) {
+      cancelSleepTimer();
+      return;
+    }
+
+    state = state.copyWith(
+      remainingSleepDuration: duration,
+      stopAtEndOfTrack: false,
+    );
+
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final current = state.remainingSleepDuration;
+      if (current == null) {
+        timer.cancel();
+        _sleepTimer = null;
+        return;
+      }
+
+      final nextRemaining = current - const Duration(seconds: 1);
+      if (nextRemaining <= Duration.zero) {
+        timer.cancel();
+        _sleepTimer = null;
+        state = state.copyWith(clearSleepTimer: true);
+        pause();
+      } else {
+        state = state.copyWith(remainingSleepDuration: nextRemaining);
+      }
+    });
+  }
+
+  /// Sets the sleep timer to pause playback at the conclusion of the current track.
+  void setSleepTimerEndOfTrack() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    state = state.copyWith(
+      clearSleepTimer: true,
+      stopAtEndOfTrack: true,
+    );
+  }
+
+  /// Cancels any active sleep timer or end-of-track pause rule.
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    state = state.copyWith(
+      clearSleepTimer: true,
+      stopAtEndOfTrack: false,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Playback Speed Management
+  // ---------------------------------------------------------------------------
+
+  static const List<double> availablePlaybackSpeeds = [
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+  ];
+
+  /// Updates audio playback speed on [player] and updates state.
+  Future<void> setPlaybackSpeed(double speed) async {
+    try {
+      await player.setSpeed(speed);
+      state = state.copyWith(playbackSpeed: speed);
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error setting playback speed: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to set playback speed on player',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Cycles through available playback speed presets (0.75x -> 1.0x -> 1.25x -> 1.5x -> 2.0x).
+  Future<void> cyclePlaybackSpeed() async {
+    final currentSpeed = state.playbackSpeed;
+    final currentIndex = availablePlaybackSpeeds.indexWhere(
+      (s) => (s - currentSpeed).abs() < 0.01,
+    );
+    final nextIndex = currentIndex == -1
+        ? 1 // default to 1.0
+        : (currentIndex + 1) % availablePlaybackSpeeds.length;
+    await setPlaybackSpeed(availablePlaybackSpeeds[nextIndex]);
   }
 }
 

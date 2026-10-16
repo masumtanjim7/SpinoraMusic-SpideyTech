@@ -271,3 +271,9 @@ final recentlyPlayedSongsStreamProvider =
   final db = ref.watch(appDatabaseProvider);
   return db.watchRecentlyPlayedSongs();
 });
+
+/// Fetches a specific [Song] by its ID.
+final songByIdProvider = FutureProvider.family<Song?, int>((ref, songId) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.getSongById(songId);
+});

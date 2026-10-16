@@ -110,6 +110,12 @@ Task 2.2e DONE (Playback Persistence, Listening History / "Recently Played", and
   horizontal "Recently Played" glassmorphic carousel added to `LibraryScreen` along with neon glowing active song tile & animated equalizer;
   complete visual overhaul for `NowPlayingScreen` (dual neon ambient glow blobs, multi-layered glass card, inline status badges, pill controls)
   and `MiniPlayer` (floating pill card margin, neon progress accent, Previous/Play/Next quick actions); 0 analyzer issues and all 22 tests passing.
+Task 2.2f DONE (Sleep Timer, Playback Speed Control, and Song Information Sheet):
+  Reactive sleep timer in `PlayerController` with presets (15, 30, 45, 60 min, End of Track), live 1-second countdown,
+  and clean auto-pause on timer expiry or track completion; playback speed control (0.75x, 1.0x, 1.25x, 1.5x, 2.0x) on `AudioPlayer`;
+  compact glassmorphic bottom audio tools row on `NowPlayingScreen` with glowing active timer badge, speed badge, queue trigger,
+  and track info trigger; dark glassmorphic modal bottom sheets for Sleep Timer, Playback Speed, and Song Info (title, artist, album,
+  duration, play count, last played date/time, and file path); 0 analyzer issues and all 26 tests passing.
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

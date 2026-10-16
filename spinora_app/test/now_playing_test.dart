@@ -64,13 +64,93 @@ void main() {
     expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
 
     // Verify Queue button is present
-    expect(find.byIcon(Icons.queue_music_rounded), findsOneWidget);
+    final queueButton = find.byIcon(Icons.queue_music_rounded);
+    expect(queueButton, findsOneWidget);
 
-    // Tap Queue button to open UpNextQueueSheet
-    await tester.tap(find.byIcon(Icons.queue_music_rounded));
+    // Scroll to and tap Queue button to open UpNextQueueSheet
+    await tester.ensureVisible(queueButton);
+    await tester.tap(queueButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Up Next Queue'), findsOneWidget);
+  });
+
+  testWidgets('Audio tools row opens Sleep Timer, Speed, and Track Info sheets',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          playerControllerProvider.overrideWith(
+            () => _FakePlayerController(
+              const PlayerState(
+                currentTrack: testTrack,
+                isPlaying: true,
+                position: Duration(seconds: 30),
+                duration: Duration(seconds: 180),
+                playbackSpeed: 1.25,
+                remainingSleepDuration: Duration(minutes: 14, seconds: 45),
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: NowPlayingScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // 1. Verify glowing sleep timer countdown badge is displayed
+    expect(find.text('14:45'), findsOneWidget);
+    final timerButton = find.byIcon(Icons.bedtime_rounded);
+    expect(timerButton, findsOneWidget);
+
+    await tester.ensureVisible(timerButton);
+    await tester.tap(timerButton);
+    await tester.pumpAndSettle();
+
+    // Verify Sleep Timer modal sheet is displayed
+    expect(find.text('SLEEP TIMER'), findsOneWidget);
+    expect(find.text('15 Minutes'), findsOneWidget);
+    expect(find.text('30 Minutes'), findsOneWidget);
+    expect(find.text('End of Current Track'), findsOneWidget);
+
+    // Dismiss sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // 2. Verify playback speed badge
+    expect(find.text('1.25x'), findsOneWidget);
+    final speedButton = find.byIcon(Icons.speed_rounded);
+    expect(speedButton, findsOneWidget);
+
+    await tester.ensureVisible(speedButton);
+    await tester.tap(speedButton);
+    await tester.pumpAndSettle();
+
+    // Verify Playback Speed modal sheet is displayed
+    expect(find.text('PLAYBACK SPEED'), findsOneWidget);
+    expect(find.text('Normal speed'), findsOneWidget);
+    expect(find.text('Double speed'), findsOneWidget);
+
+    // Dismiss sheet
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    // 3. Verify Track Info button
+    final infoButton = find.byIcon(Icons.info_outline_rounded);
+    expect(infoButton, findsOneWidget);
+
+    await tester.ensureVisible(infoButton);
+    await tester.tap(infoButton);
+    await tester.pumpAndSettle();
+
+    // Verify Track Info modal sheet is displayed
+    expect(find.text('TRACK INFORMATION'), findsOneWidget);
+    expect(find.text('Neon Cyberpunk'), findsWidgets);
+    expect(find.text('Spidey Composer'), findsWidgets);
+    expect(find.text('Spider Beats'), findsWidgets);
   });
 }
 

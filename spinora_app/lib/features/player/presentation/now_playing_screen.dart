@@ -8,6 +8,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
+import 'widgets/audio_tools_sheets.dart';
 import 'widgets/up_next_queue_sheet.dart';
 
 /// Full-screen dark glassmorphic Now Playing modal sheet.
@@ -104,7 +105,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         children: [
                           const SizedBox(height: 8),
 
-                          // Top bar: Dismiss chevron, Title, Up Next Queue, Favorite toggle
+                          // Top bar: Dismiss chevron, Title, Favorite toggle
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -125,44 +126,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    onPressed: () {
-                                      showModalBottomSheet<void>(
-                                        context: context,
-                                        backgroundColor: Colors.transparent,
-                                        isScrollControlled: true,
-                                        builder: (context) =>
-                                            const UpNextQueueSheet(),
-                                      );
-                                    },
-                                    icon: const Icon(
-                                      Icons.queue_music_rounded,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                    tooltip: 'Up Next Queue',
-                                  ),
-                                  IconButton(
-                                    onPressed: () => ref
-                                        .read(playerControllerProvider.notifier)
-                                        .toggleFavorite(),
-                                    icon: Icon(
-                                      track.isFavorite
-                                          ? Icons.favorite_rounded
-                                          : Icons.favorite_border_rounded,
-                                      color: track.isFavorite
-                                          ? Colors.pinkAccent
-                                          : Colors.white.withValues(alpha: 0.7),
-                                      size: 26,
-                                    ),
-                                    tooltip: track.isFavorite
-                                        ? 'Remove from Favorites'
-                                        : 'Add to Favorites',
-                                  ),
-                                ],
+                              IconButton(
+                                onPressed: () => ref
+                                    .read(playerControllerProvider.notifier)
+                                    .toggleFavorite(),
+                                icon: Icon(
+                                  track.isFavorite
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  color: track.isFavorite
+                                      ? Colors.pinkAccent
+                                      : Colors.white.withValues(alpha: 0.7),
+                                  size: 26,
+                                ),
+                                tooltip: track.isFavorite
+                                    ? 'Remove from Favorites'
+                                    : 'Add to Favorites',
                               ),
                             ],
                           ),
@@ -600,7 +579,23 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
+
+                          // Compact Glassmorphic Audio Tools Action Row (Sleep Timer, Playback Speed, Queue, Info)
+                          AudioToolsActionRow(
+                            playerState: playerState,
+                            track: track,
+                            onOpenQueue: () {
+                              showModalBottomSheet<void>(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                                builder: (context) => const UpNextQueueSheet(),
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),

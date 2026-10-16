@@ -138,5 +138,54 @@ void main() {
       expect(updatedState.queue[0], track2);
       expect(updatedState.queue[1], track3);
     });
+
+    test('playback speed defaults to 1.0 and updates via copyWith', () {
+      const state = PlayerState();
+      expect(state.playbackSpeed, 1.0);
+
+      final fasterState = state.copyWith(playbackSpeed: 1.5);
+      expect(fasterState.playbackSpeed, 1.5);
+
+      final slowerState = fasterState.copyWith(playbackSpeed: 0.75);
+      expect(slowerState.playbackSpeed, 0.75);
+    });
+
+    test('sleep timer state, isSleepTimerActive, and clearSleepTimer', () {
+      const state = PlayerState();
+      expect(state.isSleepTimerActive, false);
+      expect(state.remainingSleepDuration, isNull);
+      expect(state.stopAtEndOfTrack, false);
+
+      // Set timed duration
+      final timedState = state.copyWith(
+        remainingSleepDuration: const Duration(minutes: 30),
+      );
+      expect(timedState.isSleepTimerActive, true);
+      expect(timedState.remainingSleepDuration, const Duration(minutes: 30));
+      expect(timedState.stopAtEndOfTrack, false);
+
+      // Set end of track
+      final endOfTrackState = state.copyWith(
+        stopAtEndOfTrack: true,
+      );
+      expect(endOfTrackState.isSleepTimerActive, true);
+      expect(endOfTrackState.stopAtEndOfTrack, true);
+
+      // Clear sleep timer
+      final clearedState = timedState.copyWith(clearSleepTimer: true);
+      expect(clearedState.isSleepTimerActive, false);
+      expect(clearedState.remainingSleepDuration, isNull);
+      expect(clearedState.stopAtEndOfTrack, false);
+    });
+
+    test('available playback speeds contains standard presets', () {
+      expect(PlayerController.availablePlaybackSpeeds, [
+        0.75,
+        1.0,
+        1.25,
+        1.5,
+        2.0,
+      ]);
+    });
   });
 }
