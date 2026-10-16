@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/audio/track.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
@@ -44,18 +45,21 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Ambient neon radial glows behind artwork
+          // Dual ambient neon glow blobs behind artwork
           Positioned(
-            top: 100,
-            left: screenSize.width * 0.15,
-            child: Container(
-              width: 280,
-              height: 280,
+            top: 60,
+            left: screenSize.width * 0.05,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              width: 320,
+              height: 320,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.purpleAccent.withValues(alpha: 0.35),
+                    AppColors.purpleAccent.withValues(
+                      alpha: playerState.isPlaying ? 0.45 : 0.25,
+                    ),
                     Colors.transparent,
                   ],
                 ),
@@ -63,16 +67,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ),
           ),
           Positioned(
-            top: 220,
-            right: 20,
-            child: Container(
-              width: 220,
-              height: 220,
+            top: 200,
+            right: 0,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              width: 290,
+              height: 290,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.cyanAccent.withValues(alpha: 0.25),
+                    AppColors.cyanAccent.withValues(
+                      alpha: playerState.isPlaying ? 0.35 : 0.18,
+                    ),
                     Colors.transparent,
                   ],
                 ),
@@ -97,7 +104,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         children: [
                           const SizedBox(height: 8),
 
-                          // Top bar: Dismiss chevron, Title, Favorite toggle
+                          // Top bar: Dismiss chevron, Title, Up Next Queue, Favorite toggle
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -147,7 +154,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                           ? Icons.favorite_rounded
                                           : Icons.favorite_border_rounded,
                                       color: track.isFavorite
-                                          ? AppColors.cyanAccent
+                                          ? Colors.pinkAccent
                                           : Colors.white.withValues(alpha: 0.7),
                                       size: 26,
                                     ),
@@ -162,22 +169,36 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
                           const SizedBox(height: 12),
 
-                          // Centerpiece: Large glassmorphic artwork card
+                          // Centerpiece: Deeper layered glassmorphic artwork card
                           Center(
                             child: AnimatedScale(
                               scale: playerState.isPlaying ? 1.02 : 0.96,
                               duration: const Duration(milliseconds: 400),
                               curve: Curves.easeOutCubic,
                               child: Container(
+                                padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(32),
+                                  borderRadius: BorderRadius.circular(36),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(
+                                      alpha: playerState.isPlaying ? 0.22 : 0.10,
+                                    ),
+                                    width: 1.5,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppColors.purpleAccent.withValues(
-                                        alpha: playerState.isPlaying ? 0.35 : 0.15,
+                                        alpha: playerState.isPlaying ? 0.40 : 0.18,
                                       ),
-                                      blurRadius: 40,
+                                      blurRadius: 44,
                                       spreadRadius: 2,
+                                    ),
+                                    BoxShadow(
+                                      color: AppColors.cyanAccent.withValues(
+                                        alpha: playerState.isPlaying ? 0.25 : 0.10,
+                                      ),
+                                      blurRadius: 28,
+                                      offset: const Offset(0, 10),
                                     ),
                                   ],
                                 ),
@@ -202,13 +223,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
                           const SizedBox(height: 20),
 
-                          // Track Info: Title and Artist
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
+                          // Track Info & Inline Status Badges
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
                                   track.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -218,8 +239,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     letterSpacing: -0.3,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
+                              ),
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
                                   '${track.artist}${track.album != null ? ' • ${track.album}' : ''}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -227,11 +251,153 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     color: Colors.white.withValues(alpha: 0.65),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Inline status badge row: Source/Format, Favorite status, and Queue position
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  // Source / Format pill badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.07),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          track.source == TrackSource.local
+                                              ? Icons.music_note_rounded
+                                              : Icons.cloud_rounded,
+                                          size: 13,
+                                          color: AppColors.cyanAccent,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          track.source == TrackSource.local
+                                              ? 'LOCAL AUDIO'
+                                              : 'STREAMING',
+                                          style: tt.labelSmall?.copyWith(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.85),
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.8,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Interactive Favorite pill badge
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () => ref
+                                        .read(playerControllerProvider.notifier)
+                                        .toggleFavorite(),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: track.isFavorite
+                                            ? Colors.pinkAccent
+                                                .withValues(alpha: 0.18)
+                                            : Colors.white.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: track.isFavorite
+                                              ? Colors.pinkAccent
+                                                  .withValues(alpha: 0.45)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.12),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            track.isFavorite
+                                                ? Icons.favorite_rounded
+                                                : Icons.favorite_border_rounded,
+                                            size: 13,
+                                            color: track.isFavorite
+                                                ? Colors.pinkAccent
+                                                : Colors.white
+                                                    .withValues(alpha: 0.6),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            track.isFavorite
+                                                ? 'FAVORITE'
+                                                : 'ADD FAVORITE',
+                                            style: tt.labelSmall?.copyWith(
+                                              color: track.isFavorite
+                                                  ? Colors.pinkAccent
+                                                  : Colors.white
+                                                      .withValues(alpha: 0.6),
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  if (playerState.queue.isNotEmpty) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.12),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.queue_music_rounded,
+                                            size: 13,
+                                            color: AppColors.purpleAccent,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'TRACK ${playerState.currentIndex + 1}/${playerState.queue.length}',
+                                            style: tt.labelSmall?.copyWith(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.75),
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           // Interactive Seek Slider & Timestamps
                           Column(
@@ -302,118 +468,139 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
                           const SizedBox(height: 12),
 
-                          // Transport Controls: Shuffle, Prev, Play/Pause, Next, Repeat
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Shuffle Button
-                              IconButton(
-                                onPressed: () => ref
-                                    .read(playerControllerProvider.notifier)
-                                    .toggleShuffle(),
-                                icon: Icon(
-                                  Icons.shuffle_rounded,
-                                  color: playerState.isShuffled
-                                      ? AppColors.cyanAccent
-                                      : Colors.white.withValues(alpha: 0.45),
-                                  size: 24,
-                                ),
-                                tooltip: playerState.isShuffled
-                                    ? 'Shuffle: On'
-                                    : 'Shuffle: Off',
+                          // Refined Pill-Shaped Transport Control Bar
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(44),
+                              color: Colors.white.withValues(alpha: 0.06),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                width: 1,
                               ),
-
-                              // Previous Track
-                              IconButton(
-                                onPressed: () => ref
-                                    .read(playerControllerProvider.notifier)
-                                    .previous(),
-                                icon: const Icon(
-                                  Icons.skip_previous_rounded,
-                                  color: Colors.white,
-                                  size: 36,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
                                 ),
-                                tooltip: 'Previous Track',
-                              ),
-
-                              // Prominent Glowing Play / Pause Button
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: AppColors.purpleGradient,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.purpleAccent
-                                          .withValues(alpha: 0.5),
-                                      blurRadius: 24,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: IconButton(
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Shuffle Button
+                                IconButton(
                                   onPressed: () => ref
                                       .read(playerControllerProvider.notifier)
-                                      .togglePlayPause(),
-                                  icon: playerState.isBuffering
-                                      ? const SizedBox(
-                                          width: 26,
-                                          height: 26,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
+                                      .toggleShuffle(),
+                                  icon: Icon(
+                                    Icons.shuffle_rounded,
+                                    color: playerState.isShuffled
+                                        ? AppColors.cyanAccent
+                                        : Colors.white.withValues(alpha: 0.45),
+                                    size: 22,
+                                  ),
+                                  tooltip: playerState.isShuffled
+                                      ? 'Shuffle: On'
+                                      : 'Shuffle: Off',
+                                ),
+
+                                // Previous Track
+                                IconButton(
+                                  onPressed: () => ref
+                                      .read(playerControllerProvider.notifier)
+                                      .previous(),
+                                  icon: const Icon(
+                                    Icons.skip_previous_rounded,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                  tooltip: 'Previous Track',
+                                ),
+
+                                // Prominent Glowing Play / Pause Button
+                                Container(
+                                  width: 66,
+                                  height: 66,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: AppColors.purpleGradient,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.purpleAccent
+                                            .withValues(alpha: 0.6),
+                                        blurRadius: 22,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () => ref
+                                        .read(playerControllerProvider.notifier)
+                                        .togglePlayPause(),
+                                    icon: playerState.isBuffering
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Icon(
+                                            playerState.isPlaying
+                                                ? Icons.pause_rounded
+                                                : Icons.play_arrow_rounded,
                                             color: Colors.white,
+                                            size: 36,
                                           ),
-                                        )
-                                      : Icon(
-                                          playerState.isPlaying
-                                              ? Icons.pause_rounded
-                                              : Icons.play_arrow_rounded,
-                                          color: Colors.white,
-                                          size: 40,
-                                        ),
+                                    tooltip:
+                                        playerState.isPlaying ? 'Pause' : 'Play',
+                                  ),
+                                ),
+
+                                // Next Track
+                                IconButton(
+                                  onPressed: () => ref
+                                      .read(playerControllerProvider.notifier)
+                                      .next(),
+                                  icon: Icon(
+                                    Icons.skip_next_rounded,
+                                    color: playerState.hasNext ||
+                                            playerState.loopMode == LoopMode.all
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.3),
+                                    size: 32,
+                                  ),
+                                  tooltip: 'Next Track',
+                                ),
+
+                                // Repeat Mode Cycle Button
+                                IconButton(
+                                  onPressed: () => ref
+                                      .read(playerControllerProvider.notifier)
+                                      .cycleLoopMode(),
+                                  icon: Icon(
+                                    playerState.loopMode == LoopMode.one
+                                        ? Icons.repeat_one_rounded
+                                        : Icons.repeat_rounded,
+                                    color: playerState.loopMode != LoopMode.off
+                                        ? AppColors.cyanAccent
+                                        : Colors.white.withValues(alpha: 0.45),
+                                    size: 22,
+                                  ),
                                   tooltip:
-                                      playerState.isPlaying ? 'Pause' : 'Play',
+                                      'Repeat: ${playerState.loopMode.name.toUpperCase()}',
                                 ),
-                              ),
-
-                              // Next Track
-                              IconButton(
-                                onPressed: () => ref
-                                    .read(playerControllerProvider.notifier)
-                                    .next(),
-                                icon: Icon(
-                                  Icons.skip_next_rounded,
-                                  color: playerState.hasNext ||
-                                          playerState.loopMode == LoopMode.all
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.3),
-                                  size: 36,
-                                ),
-                                tooltip: 'Next Track',
-                              ),
-
-                              // Repeat Mode Cycle Button
-                              IconButton(
-                                onPressed: () => ref
-                                    .read(playerControllerProvider.notifier)
-                                    .cycleLoopMode(),
-                                icon: Icon(
-                                  playerState.loopMode == LoopMode.one
-                                      ? Icons.repeat_one_rounded
-                                      : Icons.repeat_rounded,
-                                  color: playerState.loopMode != LoopMode.off
-                                      ? AppColors.cyanAccent
-                                      : Colors.white.withValues(alpha: 0.45),
-                                  size: 24,
-                                ),
-                                tooltip:
-                                    'Repeat: ${playerState.loopMode.name.toUpperCase()}',
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
 
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 18),
                         ],
                       ),
                     ),

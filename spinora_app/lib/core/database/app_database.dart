@@ -17,6 +17,21 @@ class Songs extends Table {
   TextColumn get filePath => text()();
   TextColumn get albumArtPath => text().nullable()();
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get lastPlayedAt => dateTime().nullable()();
+  IntColumn get playCount => integer().withDefault(const Constant(0))();
+}
+
+/// Drift table storing active playback state to support app reload / resume.
+@DataClassName('SavedPlaybackSession')
+class PlaybackSessions extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  TextColumn get lastTrackId => text().nullable()();
+  IntColumn get lastSongId => integer().nullable()();
+  IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// Drift table storing custom user playlists.
@@ -36,12 +51,12 @@ class PlaylistSongs extends Table {
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@DriftDatabase(tables: [Songs, Playlists, PlaylistSongs])
+@DriftDatabase(tables: [Songs, Playlists, PlaylistSongs, PlaybackSessions])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +67,11 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.createTable(playlists);
             await m.createTable(playlistSongs);
+          }
+          if (from < 3) {
+            await m.addColumn(songs, songs.lastPlayedAt);
+            await m.addColumn(songs, songs.playCount);
+            await m.createTable(playbackSessions);
           }
         },
         beforeOpen: (details) async {
@@ -144,6 +164,66 @@ class AppDatabase extends _$AppDatabase {
 
     return query.watchSingle().map((row) => row.read(countExp) ?? 0);
   }
+
+  // ---------------------------------------------------------------------------
+  // History & Playback Queries
+  // ---------------------------------------------------------------------------
+
+  /// Records a track play by updating [lastPlayedAt] and incrementing [playCount].
+  Future<void> recordSongPlay(int songId) async {
+    final existing = await (select(songs)..where((s) => s.id.equals(songId)))
+        .getSingleOrNull();
+    if (existing != null) {
+      await (update(songs)..where((s) => s.id.equals(songId))).write(
+        SongsCompanion(
+          lastPlayedAt: Value(DateTime.now()),
+          playCount: Value(existing.playCount + 1),
+        ),
+      );
+    }
+  }
+
+  /// Watches recently played songs ordered by [lastPlayedAt] descending.
+  Stream<List<Song>> watchRecentlyPlayedSongs({int limit = 15}) {
+    return (select(songs)
+          ..where((s) => s.lastPlayedAt.isNotNull())
+          ..orderBy([
+            (s) => OrderingTerm(
+                  expression: s.lastPlayedAt,
+                  mode: OrderingMode.desc,
+                ),
+          ])
+          ..limit(limit))
+        .watch();
+  }
+
+  /// Fetches a single [Song] by its [id].
+  Future<Song?> getSongById(int songId) {
+    return (select(songs)..where((s) => s.id.equals(songId))).getSingleOrNull();
+  }
+
+  /// Fetches the last saved playback session state.
+  Future<SavedPlaybackSession?> getPlaybackSession() {
+    return (select(playbackSessions)..where((p) => p.id.equals(1)))
+        .getSingleOrNull();
+  }
+
+  /// Persists active playback session state for resume on next launch.
+  Future<void> savePlaybackSession({
+    required int? songId,
+    required String? trackId,
+    required int positionMs,
+  }) {
+    return into(playbackSessions).insertOnConflictUpdate(
+      PlaybackSessionsCompanion(
+        id: const Value(1),
+        lastSongId: Value(songId),
+        lastTrackId: Value(trackId),
+        lastPositionMs: Value(positionMs),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
 }
 
 LazyDatabase _openConnection() {
@@ -183,4 +263,11 @@ final playlistSongCountStreamProvider =
     StreamProvider.family<int, int>((ref, playlistId) {
   final db = ref.watch(appDatabaseProvider);
   return db.watchPlaylistSongCount(playlistId);
+});
+
+/// Reactive stream of recently played songs ordered by last played timestamp descending.
+final recentlyPlayedSongsStreamProvider =
+    StreamProvider<List<Song>>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchRecentlyPlayedSongs();
 });

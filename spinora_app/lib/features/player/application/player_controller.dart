@@ -95,11 +95,15 @@ class PlayerController extends Notifier<PlayerState> {
   AudioPlayer get player => _player ??= playerInstance ?? AudioPlayer();
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
+  String? _lastRecordedTrackId;
+  DateTime? _lastRecordedTime;
+  DateTime? _lastPersistedTime;
 
   @override
   PlayerState build() {
     _initAudioSession();
     _listenToPlayerStreams();
+    _restoreSavedSession();
 
     ref.onDispose(() {
       for (final sub in _subscriptions) {
@@ -109,6 +113,116 @@ class PlayerController extends Notifier<PlayerState> {
     });
 
     return const PlayerState();
+  }
+
+  /// Restores the last active track and playback position from local database on startup.
+  Future<void> _restoreSavedSession() async {
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final session = await db.getPlaybackSession();
+      if (session == null || session.lastSongId == null) return;
+
+      // Ensure user hasn't already started playing a track before restore finishes
+      if (state.hasTrack) return;
+
+      final song = await db.getSongById(session.lastSongId!);
+      if (song == null) return;
+
+      if (state.hasTrack) return;
+
+      final track = Track.fromSong(song);
+      final savedPosition = Duration(milliseconds: session.lastPositionMs);
+      final trackDuration = Duration(milliseconds: track.durationMs);
+      final safePosition =
+          (savedPosition > trackDuration || savedPosition < Duration.zero)
+              ? Duration.zero
+              : savedPosition;
+
+      final audioSource = _buildAudioSource(track);
+      await player.setAudioSource(
+        audioSource,
+        initialPosition: safePosition,
+      );
+
+      state = state.copyWith(
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+        position: safePosition,
+        duration: trackDuration,
+        isPlaying: false,
+      );
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error restoring saved session: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Error restoring playback session',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Records a play count and lastPlayedAt timestamp in Drift for local songs.
+  void _recordPlayback(Track track) {
+    final now = DateTime.now();
+    if (_lastRecordedTrackId == track.id &&
+        _lastRecordedTime != null &&
+        now.difference(_lastRecordedTime!).inSeconds < 5) {
+      return;
+    }
+
+    _lastRecordedTrackId = track.id;
+    _lastRecordedTime = now;
+
+    if (track.source == TrackSource.local && track.id.startsWith('local_')) {
+      final songId = int.tryParse(track.id.replaceFirst('local_', ''));
+      if (songId != null) {
+        try {
+          final db = ref.read(appDatabaseProvider);
+          db.recordSongPlay(songId);
+        } catch (e, st) {
+          debugPrint('[PlayerController] Error recording song play: $e');
+          FirebaseCrashlytics.instance.recordError(
+            e,
+            st,
+            reason: 'Failed to record song play in Drift',
+            fatal: false,
+          );
+        }
+      }
+    }
+    _persistCurrentSession(immediate: true);
+  }
+
+  /// Persists active playback session state to Drift database.
+  void _persistCurrentSession({bool immediate = false}) {
+    final currentTrack = state.currentTrack;
+    if (currentTrack == null) return;
+
+    final now = DateTime.now();
+    if (!immediate &&
+        _lastPersistedTime != null &&
+        now.difference(_lastPersistedTime!).inSeconds < 3) {
+      return;
+    }
+    _lastPersistedTime = now;
+
+    final songId = (currentTrack.source == TrackSource.local &&
+            currentTrack.id.startsWith('local_'))
+        ? int.tryParse(currentTrack.id.replaceFirst('local_', ''))
+        : null;
+
+    try {
+      final db = ref.read(appDatabaseProvider);
+      db.savePlaybackSession(
+        songId: songId,
+        trackId: currentTrack.id,
+        positionMs: state.position.inMilliseconds,
+      );
+    } catch (e) {
+      debugPrint('[PlayerController] Failed to persist session: $e');
+    }
   }
 
   Future<void> _initAudioSession() async {
@@ -140,10 +254,16 @@ class PlayerController extends Notifier<PlayerState> {
             playerState.processingState == ProcessingState.buffering ||
                 playerState.processingState == ProcessingState.loading;
 
+        final wasPlaying = state.isPlaying;
+
         state = state.copyWith(
           isPlaying: isPlaying,
           isBuffering: isBuffering,
         );
+
+        if (isPlaying && !wasPlaying && state.currentTrack != null) {
+          _recordPlayback(state.currentTrack!);
+        }
 
         if (playerState.processingState == ProcessingState.completed) {
           if (state.loopMode == LoopMode.one) {
@@ -164,6 +284,7 @@ class PlayerController extends Notifier<PlayerState> {
     _subscriptions.add(
       player.positionStream.listen((pos) {
         state = state.copyWith(position: pos);
+        _persistCurrentSession();
       }),
     );
 
@@ -181,10 +302,14 @@ class PlayerController extends Notifier<PlayerState> {
             index >= 0 &&
             index < state.queue.length &&
             index != state.currentIndex) {
+          final nextTrack = state.queue[index];
           state = state.copyWith(
             currentIndex: index,
-            currentTrack: state.queue[index],
+            currentTrack: nextTrack,
           );
+          if (state.isPlaying) {
+            _recordPlayback(nextTrack);
+          }
         }
       }),
     );
@@ -240,6 +365,7 @@ class PlayerController extends Notifier<PlayerState> {
       }
 
       await player.play();
+      _recordPlayback(track);
     } catch (e, st) {
       debugPrint('[PlayerController] Error playing track "${track.title}": $e');
       FirebaseCrashlytics.instance.recordError(
@@ -431,11 +557,15 @@ class PlayerController extends Notifier<PlayerState> {
     await player.play();
   }
 
-  Future<void> pause() => player.pause();
+  Future<void> pause() {
+    _persistCurrentSession(immediate: true);
+    return player.pause();
+  }
 
   Future<void> seek(Duration position) async {
     state = state.copyWith(position: position);
     await player.seek(position);
+    _persistCurrentSession(immediate: true);
   }
 
   /// Toggles queue shuffle.

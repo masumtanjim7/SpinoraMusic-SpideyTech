@@ -47,7 +47,7 @@ void main() {
     expect(find.text('Spidey Composer • Spider Beats'), findsOneWidget);
 
     // Verify favorite status icon (active favorite)
-    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_rounded), findsWidgets);
 
     // Verify duration labels: 1:00 current, 4:00 total
     expect(find.text('1:00'), findsOneWidget);

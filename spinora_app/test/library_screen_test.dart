@@ -13,6 +13,10 @@ void main() {
       ProviderScope(
         overrides: [
           localSongsStreamProvider.overrideWith((ref) => Stream.value([])),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
         ],
         child: const MaterialApp(
           home: LibraryScreen(),
@@ -38,6 +42,7 @@ void main() {
         duration: 185000,
         filePath: '/music/track1.mp3',
         isFavorite: false,
+        playCount: 0,
       ),
       const Song(
         id: 2,
@@ -47,6 +52,7 @@ void main() {
         duration: 240000,
         filePath: '/music/track2.mp3',
         isFavorite: false,
+        playCount: 0,
       ),
     ];
 
@@ -55,6 +61,10 @@ void main() {
         overrides: [
           localSongsStreamProvider
               .overrideWith((ref) => Stream.value(fakeSongs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
         ],
         child: const MaterialApp(
           home: LibraryScreen(),
@@ -71,7 +81,47 @@ void main() {
     expect(find.text('4:00'), findsOneWidget); // 240s = 4m 00s
   });
 
-  testWidgets('LibraryScreen filters tracks in real time by search query and favorites',
+  testWidgets(
+      'LibraryScreen displays Recently Played carousel when recent songs exist',
+      (tester) async {
+    final recentSong = Song(
+      id: 99,
+      title: 'Neon Drift Highway',
+      artist: 'Spidey Producer',
+      album: 'Synth City',
+      duration: 195000,
+      filePath: '/music/neon.mp3',
+      isFavorite: true,
+      lastPlayedAt: DateTime(2026, 1, 1),
+      playCount: 5,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localSongsStreamProvider
+              .overrideWith((ref) => Stream.value([recentSong])),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([recentSong])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(
+          home: LibraryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify Recently Played header and card are rendered
+    expect(find.text('RECENTLY PLAYED'), findsOneWidget);
+    expect(find.text('Neon Drift Highway'), findsWidgets);
+    expect(find.text('Spidey Producer'), findsWidgets);
+  });
+
+  testWidgets(
+      'LibraryScreen filters tracks in real time by search query and favorites',
       (tester) async {
     final fakeSongs = [
       const Song(
@@ -82,6 +132,7 @@ void main() {
         duration: 180000,
         filePath: '/music/cyber.mp3',
         isFavorite: true,
+        playCount: 0,
       ),
       const Song(
         id: 2,
@@ -91,6 +142,7 @@ void main() {
         duration: 210000,
         filePath: '/music/acoustic.mp3',
         isFavorite: false,
+        playCount: 0,
       ),
     ];
 
@@ -99,6 +151,8 @@ void main() {
         overrides: [
           localSongsStreamProvider
               .overrideWith((ref) => Stream.value(fakeSongs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
           allPlaylistsStreamProvider
               .overrideWith((ref) => Stream.value([])),
         ],
@@ -157,6 +211,7 @@ void main() {
         duration: 180000,
         filePath: '/music/theme.mp3',
         isFavorite: false,
+        playCount: 0,
       ),
     ];
 
@@ -165,6 +220,10 @@ void main() {
         overrides: [
           localSongsStreamProvider
               .overrideWith((ref) => Stream.value(fakeSongs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
+          allPlaylistsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
         ],
         child: const MaterialApp(
           home: LibraryScreen(),
@@ -202,6 +261,8 @@ void main() {
       ProviderScope(
         overrides: [
           localSongsStreamProvider.overrideWith((ref) => Stream.value([])),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
           allPlaylistsStreamProvider
               .overrideWith((ref) => Stream.value(fakePlaylists)),
           playlistSongCountStreamProvider(1)
@@ -259,6 +320,7 @@ void main() {
         duration: 320000,
         filePath: '/music/long.mp3',
         isFavorite: true,
+        playCount: 0,
       ),
     ];
 
@@ -267,6 +329,8 @@ void main() {
         overrides: [
           localSongsStreamProvider
               .overrideWith((ref) => Stream.value(fakeSongs)),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
           allPlaylistsStreamProvider
               .overrideWith((ref) => Stream.value([])),
         ],
@@ -296,6 +360,8 @@ void main() {
         overrides: [
           appDatabaseProvider.overrideWithValue(memoryDb),
           localSongsStreamProvider.overrideWith((ref) => Stream.value([])),
+          recentlyPlayedSongsStreamProvider
+              .overrideWith((ref) => Stream.value([])),
           allPlaylistsStreamProvider
               .overrideWith((ref) => Stream.value([])),
         ],

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,6 +102,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Widget build(BuildContext context) {
     final allSongsAsync = ref.watch(localSongsStreamProvider);
     final filteredSongsAsync = ref.watch(filteredSongsProvider);
+    final recentSongsAsync = ref.watch(recentlyPlayedSongsStreamProvider);
     final scanState = ref.watch(audioScannerStateProvider);
     final playerState = ref.watch(playerControllerProvider);
     final selectedFilter = ref.watch(libraryFilterProvider);
@@ -108,6 +111,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     final allSongs = allSongsAsync.asData?.value ?? [];
     final filteredSongs = filteredSongsAsync.asData?.value ?? [];
+    final recentSongs = recentSongsAsync.asData?.value ?? [];
     final isSearchingOrFiltering =
         searchQuery.isNotEmpty || selectedFilter != LibraryFilter.all;
 
@@ -322,23 +326,42 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         );
                       }
 
-                      return ListView.separated(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          8,
-                          20,
-                          playerState.hasTrack ? 110 : 80,
-                        ),
-                        itemCount: filteredSongs.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final song = filteredSongs[index];
-                          return _SongListTile(
-                            song: song,
-                            songs: filteredSongs,
-                          );
-                        },
+                      final showRecentlyPlayed =
+                          selectedFilter == LibraryFilter.all &&
+                              searchQuery.isEmpty &&
+                              recentSongs.isNotEmpty;
+
+                      return CustomScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        slivers: [
+                          if (showRecentlyPlayed) ...[
+                            SliverToBoxAdapter(
+                              child: _RecentlyPlayedSection(
+                                recentSongs: recentSongs,
+                              ),
+                            ),
+                          ],
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              20,
+                              showRecentlyPlayed ? 4 : 8,
+                              20,
+                              playerState.hasTrack ? 110 : 80,
+                            ),
+                            sliver: SliverList.separated(
+                              itemCount: filteredSongs.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final song = filteredSongs[index];
+                                return _SongListTile(
+                                  song: song,
+                                  songs: filteredSongs,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       );
                     },
                     loading: () => const Center(
@@ -652,10 +675,249 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Recently Played Horizontal Strip Widgets
+// ---------------------------------------------------------------------------
+
+/// Sleek horizontal "Recently Played" glassmorphic carousel displayed at the top of All Songs.
+class _RecentlyPlayedSection extends ConsumerWidget {
+  const _RecentlyPlayedSection({required this.recentSongs});
+
+  final List<Song> recentSongs;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(playerControllerProvider);
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.cyanAccent.withValues(alpha: 0.15),
+                      ),
+                      child: const Icon(
+                        Icons.history_rounded,
+                        size: 15,
+                        color: AppColors.cyanAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'RECENTLY PLAYED',
+                      style: tt.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${recentSongs.length}',
+                    style: tt.labelSmall?.copyWith(
+                      color: AppColors.cyanAccent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 156,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: recentSongs.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final song = recentSongs[index];
+                final isCurrent =
+                    playerState.currentTrack?.id == 'local_${song.id}';
+                final isPlaying = isCurrent && playerState.isPlaying;
+
+                return _RecentlyPlayedCard(
+                  song: song,
+                  recentSongs: recentSongs,
+                  isCurrent: isCurrent,
+                  isPlaying: isPlaying,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Glassmorphic card in the Recently Played strip featuring artwork, glowing play badge, and metadata.
+class _RecentlyPlayedCard extends ConsumerWidget {
+  const _RecentlyPlayedCard({
+    required this.song,
+    required this.recentSongs,
+    required this.isCurrent,
+    required this.isPlaying,
+  });
+
+  final Song song;
+  final List<Song> recentSongs;
+  final bool isCurrent;
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tt = Theme.of(context).textTheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        if (isCurrent) {
+          ref.read(playerControllerProvider.notifier).togglePlayPause();
+        } else {
+          ref
+              .read(playerControllerProvider.notifier)
+              .playSong(song, songsQueue: recentSongs);
+        }
+      },
+      onLongPress: () => showSongOptionsSheet(
+        context: context,
+        song: song,
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        width: 110,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: isCurrent
+              ? AppColors.purpleAccent.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.05),
+          border: Border.all(
+            color: isCurrent
+                ? AppColors.cyanAccent.withValues(alpha: 0.6)
+                : Colors.white.withValues(alpha: 0.1),
+            width: isCurrent ? 1.5 : 1,
+          ),
+          boxShadow: isCurrent
+              ? [
+                  BoxShadow(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SongArtwork.fromSong(
+                  song,
+                  size: 94,
+                  borderRadius: BorderRadius.circular(14),
+                  isCurrent: isCurrent,
+                  iconSize: 32,
+                ),
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: isCurrent
+                          ? AppColors.purpleGradient
+                          : const LinearGradient(
+                              colors: [
+                                AppColors.cyanAccent,
+                                AppColors.purpleAccent,
+                              ],
+                            ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isCurrent
+                                  ? AppColors.purpleAccent
+                                  : AppColors.cyanAccent)
+                              .withValues(alpha: 0.6),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              song.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tt.bodySmall?.copyWith(
+                color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              song.artist,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tt.labelSmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Song List Tile Widget
 // ---------------------------------------------------------------------------
 
-/// Song item tile formatted with frosted glass styling and active track highlights.
+/// Song item tile formatted with frosted glass styling, neon border glow, and animated equalizer.
 class _SongListTile extends ConsumerWidget {
   const _SongListTile({
     required this.song,
@@ -672,86 +934,99 @@ class _SongListTile extends ConsumerWidget {
     final isPlaying = isCurrent && playerState.isPlaying;
     final tt = Theme.of(context).textTheme;
 
-    return Material(
-      color: isCurrent
-          ? AppColors.purpleAccent.withValues(alpha: 0.15)
-          : Colors.white.withValues(alpha: 0.05),
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
+        color: isCurrent
+            ? AppColors.purpleAccent.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.05),
+        border: Border.all(
           color: isCurrent
-              ? AppColors.cyanAccent.withValues(alpha: 0.4)
+              ? AppColors.cyanAccent.withValues(alpha: 0.65)
               : Colors.white.withValues(alpha: 0.08),
           width: isCurrent ? 1.5 : 1,
         ),
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: AppColors.cyanAccent.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  spreadRadius: 0.5,
+                ),
+                BoxShadow(
+                  color: AppColors.purpleAccent.withValues(alpha: 0.16),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          if (isCurrent) {
-            ref.read(playerControllerProvider.notifier).togglePlayPause();
-          } else {
-            ref
-                .read(playerControllerProvider.notifier)
-                .playSong(song, songsQueue: songs);
-          }
-        },
-        onLongPress: () => showSongOptionsSheet(
-          context: context,
-          song: song,
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            children: [
-              SongArtwork.fromSong(
-                song,
-                size: 48,
-                borderRadius: BorderRadius.circular(12),
-                isCurrent: isCurrent,
-                iconSize: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            if (isCurrent) {
+              ref.read(playerControllerProvider.notifier).togglePlayPause();
+            } else {
+              ref
+                  .read(playerControllerProvider.notifier)
+                  .playSong(song, songsQueue: songs);
+            }
+          },
+          onLongPress: () => showSongOptionsSheet(
+            context: context,
+            song: song,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                SongArtwork.fromSong(
+                  song,
+                  size: 48,
+                  borderRadius: BorderRadius.circular(12),
+                  isCurrent: isCurrent,
+                  iconSize: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        song.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      song.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: tt.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isCurrent ? AppColors.cyanAccent : Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${song.artist}${song.album != null ? ' • ${song.album}' : ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: tt.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isCurrent) ...[
-                    Icon(
-                      isPlaying
-                          ? Icons.graphic_eq_rounded
-                          : Icons.pause_circle_outline_rounded,
-                      color: AppColors.cyanAccent,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
+                    if (isCurrent) ...[
+                      _EqualizerIndicator(isPlaying: isPlaying),
+                      const SizedBox(width: 8),
+                    ],
                   IconButton(
                     icon: Icon(
                       song.isFavorite
@@ -810,6 +1085,112 @@ class _SongListTile extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    ),
+  );
+ }
+}
+
+/// Animated 4-bar equalizer icon that bounces rhythmically while playing.
+class _EqualizerIndicator extends StatefulWidget {
+  const _EqualizerIndicator({required this.isPlaying});
+
+  final bool isPlaying;
+
+  @override
+  State<_EqualizerIndicator> createState() => _EqualizerIndicatorState();
+}
+
+class _EqualizerIndicatorState extends State<_EqualizerIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    if (widget.isPlaying) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _EqualizerIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying != oldWidget.isPlaying) {
+      if (widget.isPlaying) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        final h1 = widget.isPlaying
+            ? (5.0 + 8.0 * math.sin(t * math.pi)).clamp(4.0, 15.0)
+            : 5.0;
+        final h2 = widget.isPlaying
+            ? (4.0 + 11.0 * (math.sin((t + 0.3) * math.pi)).abs())
+                .clamp(4.0, 15.0)
+            : 11.0;
+        final h3 = widget.isPlaying
+            ? (4.0 + 10.0 * (math.sin((t + 0.6) * math.pi)).abs())
+                .clamp(4.0, 15.0)
+            : 7.0;
+        final h4 = widget.isPlaying
+            ? (4.0 + 8.0 * (math.sin((t + 0.85) * math.pi)).abs())
+                .clamp(4.0, 15.0)
+            : 4.0;
+
+        return SizedBox(
+          width: 18,
+          height: 18,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildBar(h1),
+              const SizedBox(width: 2),
+              _buildBar(h2),
+              const SizedBox(width: 2),
+              _buildBar(h3),
+              const SizedBox(width: 2),
+              _buildBar(h4),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBar(double height) {
+    return Container(
+      width: 2.5,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.cyanAccent,
+        borderRadius: BorderRadius.circular(1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cyanAccent.withValues(alpha: 0.55),
+            blurRadius: 3,
+          ),
+        ],
       ),
     );
   }

@@ -103,6 +103,13 @@ Task 2.2d DONE (Custom Playlists & Up-Next Playback Queue Management):
   3-dot trailing menu and long-press song options sheet ("Play Next", "Add to Playlist", "Toggle Favorite");
   dark glassmorphic "Up Next" queue modal sheet in `NowPlayingScreen` with current track highlight badge, jump-to-track tap,
   and swipe/tap track removal; 0 warnings with `.withValues(alpha: ...)`.
+Task 2.2e DONE (Playback Persistence, Listening History / "Recently Played", and Premium Dark Glassmorphic UI Polish):
+  Drift database schema updated to version 3 with safe `MigrationStrategy` onUpgrade adding `lastPlayedAt` and `playCount`
+  to `Songs` table plus a new `PlaybackSessions` table; playback controller automatically records track play timestamps/counts
+  and continuously throttles/persists active track position; automatically preloads last session on fresh launch ready to resume;
+  horizontal "Recently Played" glassmorphic carousel added to `LibraryScreen` along with neon glowing active song tile & animated equalizer;
+  complete visual overhaul for `NowPlayingScreen` (dual neon ambient glow blobs, multi-layered glass card, inline status badges, pill controls)
+  and `MiniPlayer` (floating pill card margin, neon progress accent, Previous/Play/Next quick actions); 0 analyzer issues and all 22 tests passing.
 Next: Task 2.3 – Synced Lyrics Engine (LRC parser, LRCLIB API client, auto-scrolling lyrics card).
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
