@@ -6,10 +6,13 @@ import '../../../../core/audio/track.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../application/player_controller.dart';
+import 'equalizer_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers to Launch Audio Tool Sheets
 // ---------------------------------------------------------------------------
+
+export 'equalizer_sheet.dart' show showEqualizerSheet, EqualizerSheet;
 
 void showSleepTimerSheet(BuildContext context) {
   showModalBottomSheet<void>(
@@ -817,7 +820,20 @@ class AudioToolsActionRow extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
 
-            // 3. Lyrics Quick Button
+            // 3. Hardware Equalizer Quick Button
+            _ToolButton(
+              icon: Icons.tune_rounded,
+              label: 'EQ',
+              isActive: playerState.equalizerEnabled,
+              activeColor: AppColors.cyanAccent,
+              onTap: () => showEqualizerSheet(context),
+              tooltip: playerState.equalizerEnabled
+                  ? 'Equalizer Active (${playerState.equalizerPreset.displayName})'
+                  : 'Audio Equalizer',
+            ),
+            const SizedBox(width: 8),
+
+            // 4. Lyrics Quick Button
             _ToolButton(
               icon: Icons.lyrics_rounded,
               label: 'Lyrics',

@@ -10,6 +10,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
+import '../domain/equalizer_state.dart';
 import 'lyrics_controller.dart';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,11 @@ class PlayerState {
     this.playbackSpeed = 1.0,
     this.remainingSleepDuration,
     this.stopAtEndOfTrack = false,
+    this.equalizerEnabled = false,
+    this.loudnessEnhancerEnabled = false,
+    this.loudnessGain = 0.0,
+    this.equalizerPreset = EqualizerPreset.flat,
+    this.equalizerBands = defaultEqualizerBands,
   });
 
   final Track? currentTrack;
@@ -49,6 +55,11 @@ class PlayerState {
   final double playbackSpeed;
   final Duration? remainingSleepDuration;
   final bool stopAtEndOfTrack;
+  final bool equalizerEnabled;
+  final bool loudnessEnhancerEnabled;
+  final double loudnessGain;
+  final EqualizerPreset equalizerPreset;
+  final List<EqualizerBandState> equalizerBands;
 
   bool get hasTrack => currentTrack != null;
   bool get hasNext => queue.isNotEmpty && currentIndex < queue.length - 1;
@@ -78,6 +89,11 @@ class PlayerState {
     Duration? remainingSleepDuration,
     bool clearSleepTimer = false,
     bool? stopAtEndOfTrack,
+    bool? equalizerEnabled,
+    bool? loudnessEnhancerEnabled,
+    double? loudnessGain,
+    EqualizerPreset? equalizerPreset,
+    List<EqualizerBandState>? equalizerBands,
   }) {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -98,6 +114,12 @@ class PlayerState {
       stopAtEndOfTrack: clearSleepTimer
           ? false
           : (stopAtEndOfTrack ?? this.stopAtEndOfTrack),
+      equalizerEnabled: equalizerEnabled ?? this.equalizerEnabled,
+      loudnessEnhancerEnabled:
+          loudnessEnhancerEnabled ?? this.loudnessEnhancerEnabled,
+      loudnessGain: loudnessGain ?? this.loudnessGain,
+      equalizerPreset: equalizerPreset ?? this.equalizerPreset,
+      equalizerBands: equalizerBands ?? this.equalizerBands,
     );
   }
 }
@@ -108,11 +130,51 @@ class PlayerState {
 
 /// Global controller managing audio playback, audio session focus, and queues.
 class PlayerController extends Notifier<PlayerState> {
-  PlayerController({this.playerInstance});
+  PlayerController({
+    this.playerInstance,
+    AndroidEqualizer? equalizerInstance,
+    AndroidLoudnessEnhancer? loudnessEnhancerInstance,
+  })  : _equalizer = equalizerInstance,
+        _loudnessEnhancer = loudnessEnhancerInstance;
 
   final AudioPlayer? playerInstance;
   AudioPlayer? _player;
-  AudioPlayer get player => _player ??= playerInstance ?? AudioPlayer();
+  AndroidEqualizer? _equalizer;
+  AndroidLoudnessEnhancer? _loudnessEnhancer;
+  AndroidEqualizerParameters? _equalizerParameters;
+
+  AudioPlayer get player {
+    if (_player != null) return _player!;
+    if (playerInstance != null) {
+      _player = playerInstance;
+      return _player!;
+    }
+    _equalizer ??= AndroidEqualizer();
+    _loudnessEnhancer ??= AndroidLoudnessEnhancer();
+    _player = AudioPlayer(
+      audioPipeline: AudioPipeline(
+        androidAudioEffects: [
+          _equalizer!,
+          _loudnessEnhancer!,
+        ],
+      ),
+    );
+    return _player!;
+  }
+
+  AndroidEqualizer get equalizer {
+    if (_equalizer == null) {
+      final _ = player;
+    }
+    return _equalizer ??= AndroidEqualizer();
+  }
+
+  AndroidLoudnessEnhancer get loudnessEnhancer {
+    if (_loudnessEnhancer == null) {
+      final _ = player;
+    }
+    return _loudnessEnhancer ??= AndroidLoudnessEnhancer();
+  }
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _sleepTimer;
@@ -125,6 +187,7 @@ class PlayerController extends Notifier<PlayerState> {
     _initAudioSession();
     _listenToPlayerStreams();
     _restoreSavedSession();
+    _initAudioEffects();
 
     ref.onDispose(() {
       _sleepTimer?.cancel();
@@ -875,6 +938,196 @@ class PlayerController extends Notifier<PlayerState> {
         ? 1 // default to 1.0
         : (currentIndex + 1) % availablePlaybackSpeeds.length;
     await setPlaybackSpeed(availablePlaybackSpeeds[nextIndex]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hardware Audio Equalizer & Loudness/Bass Enhancer Management
+  // ---------------------------------------------------------------------------
+
+  /// Initializes hardware audio equalizer & loudness enhancer streams and parameters.
+  Future<void> _initAudioEffects() async {
+    try {
+      final eq = equalizer;
+      final le = loudnessEnhancer;
+
+      _subscriptions.add(eq.enabledStream.listen((enabled) {
+        if (state.equalizerEnabled != enabled) {
+          state = state.copyWith(equalizerEnabled: enabled);
+        }
+      }));
+
+      _subscriptions.add(le.enabledStream.listen((enabled) {
+        if (state.loudnessEnhancerEnabled != enabled) {
+          state = state.copyWith(loudnessEnhancerEnabled: enabled);
+        }
+      }));
+
+      _subscriptions.add(le.targetGainStream.listen((gain) {
+        if ((state.loudnessGain - gain).abs() > 0.01) {
+          state = state.copyWith(loudnessGain: gain);
+        }
+      }));
+
+      final params = await eq.parameters;
+      _equalizerParameters = params;
+
+      final eqEnabled = eq.enabled;
+      final leEnabled = le.enabled;
+      final targetGain = le.targetGain;
+
+      final List<EqualizerBandState> initialBands = [];
+      for (final band in params.bands) {
+        final gain = band.gain;
+        initialBands.add(EqualizerBandState(
+          index: band.index,
+          centerFrequency: band.centerFrequency,
+          gain: gain,
+          minDecibels: params.minDecibels,
+          maxDecibels: params.maxDecibels,
+        ));
+      }
+
+      state = state.copyWith(
+        equalizerEnabled: eqEnabled,
+        loudnessEnhancerEnabled: leEnabled,
+        loudnessGain: targetGain,
+        equalizerBands:
+            initialBands.isNotEmpty ? initialBands : defaultEqualizerBands,
+      );
+    } catch (e) {
+      debugPrint('[PlayerController] Audio effects init fallback: $e');
+    }
+  }
+
+  /// Toggles or updates hardware equalizer enabled state.
+  Future<void> setEqualizerEnabled(bool enabled) async {
+    state = state.copyWith(equalizerEnabled: enabled);
+    try {
+      await equalizer.setEnabled(enabled);
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error setting equalizer enabled: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to set equalizer enabled',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Toggles hardware equalizer on or off.
+  Future<void> toggleEqualizer() async {
+    await setEqualizerEnabled(!state.equalizerEnabled);
+  }
+
+  /// Toggles or updates hardware loudness enhancer enabled state.
+  Future<void> setLoudnessEnhancerEnabled(bool enabled) async {
+    state = state.copyWith(loudnessEnhancerEnabled: enabled);
+    try {
+      await loudnessEnhancer.setEnabled(enabled);
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error setting loudness enhancer enabled: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to set loudness enhancer enabled',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Toggles hardware loudness enhancer on or off.
+  Future<void> toggleLoudnessEnhancer() async {
+    await setLoudnessEnhancerEnabled(!state.loudnessEnhancerEnabled);
+  }
+
+  /// Sets target gain (0.0 to 10.0 dB) on AndroidLoudnessEnhancer for Bass / Loudness Boost.
+  Future<void> setLoudnessGain(double gain) async {
+    final clampedGain = gain.clamp(0.0, 10.0);
+    final shouldEnable = clampedGain > 0.0;
+    state = state.copyWith(
+      loudnessGain: clampedGain,
+      loudnessEnhancerEnabled: shouldEnable,
+    );
+    try {
+      await loudnessEnhancer.setEnabled(shouldEnable);
+      await loudnessEnhancer.setTargetGain(clampedGain);
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error setting loudness gain: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to set loudness gain',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Updates gain for an individual equalizer band in real-time and switches preset to Custom.
+  Future<void> setBandGain(int bandIndex, double gain) async {
+    final currentBands = List<EqualizerBandState>.from(state.equalizerBands);
+    if (bandIndex < 0 || bandIndex >= currentBands.length) return;
+
+    final targetBand = currentBands[bandIndex];
+    final clampedGain =
+        gain.clamp(targetBand.minDecibels, targetBand.maxDecibels);
+    currentBands[bandIndex] = targetBand.copyWith(gain: clampedGain);
+
+    state = state.copyWith(
+      equalizerBands: currentBands,
+      equalizerPreset: EqualizerPreset.custom,
+    );
+
+    try {
+      final params = _equalizerParameters ?? await equalizer.parameters;
+      _equalizerParameters = params;
+      if (bandIndex < params.bands.length) {
+        await params.bands[bandIndex].setGain(clampedGain);
+      }
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error setting band gain: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to set equalizer band gain',
+        fatal: false,
+      );
+    }
+  }
+
+  /// Applies a built-in equalizer preset curve (Flat, Bass Boost, Pop, Rock, Vocal, Custom).
+  Future<void> applyPreset(EqualizerPreset preset) async {
+    final currentBands = state.equalizerBands;
+    final presetGains = calculatePresetGainsForBands(preset, currentBands);
+
+    final updatedBands = <EqualizerBandState>[];
+    for (int i = 0; i < currentBands.length; i++) {
+      final band = currentBands[i];
+      final newGain =
+          presetGains[i].clamp(band.minDecibels, band.maxDecibels);
+      updatedBands.add(band.copyWith(gain: newGain));
+    }
+
+    state = state.copyWith(
+      equalizerPreset: preset,
+      equalizerBands: updatedBands,
+    );
+
+    try {
+      final params = _equalizerParameters ?? await equalizer.parameters;
+      _equalizerParameters = params;
+      for (int i = 0; i < params.bands.length && i < updatedBands.length; i++) {
+        await params.bands[i].setGain(updatedBands[i].gain);
+      }
+    } catch (e, st) {
+      debugPrint('[PlayerController] Error applying equalizer preset: $e');
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'Failed to apply equalizer preset',
+        fatal: false,
+      );
+    }
   }
 }
 

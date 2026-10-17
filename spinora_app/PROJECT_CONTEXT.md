@@ -153,6 +153,12 @@ Task 2.3b DONE (Automatic Online Synced Lyrics Fetching, Offline Drift Caching &
   - Eliminated "Right Overflowed by 19 Pixels" Header Bug: Made the 4 header action `IconButton`s compact (`BoxConstraints(minWidth: 30, minHeight: 30)`, `padding: EdgeInsets.zero`, `iconSize: 18`) and wrapped title + badge in `Expanded` with `Flexible/ellipsis` so the header never overflows on any screen width.
   - Fixed Queue Pill Button Highlight: Set `isActive: false` on the bottom `Queue` tool button to match the neutral unselected glass aesthetic of `Timer`, `1.0x`, and `Info`.
   - Maintained `.withValues(alpha: ...)` for color opacities; 0 analyzer issues and all 50 tests passing.
-Next: Step 3 / Full-Screen Immersive Lyrics Mode or Task 2.5 Audio Equalizer.
+Task 2.5 DONE (Built-In Hardware Audio Equalizer & Loudness/Bass Enhancer):
+  - Configured `AudioPipeline` on `AudioPlayer` with native `AndroidEqualizer` and `AndroidLoudnessEnhancer`;
+  - Reactive `PlayerState` and `PlayerController` methods for enabling/disabling EQ and Loudness Enhancer, live band gain adjustment, hardware center frequency formatting (`60Hz`, `230Hz`, `910Hz`, `3.6kHz`, `14kHz`), target gain boost (`0.0` to `10.0` dB), and 6 built-in presets (`Flat`, `Bass Boost`, `Pop`, `Rock`, `Vocal`, `Custom`) with linear interpolation for arbitrary band counts;
+  - Created futuristic dark glassmorphic `EqualizerSheet` (`#0A0A12` base, neon cyan/violet sliders, `RotatedBox` vertical band sliders with live dB text, and dedicated horizontal Loudness / Bass Gain boost slider);
+  - Wired `EQ` pill button with live neon cyan active state into the horizontal scrollable `AudioToolsActionRow` on `NowPlayingScreen`;
+  - Wrapped text inside rows with `Expanded` eliminating any `RenderFlex` overflow; 0 analyzer issues and all 58 tests passing.
+Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
