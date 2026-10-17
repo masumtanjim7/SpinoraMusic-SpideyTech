@@ -315,6 +315,18 @@ Future<String?> resolveSongLyrics({
 /// Watches the lyrics for an active [Track] reactively.
 final trackLyricsProvider =
     StreamProvider.family<ParsedLyrics, Track>((ref, track) {
+  // If online track (e.g. YouTube stream)
+  if (track.source == TrackSource.online || track.uri.startsWith('yt://')) {
+    final cache = ref.watch(onlineLyricsCacheProvider);
+    final cached = cache[track.id] ?? cache[track.uri];
+    if (cached != null && cached.trim().isNotEmpty) {
+      return Stream.value(LrcParser.parse(cached));
+    }
+    // Auto-trigger online fetch if not in cache
+    ref.read(lyricsControllerProvider.notifier).triggerAutoFetchForTrack(track);
+    return Stream.value(const ParsedLyrics(lines: [], isSynced: false));
+  }
+
   final db = ref.watch(appDatabaseProvider);
 
   // Extract song ID if this is a local track (e.g. "local_42")

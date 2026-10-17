@@ -10,6 +10,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
+import '../../online/data/youtube_audio_service.dart';
 import '../domain/equalizer_state.dart';
 import 'lyrics_controller.dart';
 
@@ -433,8 +434,26 @@ class PlayerController extends Notifier<PlayerState> {
     );
   }
 
+  final Map<String, String> _resolvedStreamUrls = {};
+
+  /// Resolves direct HTTPS stream URL for online tracks (e.g. `yt://<videoId>`).
+  Future<String> _resolveTrackStreamUrl(Track track) async {
+    if (!track.uri.startsWith('yt://')) {
+      return track.uri;
+    }
+    if (_resolvedStreamUrls.containsKey(track.uri)) {
+      return _resolvedStreamUrls[track.uri]!;
+    }
+    final videoId = track.uri.replaceFirst('yt://', '');
+    final service = ref.read(youtubeAudioServiceProvider);
+    final streamUrl = await service.getAudioStreamUrl(videoId);
+    _resolvedStreamUrls[track.uri] = streamUrl;
+    return streamUrl;
+  }
+
   AudioSource _buildAudioSource(Track track) {
-    final sourceUri = Uri.parse(track.uri);
+    final uriString = _resolvedStreamUrls[track.uri] ?? track.uri;
+    final sourceUri = Uri.parse(uriString);
     return AudioSource.uri(
       sourceUri,
       tag: MediaItem(
@@ -466,14 +485,21 @@ class PlayerController extends Notifier<PlayerState> {
       activeQueue.add(track);
     }
 
+    final isOnline = track.uri.startsWith('yt://');
+
     state = state.copyWith(
       currentTrack: track,
       queue: List.unmodifiable(activeQueue),
       currentIndex: index,
+      isBuffering: isOnline,
       clearError: true,
     );
 
     try {
+      if (isOnline) {
+        await _resolveTrackStreamUrl(track);
+      }
+
       if (activeQueue.length > 1) {
         final sources = activeQueue.map(_buildAudioSource).toList();
         await player.setAudioSources(sources, initialIndex: index);
@@ -484,6 +510,11 @@ class PlayerController extends Notifier<PlayerState> {
 
       await player.play();
       _recordPlayback(track);
+
+      // Trigger automatic lyrics fetching for track
+      ref
+          .read(lyricsControllerProvider.notifier)
+          .triggerAutoFetchForTrack(track);
     } catch (e, st) {
       debugPrint('[PlayerController] Error playing track "${track.title}": $e');
       FirebaseCrashlytics.instance.recordError(
@@ -495,6 +526,7 @@ class PlayerController extends Notifier<PlayerState> {
       state = state.copyWith(
         errorMessage: 'Playback error: ${e.toString()}',
         isPlaying: false,
+        isBuffering: false,
       );
     }
   }
@@ -572,16 +604,34 @@ class PlayerController extends Notifier<PlayerState> {
     if (index == state.currentIndex) return;
 
     final targetTrack = state.queue[index];
+    final isOnline = targetTrack.uri.startsWith('yt://');
+
     state = state.copyWith(
       currentIndex: index,
       currentTrack: targetTrack,
+      isBuffering: isOnline && !_resolvedStreamUrls.containsKey(targetTrack.uri),
     );
 
     try {
-      await player.seek(Duration.zero, index: index);
+      if (isOnline && !_resolvedStreamUrls.containsKey(targetTrack.uri)) {
+        await _resolveTrackStreamUrl(targetTrack);
+        final sources = state.queue.map(_buildAudioSource).toList();
+        await player.setAudioSources(
+          sources,
+          initialIndex: index,
+          initialPosition: Duration.zero,
+        );
+      } else {
+        await player.seek(Duration.zero, index: index);
+      }
+
       if (!state.isPlaying) {
         await player.play();
       }
+
+      ref
+          .read(lyricsControllerProvider.notifier)
+          .triggerAutoFetchForTrack(targetTrack);
     } catch (e, st) {
       debugPrint('[PlayerController] Error jumping to index $index: $e');
       FirebaseCrashlytics.instance.recordError(

@@ -56,23 +56,29 @@ class LyricsController extends Notifier<LyricsFetchState> {
 
   /// Triggers background automatic lyrics fetching for a [Track] if not already cached.
   void triggerAutoFetchForTrack(Track track) {
-    if (track.source != TrackSource.local || !track.id.startsWith('local_')) {
-      return;
-    }
-    final songId = int.tryParse(track.id.replaceFirst('local_', ''));
-    if (songId == null) return;
+    if (track.source == TrackSource.local && track.id.startsWith('local_')) {
+      final songId = int.tryParse(track.id.replaceFirst('local_', ''));
+      if (songId == null) return;
 
-    Future.microtask(() async {
-      try {
-        final db = ref.read(appDatabaseProvider);
-        final song = await db.getSongById(songId);
-        if (song != null) {
-          triggerAutoFetch(song);
+      Future.microtask(() async {
+        try {
+          final db = ref.read(appDatabaseProvider);
+          final song = await db.getSongById(songId);
+          if (song != null) {
+            triggerAutoFetch(song);
+          }
+        } catch (e) {
+          debugPrint('[LyricsController] Error auto-fetching for track: $e');
         }
-      } catch (e) {
-        debugPrint('[LyricsController] Error auto-fetching for track: $e');
+      });
+    } else if (track.uri.startsWith('yt://') ||
+        track.source == TrackSource.online) {
+      final cache = ref.read(onlineLyricsCacheProvider);
+      if (cache.containsKey(track.id) || cache.containsKey(track.uri)) {
+        return;
       }
-    });
+      refetchOnlineLyrics(track);
+    }
   }
 
   /// Triggers background automatic lyrics fetching for a [Song] if lyrics are empty.
@@ -142,7 +148,8 @@ class LyricsController extends Notifier<LyricsFetchState> {
         state = state.copyWith(
           isFetching: false,
           activeSongId: null,
-          errorMessage: 'No lyrics found online for "${customQuery ?? song.title}".',
+          errorMessage:
+              'No lyrics found online for "${customQuery ?? song.title}".',
         );
         return false;
       }
@@ -158,11 +165,100 @@ class LyricsController extends Notifier<LyricsFetchState> {
       _inFlightSongIds.remove(songId);
     }
   }
+
+  /// Fetches lyrics for an online streaming [Track] and caches in memory.
+  Future<bool> refetchOnlineLyrics(
+    Track track, {
+    String? customQuery,
+  }) async {
+    final cacheKey = track.id;
+    final int syntheticId = track.id.hashCode;
+    if (_inFlightSongIds.contains(syntheticId)) return false;
+
+    _inFlightSongIds.add(syntheticId);
+    state = state.copyWith(
+      isFetching: true,
+      activeSongId: syntheticId,
+      clearError: true,
+    );
+
+    try {
+      final onlineService = ref.read(onlineLyricsServiceProvider);
+      final tempSong = Song(
+        id: syntheticId,
+        title: track.title,
+        artist: track.artist,
+        duration: track.durationMs,
+        filePath: track.uri,
+        isFavorite: false,
+        playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
+      );
+
+      final fetched = await onlineService.fetchLyricsForSong(
+        tempSong,
+        customQuery: customQuery,
+      );
+
+      if (fetched != null && fetched.trim().isNotEmpty) {
+        ref
+            .read(onlineLyricsCacheProvider.notifier)
+            .cacheLyrics(cacheKey, fetched.trim());
+        ref
+            .read(onlineLyricsCacheProvider.notifier)
+            .cacheLyrics(track.uri, fetched.trim());
+
+        state = state.copyWith(
+          isFetching: false,
+          activeSongId: null,
+          clearError: true,
+        );
+        return true;
+      } else {
+        state = state.copyWith(
+          isFetching: false,
+          activeSongId: null,
+          errorMessage:
+              'No lyrics found online for "${customQuery ?? track.title}".',
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('[LyricsController] Online lyrics fetch failed: $e');
+      state = state.copyWith(
+        isFetching: false,
+        activeSongId: null,
+        errorMessage: 'Failed to fetch lyrics: $e',
+      );
+      return false;
+    } finally {
+      _inFlightSongIds.remove(syntheticId);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Riverpod Providers
 // ---------------------------------------------------------------------------
+
+/// In-memory reactive cache mapping online track IDs (e.g. 'online_-123' or 'yt://...')
+/// to raw LRC/plain text lyrics.
+class OnlineLyricsCacheNotifier extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() => const {};
+
+  void cacheLyrics(String key, String lyrics) {
+    state = {...state, key: lyrics};
+  }
+
+  String? getLyrics(String key) => state[key];
+}
+
+final onlineLyricsCacheProvider =
+    NotifierProvider<OnlineLyricsCacheNotifier, Map<String, String>>(
+  OnlineLyricsCacheNotifier.new,
+);
 
 /// Provider for managing online lyrics fetching lifecycle.
 final lyricsControllerProvider =

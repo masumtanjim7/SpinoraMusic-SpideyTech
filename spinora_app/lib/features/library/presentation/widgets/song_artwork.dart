@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -273,17 +272,21 @@ class _SongArtworkState extends State<SongArtwork> {
             _buildFallback(w, h, radius),
       );
     }
-    // 2. Remote HTTP/HTTPS Artwork (Audius / Online)
+    // 2. Remote HTTP/HTTPS Artwork (YouTube / Online Stream)
     else if (widget.artworkUri != null &&
         (widget.artworkUri!.startsWith('http://') ||
             widget.artworkUri!.startsWith('https://'))) {
-      content = CachedNetworkImage(
-        imageUrl: widget.artworkUri!,
+      content = Image.network(
+        widget.artworkUri!,
         width: w,
         height: h,
         fit: widget.fit,
-        placeholder: (context, url) => _buildFallback(w, h, radius),
-        errorWidget: (context, url, error) => _buildFallback(w, h, radius),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildFallback(w, h, radius);
+        },
+        errorBuilder: (context, error, stackTrace) =>
+            _buildFallback(w, h, radius),
       );
     }
     // 3. Local image file

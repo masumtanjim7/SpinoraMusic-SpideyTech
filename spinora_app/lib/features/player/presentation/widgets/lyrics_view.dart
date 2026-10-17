@@ -74,6 +74,29 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   }
 
   Future<void> _triggerRefresh(BuildContext context) async {
+    if (widget.track.source == TrackSource.online ||
+        widget.track.uri.startsWith('yt://')) {
+      final success = await ref
+          .read(lyricsControllerProvider.notifier)
+          .refetchOnlineLyrics(widget.track);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Lyrics fetched for "${widget.track.title}"!'
+                  : 'No online lyrics found for "${widget.track.title}".',
+            ),
+            duration: const Duration(seconds: 3),
+            backgroundColor: success
+                ? AppColors.cyanAccent.withValues(alpha: 0.9)
+                : Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
     final songId = widget.track.id.startsWith('local_')
         ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
         : null;
@@ -579,6 +602,45 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
   }
 
   void _openSearchDialog(BuildContext context) async {
+    if (widget.track.source == TrackSource.online ||
+        widget.track.uri.startsWith('yt://')) {
+      final cleaned = cleanSongMetadata(
+        rawTitle: widget.track.title,
+        rawArtist: widget.track.artist,
+      );
+      final initialQuery = cleaned.artist.isNotEmpty
+          ? '${cleaned.artist} - ${cleaned.title}'
+          : cleaned.title;
+
+      final query = await showSearchLyricsDialog(
+        context: context,
+        initialQuery: initialQuery,
+      );
+
+      if (query != null && query.trim().isNotEmpty && context.mounted) {
+        final success = await ref
+            .read(lyricsControllerProvider.notifier)
+            .refetchOnlineLyrics(widget.track, customQuery: query.trim());
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                success
+                    ? 'Lyrics downloaded and cached!'
+                    : 'No lyrics found for "$query".',
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: success
+                  ? AppColors.cyanAccent.withValues(alpha: 0.9)
+                  : Colors.redAccent,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
     final songId = widget.track.id.startsWith('local_')
         ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
         : null;

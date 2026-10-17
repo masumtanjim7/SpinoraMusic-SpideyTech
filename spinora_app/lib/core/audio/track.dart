@@ -58,15 +58,19 @@ class Track {
 
   /// Creates a [Track] from a Drift [Song] record.
   factory Track.fromSong(Song song) {
+    final isOnline = song.filePath.startsWith('yt://') ||
+        song.filePath.startsWith('http://') ||
+        song.filePath.startsWith('https://');
+
     return Track(
-      id: 'local_${song.id}',
+      id: isOnline ? 'online_${song.id}' : 'local_${song.id}',
       title: song.title,
       artist: song.artist,
       album: song.album,
       durationMs: song.duration,
       artworkUri: song.albumArtPath,
-      source: TrackSource.local,
-      uri: Uri.file(song.filePath).toString(),
+      source: isOnline ? TrackSource.online : TrackSource.local,
+      uri: isOnline ? song.filePath : Uri.file(song.filePath).toString(),
       isFavorite: song.isFavorite,
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart' show Value;
@@ -13,6 +14,7 @@ import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
 import 'playlist_detail_screen.dart';
 import 'widgets/library_group_views.dart';
+import 'widgets/online_search_view.dart';
 import 'widgets/song_artwork.dart';
 import 'widgets/song_options_sheet.dart';
 
@@ -34,6 +36,7 @@ enum SongSortOption {
 
 enum LibraryFilter {
   all,
+  onlineSearch,
   favorites,
   mostPlayed,
   playlists,
@@ -168,6 +171,7 @@ class LibraryScreen extends ConsumerStatefulWidget {
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   late final TextEditingController _searchController;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -179,6 +183,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -346,18 +351,39 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                   ),
 
-                // Search Bar (shown when library has songs, searching, or on playlists tab)
+                // Search Bar (shown when library has songs, searching, on playlists tab, or online search tab)
                 if (allSongs.isNotEmpty ||
                     isSearchingOrFiltering ||
-                    selectedFilter == LibraryFilter.playlists) ...[
+                    selectedFilter == LibraryFilter.playlists ||
+                    selectedFilter == LibraryFilter.onlineSearch) ...[
                   _GlassSearchBar(
                     controller: _searchController,
+                    hintText: selectedFilter == LibraryFilter.onlineSearch
+                        ? 'Search YouTube music & streams...'
+                        : 'Search songs, artists, albums...',
                     onChanged: (val) {
+                      if (selectedFilter == LibraryFilter.onlineSearch) {
+                        _debounceTimer?.cancel();
+                        _debounceTimer =
+                            Timer(const Duration(milliseconds: 500), () {
+                          ref
+                              .read(librarySearchQueryProvider.notifier)
+                              .setQuery(val);
+                        });
+                      } else {
+                        ref
+                            .read(librarySearchQueryProvider.notifier)
+                            .setQuery(val);
+                      }
+                    },
+                    onSubmitted: (val) {
+                      _debounceTimer?.cancel();
                       ref
                           .read(librarySearchQueryProvider.notifier)
                           .setQuery(val);
                     },
                     onClear: () {
+                      _debounceTimer?.cancel();
                       _searchController.clear();
                       ref.read(librarySearchQueryProvider.notifier).clear();
                     },
@@ -381,6 +407,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 // Songs List, Playlists, Artists, Albums, or State Placeholders
                 Expanded(
                   child: switch (selectedFilter) {
+                    LibraryFilter.onlineSearch => OnlineSearchView(
+                        searchQuery: searchQuery,
+                        onSuggestionTap: (tag) {
+                          _searchController.text = tag;
+                          _debounceTimer?.cancel();
+                          ref
+                              .read(librarySearchQueryProvider.notifier)
+                              .setQuery(tag);
+                        },
+                      ),
                     LibraryFilter.playlists => const _PlaylistsView(),
                     LibraryFilter.artists => ArtistsGroupedView(
                         songs: allSongs,
@@ -533,11 +569,15 @@ class _GlassSearchBar extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     required this.onClear,
+    this.hintText = 'Search songs, artists, albums...',
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final String hintText;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -553,10 +593,12 @@ class _GlassSearchBar extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        textInputAction: TextInputAction.search,
         style: const TextStyle(color: Colors.white, fontSize: 14),
         cursorColor: AppColors.cyanAccent,
         decoration: InputDecoration(
-          hintText: 'Search songs, artists, albums...',
+          hintText: hintText,
           hintStyle: TextStyle(
             color: Colors.white.withValues(alpha: 0.4),
             fontSize: 14,
@@ -673,7 +715,30 @@ class _LibraryFilterBar extends StatelessWidget {
             const SizedBox(width: 12),
 
             // Counter badge according to active tab
-            if (selectedFilter == LibraryFilter.playlists)
+            if (selectedFilter == LibraryFilter.onlineSearch)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.redAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: const Text(
+                  'YouTube Search',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              )
+            else if (selectedFilter == LibraryFilter.playlists)
               Consumer(
                 builder: (context, ref, _) {
                   final playlists =
@@ -832,6 +897,14 @@ class _LibraryFilterBar extends StatelessWidget {
               },
               ),
             ],
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'YouTube Stream',
+              icon: Icons.travel_explore_rounded,
+              isSelected: selectedFilter == LibraryFilter.onlineSearch,
+              onTap: () => onFilterSelected(LibraryFilter.onlineSearch),
+              activeColor: Colors.redAccent,
+            ),
           ],
         ),
       ),

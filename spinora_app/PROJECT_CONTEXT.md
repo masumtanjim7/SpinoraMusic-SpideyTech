@@ -167,6 +167,23 @@ Task 2.6 DONE (Offline Track Metadata Editor & Library Track Management):
   - Created dark glassmorphic `EditSongDialog` (`lib/features/library/presentation/widgets/edit_song_dialog.dart`) with `Title`, `Artist`, and `Album` text fields, convenient "Auto-Clean Tags from Filename" button stripping extensions, bitrates, website watermarks, and promotional tags with one tap; strictly managed `TextEditingController` lifecycles in `State.dispose()`; updates Drift database, updates active track in `PlayerController`, and triggers `refetchLyrics()` if lyrics were empty;
   - Added "Edit Tags" and "Hide from Library" (with quick Undo SnackBar action) options to `SongOptionsSheet` in `library_screen.dart`; added "Edit Tags" action button to `TrackInfoSheet` in `audio_tools_sheets.dart`;
   - 0 analyzer issues and all 65 unit/widget tests passing.
+Task 2.7 DONE (Phase 2: Hybrid Online Audio Search & Streaming via `youtube_explode_dart`):
+  - Dependency: Added `youtube_explode_dart: 3.1.0` to `pubspec.yaml`;
+  - Created `YoutubeAudioService` (`lib/features/online/data/youtube_audio_service.dart`) wrapping `YoutubeExplode`:
+    * `searchSongs(query)`: searches YouTube videos matching query, filtering out mixes >25 min, mapping into unified `Song` with deterministic negative virtual IDs (`generateVirtualId`), high-res thumbnail artwork (`video.thumbnails.highResUrl`), and `filePath` formatted as `yt://$videoId`;
+    * `getAudioStreamUrl(videoId)`: resolves direct audio stream URL via `manifest.audioOnly.withHighestBitrate().url.toString()`;
+    * Exposed via `youtubeAudioServiceProvider` and reactive `onlineSearchResultsProvider`;
+  - Hybrid Player Controller Support (`lib/features/player/application/player_controller.dart`):
+    * In `PlayerController`: automatically detects `yt://` tracks, sets `isBuffering: true`, resolves direct HTTPS stream URL via `YoutubeAudioService`, and creates `AudioSource.uri(..., tag: MediaItem(...))` with smooth transition to playback;
+    * In `Track.fromSong`: recognizes `yt://` and HTTP(S) paths, setting `TrackSource.online` without prepending `file://`;
+    * Online Synced Lyrics: added in-memory `onlineLyricsCacheProvider` and `refetchOnlineLyrics(track)` in `LyricsController`, enabling LRCLIB synced lyrics to display seamlessly on live streams;
+    * Network artwork support in `SongArtwork` (`lib/features/library/presentation/widgets/song_artwork.dart`) using `Image.network` with smooth glassmorphic placeholder and fallback icon;
+  - Online Search UI (`lib/features/library/presentation/library_screen.dart` & `widgets/online_search_view.dart`):
+    * Added `YouTube Stream` chip (`LibraryFilter.onlineSearch`) with neon red badge and horizontal scrollable placement;
+    * Debounced search bar (500ms debounce + search action) querying YouTube streams in real time;
+    * Created `OnlineSearchView`: prompt card with 6 trending music suggestion chips, loading spinner with live manifest messaging, error retry card, and glassmorphic song cards with "STREAM" neon badge, duration formatting, and one-tap playback;
+  - Strict safety: all row text wrapped in `Expanded`, controllers cleanly disposed in `State.dispose()`, and `.withValues(alpha: ...)` used everywhere;
+  - 0 analyzer issues and all 72 unit/widget tests passing.
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
