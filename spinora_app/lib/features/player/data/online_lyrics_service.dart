@@ -68,6 +68,9 @@ String cleanQueryTextHelper(String input) {
     '',
   );
 
+  // 3.5. Convert underscores to spaces (common in filenames before metadata cleaning)
+  text = text.replaceAll('_', ' ');
+
   // 4. Remove bracketed / parenthesized tags like (Official Video), [320kbps], (Lyrics), (Lyrics Video), [Official]
   text = text.replaceAll(
     RegExp(

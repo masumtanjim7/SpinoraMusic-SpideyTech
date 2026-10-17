@@ -796,6 +796,40 @@ class PlayerController extends Notifier<PlayerState> {
     );
   }
 
+  /// Updates metadata for a local track in the active queue and current track state in real-time.
+  void updateTrackMetadata({
+    required int songId,
+    required String title,
+    required String artist,
+    required String? album,
+  }) {
+    final trackId = 'local_$songId';
+    final updatedQueue = state.queue.map((t) {
+      if (t.id == trackId) {
+        return t.copyWith(
+          title: title,
+          artist: artist,
+          album: album,
+        );
+      }
+      return t;
+    }).toList();
+
+    Track? updatedCurrentTrack = state.currentTrack;
+    if (state.currentTrack?.id == trackId) {
+      updatedCurrentTrack = state.currentTrack!.copyWith(
+        title: title,
+        artist: artist,
+        album: album,
+      );
+    }
+
+    state = state.copyWith(
+      currentTrack: updatedCurrentTrack,
+      queue: List.unmodifiable(updatedQueue),
+    );
+  }
+
   /// Skips to the next song in the active queue.
   Future<void> next() async {
     if (!state.hasNext) {

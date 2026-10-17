@@ -6,6 +6,7 @@ import '../../../../core/audio/track.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../application/player_controller.dart';
+import '../../../library/presentation/widgets/edit_song_dialog.dart';
 import 'equalizer_sheet.dart';
 
 // ---------------------------------------------------------------------------
@@ -686,6 +687,40 @@ class TrackInfoSheet extends ConsumerWidget {
               ],
             ),
           ),
+          if (song != null) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  showEditSongDialog(context: context, song: song);
+                },
+                icon: const Icon(
+                  Icons.edit_note_rounded,
+                  size: 20,
+                  color: AppColors.cyanAccent,
+                ),
+                label: const Text(
+                  'Edit Tags',
+                  style: TextStyle(
+                    color: AppColors.cyanAccent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.4),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

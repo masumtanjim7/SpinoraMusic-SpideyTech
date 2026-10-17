@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../player/application/player_controller.dart';
+import 'edit_song_dialog.dart';
 import 'song_artwork.dart';
 
 /// Shows the glassmorphic song options sheet with options to "Play Next",
@@ -177,6 +178,62 @@ class _SongOptionsSheet extends ConsumerWidget {
                     .write(
                   SongsCompanion(isFavorite: Value(!song.isFavorite)),
                 );
+              },
+            ),
+
+            // Option 4: Edit Tags
+            _SheetActionTile(
+              icon: Icons.edit_note_rounded,
+              iconColor: AppColors.cyanAccent,
+              title: 'Edit Tags',
+              subtitle: 'Clean up song title, artist, or album',
+              onTap: () {
+                Navigator.of(context).pop();
+                if (parentContext.mounted) {
+                  showEditSongDialog(context: parentContext, song: song);
+                }
+              },
+            ),
+
+            // Option 5: Hide from Library
+            _SheetActionTile(
+              icon: Icons.visibility_off_rounded,
+              iconColor: Colors.amberAccent,
+              title: 'Hide from Library',
+              subtitle: 'Hide ringtone, voice note or unwanted clip',
+              onTap: () async {
+                Navigator.of(context).pop();
+                final db = ref.read(appDatabaseProvider);
+                await db.setSongHidden(songId: song.id, isHidden: true);
+                if (parentContext.mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF1E1A2E),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: Colors.amberAccent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      content: Text(
+                        'Hidden "${song.title}" from library',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      action: SnackBarAction(
+                        label: 'UNDO',
+                        textColor: AppColors.cyanAccent,
+                        onPressed: () async {
+                          await db.setSongHidden(
+                            songId: song.id,
+                            isHidden: false,
+                          );
+                        },
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
               },
             ),
           ],

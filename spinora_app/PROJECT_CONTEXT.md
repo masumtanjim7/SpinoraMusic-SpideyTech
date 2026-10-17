@@ -159,6 +159,14 @@ Task 2.5 DONE (Built-In Hardware Audio Equalizer & Loudness/Bass Enhancer):
   - Created futuristic dark glassmorphic `EqualizerSheet` (`#0A0A12` base, neon cyan/violet sliders, `RotatedBox` vertical band sliders with live dB text, and dedicated horizontal Loudness / Bass Gain boost slider);
   - Wired `EQ` pill button with live neon cyan active state into the horizontal scrollable `AudioToolsActionRow` on `NowPlayingScreen`;
   - Wrapped text inside rows with `Expanded` eliminating any `RenderFlex` overflow; 0 analyzer issues and all 58 tests passing.
+Task 2.6 DONE (Offline Track Metadata Editor & Library Track Management):
+  - Database schema updated to version 5 with safe `MigrationStrategy` `onUpgrade` adding `isCustomEdited` (`BoolColumn`, default `false`) and `isHidden` (`BoolColumn`, default `false`) to `Songs` table;
+  - Added `updateSongMetadata({required int songId, required String title, required String artist, required String album})` setting `isCustomEdited = true`, and `setSongHidden({required int songId, required bool isHidden})`;
+  - Updated all library queries (`watchAllSongs`, `watchSongsInPlaylist`, `watchRecentlyPlayedSongs`, `watchPlaylistSongCount`, and `localSongsStreamProvider`) to strictly exclude `isHidden == true` tracks so hidden ringtones/clips don't clutter the library;
+  - Updated `AudioScannerService` to preserve custom `title`, `artist`, `album`, `isFavorite`, `lyrics`, `isCustomEdited`, and `isHidden` flags during rescans so user edits are never overwritten;
+  - Created dark glassmorphic `EditSongDialog` (`lib/features/library/presentation/widgets/edit_song_dialog.dart`) with `Title`, `Artist`, and `Album` text fields, convenient "Auto-Clean Tags from Filename" button stripping extensions, bitrates, website watermarks, and promotional tags with one tap; strictly managed `TextEditingController` lifecycles in `State.dispose()`; updates Drift database, updates active track in `PlayerController`, and triggers `refetchLyrics()` if lyrics were empty;
+  - Added "Edit Tags" and "Hide from Library" (with quick Undo SnackBar action) options to `SongOptionsSheet` in `library_screen.dart`; added "Edit Tags" action button to `TrackInfoSheet` in `audio_tools_sheets.dart`;
+  - 0 analyzer issues and all 65 unit/widget tests passing.
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

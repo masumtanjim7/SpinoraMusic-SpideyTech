@@ -128,6 +128,36 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isCustomEditedMeta = const VerificationMeta(
+    'isCustomEdited',
+  );
+  @override
+  late final GeneratedColumn<bool> isCustomEdited = GeneratedColumn<bool>(
+    'is_custom_edited',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_custom_edited" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isHiddenMeta = const VerificationMeta(
+    'isHidden',
+  );
+  @override
+  late final GeneratedColumn<bool> isHidden = GeneratedColumn<bool>(
+    'is_hidden',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_hidden" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -141,6 +171,8 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     lastPlayedAt,
     playCount,
     lyrics,
+    isCustomEdited,
+    isHidden,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -231,6 +263,21 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         lyrics.isAcceptableOrUnknown(data['lyrics']!, _lyricsMeta),
       );
     }
+    if (data.containsKey('is_custom_edited')) {
+      context.handle(
+        _isCustomEditedMeta,
+        isCustomEdited.isAcceptableOrUnknown(
+          data['is_custom_edited']!,
+          _isCustomEditedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_hidden')) {
+      context.handle(
+        _isHiddenMeta,
+        isHidden.isAcceptableOrUnknown(data['is_hidden']!, _isHiddenMeta),
+      );
+    }
     return context;
   }
 
@@ -284,6 +331,14 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         DriftSqlType.string,
         data['${effectivePrefix}lyrics'],
       ),
+      isCustomEdited: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_custom_edited'],
+      )!,
+      isHidden: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_hidden'],
+      )!,
     );
   }
 
@@ -305,6 +360,8 @@ class Song extends DataClass implements Insertable<Song> {
   final DateTime? lastPlayedAt;
   final int playCount;
   final String? lyrics;
+  final bool isCustomEdited;
+  final bool isHidden;
   const Song({
     required this.id,
     required this.title,
@@ -317,6 +374,8 @@ class Song extends DataClass implements Insertable<Song> {
     this.lastPlayedAt,
     required this.playCount,
     this.lyrics,
+    required this.isCustomEdited,
+    required this.isHidden,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -340,6 +399,8 @@ class Song extends DataClass implements Insertable<Song> {
     if (!nullToAbsent || lyrics != null) {
       map['lyrics'] = Variable<String>(lyrics);
     }
+    map['is_custom_edited'] = Variable<bool>(isCustomEdited);
+    map['is_hidden'] = Variable<bool>(isHidden);
     return map;
   }
 
@@ -364,6 +425,8 @@ class Song extends DataClass implements Insertable<Song> {
       lyrics: lyrics == null && nullToAbsent
           ? const Value.absent()
           : Value(lyrics),
+      isCustomEdited: Value(isCustomEdited),
+      isHidden: Value(isHidden),
     );
   }
 
@@ -384,6 +447,8 @@ class Song extends DataClass implements Insertable<Song> {
       lastPlayedAt: serializer.fromJson<DateTime?>(json['lastPlayedAt']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lyrics: serializer.fromJson<String?>(json['lyrics']),
+      isCustomEdited: serializer.fromJson<bool>(json['isCustomEdited']),
+      isHidden: serializer.fromJson<bool>(json['isHidden']),
     );
   }
   @override
@@ -401,6 +466,8 @@ class Song extends DataClass implements Insertable<Song> {
       'lastPlayedAt': serializer.toJson<DateTime?>(lastPlayedAt),
       'playCount': serializer.toJson<int>(playCount),
       'lyrics': serializer.toJson<String?>(lyrics),
+      'isCustomEdited': serializer.toJson<bool>(isCustomEdited),
+      'isHidden': serializer.toJson<bool>(isHidden),
     };
   }
 
@@ -416,6 +483,8 @@ class Song extends DataClass implements Insertable<Song> {
     Value<DateTime?> lastPlayedAt = const Value.absent(),
     int? playCount,
     Value<String?> lyrics = const Value.absent(),
+    bool? isCustomEdited,
+    bool? isHidden,
   }) => Song(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -428,6 +497,8 @@ class Song extends DataClass implements Insertable<Song> {
     lastPlayedAt: lastPlayedAt.present ? lastPlayedAt.value : this.lastPlayedAt,
     playCount: playCount ?? this.playCount,
     lyrics: lyrics.present ? lyrics.value : this.lyrics,
+    isCustomEdited: isCustomEdited ?? this.isCustomEdited,
+    isHidden: isHidden ?? this.isHidden,
   );
   Song copyWithCompanion(SongsCompanion data) {
     return Song(
@@ -448,6 +519,10 @@ class Song extends DataClass implements Insertable<Song> {
           : this.lastPlayedAt,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       lyrics: data.lyrics.present ? data.lyrics.value : this.lyrics,
+      isCustomEdited: data.isCustomEdited.present
+          ? data.isCustomEdited.value
+          : this.isCustomEdited,
+      isHidden: data.isHidden.present ? data.isHidden.value : this.isHidden,
     );
   }
 
@@ -464,7 +539,9 @@ class Song extends DataClass implements Insertable<Song> {
           ..write('isFavorite: $isFavorite, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
           ..write('playCount: $playCount, ')
-          ..write('lyrics: $lyrics')
+          ..write('lyrics: $lyrics, ')
+          ..write('isCustomEdited: $isCustomEdited, ')
+          ..write('isHidden: $isHidden')
           ..write(')'))
         .toString();
   }
@@ -482,6 +559,8 @@ class Song extends DataClass implements Insertable<Song> {
     lastPlayedAt,
     playCount,
     lyrics,
+    isCustomEdited,
+    isHidden,
   );
   @override
   bool operator ==(Object other) =>
@@ -497,7 +576,9 @@ class Song extends DataClass implements Insertable<Song> {
           other.isFavorite == this.isFavorite &&
           other.lastPlayedAt == this.lastPlayedAt &&
           other.playCount == this.playCount &&
-          other.lyrics == this.lyrics);
+          other.lyrics == this.lyrics &&
+          other.isCustomEdited == this.isCustomEdited &&
+          other.isHidden == this.isHidden);
 }
 
 class SongsCompanion extends UpdateCompanion<Song> {
@@ -512,6 +593,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
   final Value<DateTime?> lastPlayedAt;
   final Value<int> playCount;
   final Value<String?> lyrics;
+  final Value<bool> isCustomEdited;
+  final Value<bool> isHidden;
   const SongsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -524,6 +607,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.lastPlayedAt = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lyrics = const Value.absent(),
+    this.isCustomEdited = const Value.absent(),
+    this.isHidden = const Value.absent(),
   });
   SongsCompanion.insert({
     this.id = const Value.absent(),
@@ -537,6 +622,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.lastPlayedAt = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lyrics = const Value.absent(),
+    this.isCustomEdited = const Value.absent(),
+    this.isHidden = const Value.absent(),
   }) : title = Value(title),
        artist = Value(artist),
        duration = Value(duration),
@@ -553,6 +640,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Expression<DateTime>? lastPlayedAt,
     Expression<int>? playCount,
     Expression<String>? lyrics,
+    Expression<bool>? isCustomEdited,
+    Expression<bool>? isHidden,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -566,6 +655,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
       if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
       if (playCount != null) 'play_count': playCount,
       if (lyrics != null) 'lyrics': lyrics,
+      if (isCustomEdited != null) 'is_custom_edited': isCustomEdited,
+      if (isHidden != null) 'is_hidden': isHidden,
     });
   }
 
@@ -581,6 +672,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Value<DateTime?>? lastPlayedAt,
     Value<int>? playCount,
     Value<String?>? lyrics,
+    Value<bool>? isCustomEdited,
+    Value<bool>? isHidden,
   }) {
     return SongsCompanion(
       id: id ?? this.id,
@@ -594,6 +687,8 @@ class SongsCompanion extends UpdateCompanion<Song> {
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       playCount: playCount ?? this.playCount,
       lyrics: lyrics ?? this.lyrics,
+      isCustomEdited: isCustomEdited ?? this.isCustomEdited,
+      isHidden: isHidden ?? this.isHidden,
     );
   }
 
@@ -633,6 +728,12 @@ class SongsCompanion extends UpdateCompanion<Song> {
     if (lyrics.present) {
       map['lyrics'] = Variable<String>(lyrics.value);
     }
+    if (isCustomEdited.present) {
+      map['is_custom_edited'] = Variable<bool>(isCustomEdited.value);
+    }
+    if (isHidden.present) {
+      map['is_hidden'] = Variable<bool>(isHidden.value);
+    }
     return map;
   }
 
@@ -649,7 +750,9 @@ class SongsCompanion extends UpdateCompanion<Song> {
           ..write('isFavorite: $isFavorite, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
           ..write('playCount: $playCount, ')
-          ..write('lyrics: $lyrics')
+          ..write('lyrics: $lyrics, ')
+          ..write('isCustomEdited: $isCustomEdited, ')
+          ..write('isHidden: $isHidden')
           ..write(')'))
         .toString();
   }
@@ -1620,6 +1723,8 @@ typedef $$SongsTableCreateCompanionBuilder = SongsCompanion Function({
   Value<DateTime?> lastPlayedAt,
   Value<int> playCount,
   Value<String?> lyrics,
+  Value<bool> isCustomEdited,
+  Value<bool> isHidden,
 });
 typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
   Value<int> id,
@@ -1633,6 +1738,8 @@ typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
   Value<DateTime?> lastPlayedAt,
   Value<int> playCount,
   Value<String?> lyrics,
+  Value<bool> isCustomEdited,
+  Value<bool> isHidden,
 });
 
 final class $$SongsTableReferences
@@ -1718,6 +1825,16 @@ class $$SongsTableFilterComposer extends Composer<_$AppDatabase, $SongsTable> {
 
   ColumnFilters<String> get lyrics => $composableBuilder(
     column: $table.lyrics,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCustomEdited => $composableBuilder(
+    column: $table.isCustomEdited,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isHidden => $composableBuilder(
+    column: $table.isHidden,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1810,6 +1927,16 @@ class $$SongsTableOrderingComposer
     column: $table.lyrics,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isCustomEdited => $composableBuilder(
+    column: $table.isCustomEdited,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isHidden => $composableBuilder(
+    column: $table.isHidden,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SongsTableAnnotationComposer
@@ -1859,6 +1986,14 @@ class $$SongsTableAnnotationComposer
 
   GeneratedColumn<String> get lyrics =>
       $composableBuilder(column: $table.lyrics, builder: (column) => column);
+
+  GeneratedColumn<bool> get isCustomEdited => $composableBuilder(
+    column: $table.isCustomEdited,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isHidden =>
+      $composableBuilder(column: $table.isHidden, builder: (column) => column);
 
   Expression<T> playlistSongsRefs<T extends Object>(
     Expression<T> Function($$PlaylistSongsTableAnnotationComposer a) f,
@@ -1925,6 +2060,8 @@ class $$SongsTableTableManager
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<String?> lyrics = const Value.absent(),
+                Value<bool> isCustomEdited = const Value.absent(),
+                Value<bool> isHidden = const Value.absent(),
               }) => SongsCompanion(
                 id: id,
                 title: title,
@@ -1937,6 +2074,8 @@ class $$SongsTableTableManager
                 lastPlayedAt: lastPlayedAt,
                 playCount: playCount,
                 lyrics: lyrics,
+                isCustomEdited: isCustomEdited,
+                isHidden: isHidden,
               ),
           createCompanionCallback:
               ({
@@ -1951,6 +2090,8 @@ class $$SongsTableTableManager
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<String?> lyrics = const Value.absent(),
+                Value<bool> isCustomEdited = const Value.absent(),
+                Value<bool> isHidden = const Value.absent(),
               }) => SongsCompanion.insert(
                 id: id,
                 title: title,
@@ -1963,6 +2104,8 @@ class $$SongsTableTableManager
                 lastPlayedAt: lastPlayedAt,
                 playCount: playCount,
                 lyrics: lyrics,
+                isCustomEdited: isCustomEdited,
+                isHidden: isHidden,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -141,27 +141,40 @@ class AudioScannerService {
               duration: duration,
               filePath: filePath,
               albumArtPath: Value(albumArtPath),
+              isCustomEdited: const Value(false),
+              isHidden: const Value(false),
             ),
           );
           newlyInserted++;
         } else {
+          // If song was custom edited by user, preserve user-edited title, artist, album.
+          final effectiveTitle =
+              existing.isCustomEdited ? existing.title : title;
+          final effectiveArtist =
+              existing.isCustomEdited ? existing.artist : artist;
+          final effectiveAlbum =
+              existing.isCustomEdited ? existing.album : album;
+
           // Update metadata if it has changed.
-          if (existing.title != title ||
-              existing.artist != artist ||
-              existing.album != album ||
+          if (existing.title != effectiveTitle ||
+              existing.artist != effectiveArtist ||
+              existing.album != effectiveAlbum ||
               existing.duration != duration ||
               existing.albumArtPath != albumArtPath) {
             batch.update(
               db.songs,
               SongsCompanion(
                 id: Value(existing.id),
-                title: Value(title),
-                artist: Value(artist),
-                album: Value(album),
+                title: Value(effectiveTitle),
+                artist: Value(effectiveArtist),
+                album: Value(effectiveAlbum),
                 duration: Value(duration),
                 filePath: Value(filePath),
                 albumArtPath: Value(albumArtPath),
                 isFavorite: Value(existing.isFavorite),
+                lyrics: Value(existing.lyrics),
+                isCustomEdited: Value(existing.isCustomEdited),
+                isHidden: Value(existing.isHidden),
               ),
             );
           }
@@ -229,10 +242,11 @@ final audioScannerStateProvider =
   AudioScannerNotifier.new,
 );
 
-/// Reactive stream of all songs currently indexed in the local Drift database.
+/// Reactive stream of all non-hidden songs currently indexed in the local Drift database.
 final localSongsStreamProvider = StreamProvider<List<Song>>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.songs)
+        ..where((s) => s.isHidden.equals(false))
         ..orderBy([
           (s) => OrderingTerm(expression: s.title, mode: OrderingMode.asc),
         ]))

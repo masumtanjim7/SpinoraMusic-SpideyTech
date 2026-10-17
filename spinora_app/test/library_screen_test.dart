@@ -43,6 +43,8 @@ void main() {
         filePath: '/music/track1.mp3',
         isFavorite: false,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -53,6 +55,8 @@ void main() {
         filePath: '/music/track2.mp3',
         isFavorite: false,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -94,6 +98,8 @@ void main() {
       isFavorite: true,
       lastPlayedAt: DateTime(2026, 1, 1),
       playCount: 5,
+      isCustomEdited: false,
+      isHidden: false,
     );
 
     await tester.pumpWidget(
@@ -133,6 +139,8 @@ void main() {
         filePath: '/music/cyber.mp3',
         isFavorite: true,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -143,6 +151,8 @@ void main() {
         filePath: '/music/acoustic.mp3',
         isFavorite: false,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -212,6 +222,8 @@ void main() {
         filePath: '/music/theme.mp3',
         isFavorite: false,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -321,6 +333,8 @@ void main() {
         filePath: '/music/long.mp3',
         isFavorite: true,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -424,6 +438,8 @@ void main() {
         filePath: '/music/zero.mp3',
         isFavorite: false,
         playCount: 0,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -434,6 +450,8 @@ void main() {
         filePath: '/music/ten.mp3',
         isFavorite: false,
         playCount: 10,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 3,
@@ -444,6 +462,8 @@ void main() {
         filePath: '/music/five.mp3',
         isFavorite: false,
         playCount: 5,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -496,6 +516,8 @@ void main() {
         filePath: '/music/a.mp3',
         isFavorite: false,
         playCount: 1,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -506,6 +528,8 @@ void main() {
         filePath: '/music/b.mp3',
         isFavorite: false,
         playCount: 2,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -570,6 +594,8 @@ void main() {
         filePath: '/music/daft1.mp3',
         isFavorite: false,
         playCount: 4,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -580,6 +606,8 @@ void main() {
         filePath: '/music/daft2.mp3',
         isFavorite: true,
         playCount: 12,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 3,
@@ -590,6 +618,8 @@ void main() {
         filePath: '/music/zimmer.mp3',
         isFavorite: false,
         playCount: 1,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 
@@ -648,6 +678,8 @@ void main() {
         filePath: '/music/daft_hbfs.mp3',
         isFavorite: false,
         playCount: 6,
+        isCustomEdited: false,
+        isHidden: false,
       ),
       const Song(
         id: 2,
@@ -658,6 +690,8 @@ void main() {
         filePath: '/music/zimmer_dream.mp3',
         isFavorite: false,
         playCount: 2,
+        isCustomEdited: false,
+        isHidden: false,
       ),
     ];
 

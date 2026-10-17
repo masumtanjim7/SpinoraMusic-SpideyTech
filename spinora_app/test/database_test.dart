@@ -121,4 +121,81 @@ void main() {
     final clearedSong = await db.getSongById(songId);
     expect(clearedSong?.lyrics, isNull);
   });
+
+  test('updateSongMetadata sets isCustomEdited and updates fields', () async {
+    final songId = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Original Title',
+            artist: 'Original Artist',
+            duration: 180000,
+            filePath: '/music/track.mp3',
+          ),
+        );
+
+    final before = await db.getSongById(songId);
+    expect(before?.isCustomEdited, false);
+
+    await db.updateSongMetadata(
+      songId: songId,
+      title: 'Edited Title',
+      artist: 'Edited Artist',
+      album: 'Edited Album',
+    );
+
+    final after = await db.getSongById(songId);
+    expect(after?.title, 'Edited Title');
+    expect(after?.artist, 'Edited Artist');
+    expect(after?.album, 'Edited Album');
+    expect(after?.isCustomEdited, true);
+  });
+
+  test('setSongHidden filters out songs from watchAllSongs and playlist views', () async {
+    final song1Id = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Visible Song',
+            artist: 'Artist 1',
+            duration: 120000,
+            filePath: '/music/visible.mp3',
+          ),
+        );
+    final song2Id = await db.into(db.songs).insert(
+          SongsCompanion.insert(
+            title: 'Ringtone Clip',
+            artist: 'Unknown',
+            duration: 15000,
+            filePath: '/music/clip.mp3',
+          ),
+        );
+
+    // Both are visible initially
+    var all = await db.watchAllSongs().first;
+    expect(all.length, 2);
+
+    // Hide song2
+    await db.setSongHidden(songId: song2Id, isHidden: true);
+
+    all = await db.watchAllSongs().first;
+    expect(all.length, 1);
+    expect(all.first.id, song1Id);
+    expect(all.first.title, 'Visible Song');
+
+    // Add both to playlist
+    final pId = await db.createPlaylist('Favorites');
+    await db.addSongToPlaylist(playlistId: pId, songId: song1Id);
+    await db.addSongToPlaylist(playlistId: pId, songId: song2Id);
+
+    // Hidden song should be filtered out from watchSongsInPlaylist
+    final pSongs = await db.watchSongsInPlaylist(pId).first;
+    expect(pSongs.length, 1);
+    expect(pSongs.first.id, song1Id);
+
+    // Playlist count should reflect non-hidden songs
+    final count = await db.watchPlaylistSongCount(pId).first;
+    expect(count, 1);
+
+    // Unhide song2
+    await db.setSongHidden(songId: song2Id, isHidden: false);
+    all = await db.watchAllSongs().first;
+    expect(all.length, 2);
+  });
 }

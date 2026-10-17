@@ -124,6 +124,8 @@ void main() {
         playCount: 0,
         lastPlayedAt: null,
         lyrics: null,
+        isCustomEdited: false,
+        isHidden: false,
       );
 
       final result = await service.fetchLyricsForSong(song);
@@ -170,6 +172,8 @@ void main() {
         playCount: 0,
         lastPlayedAt: null,
         lyrics: null,
+        isCustomEdited: false,
+        isHidden: false,
       );
 
       final result = await service.fetchLyricsForSong(song);
@@ -211,6 +215,8 @@ void main() {
         playCount: 0,
         lastPlayedAt: null,
         lyrics: null,
+        isCustomEdited: false,
+        isHidden: false,
       );
 
       final result = await service.fetchLyricsForSong(song);
@@ -236,6 +242,8 @@ void main() {
         playCount: 0,
         lastPlayedAt: null,
         lyrics: null,
+        isCustomEdited: false,
+        isHidden: false,
       );
 
       final result = await service.fetchLyricsForSong(song);

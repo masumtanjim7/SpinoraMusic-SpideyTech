@@ -20,6 +20,9 @@ class Songs extends Table {
   DateTimeColumn get lastPlayedAt => dateTime().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   TextColumn get lyrics => text().nullable()();
+  BoolColumn get isCustomEdited =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get isHidden => boolean().withDefault(const Constant(false))();
 }
 
 /// Drift table storing active playback state to support app reload / resume.
@@ -57,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +79,10 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.addColumn(songs, songs.lyrics);
+          }
+          if (from < 5) {
+            await m.addColumn(songs, songs.isCustomEdited);
+            await m.addColumn(songs, songs.isHidden);
           }
         },
         beforeOpen: (details) async {
@@ -149,7 +156,8 @@ class AppDatabase extends _$AppDatabase {
         playlistSongs.songId.equalsExp(songs.id),
       ),
     ])
-      ..where(playlistSongs.playlistId.equals(playlistId))
+      ..where(playlistSongs.playlistId.equals(playlistId) &
+          songs.isHidden.equals(false))
       ..orderBy([
         OrderingTerm(expression: playlistSongs.addedAt, mode: OrderingMode.asc),
       ]);
@@ -162,11 +170,27 @@ class AppDatabase extends _$AppDatabase {
   /// Watches the number of songs in a given playlist.
   Stream<int> watchPlaylistSongCount(int playlistId) {
     final countExp = playlistSongs.id.count();
-    final query = selectOnly(playlistSongs)
+    final query = selectOnly(playlistSongs).join([
+      innerJoin(
+        songs,
+        songs.id.equalsExp(playlistSongs.songId),
+      ),
+    ])
       ..addColumns([countExp])
-      ..where(playlistSongs.playlistId.equals(playlistId));
+      ..where(playlistSongs.playlistId.equals(playlistId) &
+          songs.isHidden.equals(false));
 
     return query.watchSingle().map((row) => row.read(countExp) ?? 0);
+  }
+
+  /// Watches all non-hidden songs ordered by title ascending.
+  Stream<List<Song>> watchAllSongs() {
+    return (select(songs)
+          ..where((s) => s.isHidden.equals(false))
+          ..orderBy([
+            (s) => OrderingTerm(expression: s.title, mode: OrderingMode.asc),
+          ]))
+        .watch();
   }
 
   // ---------------------------------------------------------------------------
@@ -187,10 +211,10 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  /// Watches recently played songs ordered by [lastPlayedAt] descending.
+  /// Watches recently played songs ordered by [lastPlayedAt] descending (filtering hidden).
   Stream<List<Song>> watchRecentlyPlayedSongs({int limit = 15}) {
     return (select(songs)
-          ..where((s) => s.lastPlayedAt.isNotNull())
+          ..where((s) => s.lastPlayedAt.isNotNull() & s.isHidden.equals(false))
           ..orderBy([
             (s) => OrderingTerm(
                   expression: s.lastPlayedAt,
@@ -217,6 +241,35 @@ class AppDatabase extends _$AppDatabase {
     await (update(songs)..where((s) => s.id.equals(songId))).write(
       SongsCompanion(
         lyrics: Value(lyrics),
+      ),
+    );
+  }
+
+  /// Updates song metadata (title, artist, album) and marks it as custom edited.
+  Future<void> updateSongMetadata({
+    required int songId,
+    required String title,
+    required String artist,
+    required String? album,
+  }) async {
+    await (update(songs)..where((s) => s.id.equals(songId))).write(
+      SongsCompanion(
+        title: Value(title),
+        artist: Value(artist),
+        album: Value(album?.trim().isEmpty == true ? null : album?.trim()),
+        isCustomEdited: const Value(true),
+      ),
+    );
+  }
+
+  /// Sets whether a song is hidden from library views (e.g. ringtones/audio clips).
+  Future<void> setSongHidden({
+    required int songId,
+    required bool isHidden,
+  }) async {
+    await (update(songs)..where((s) => s.id.equals(songId))).write(
+      SongsCompanion(
+        isHidden: Value(isHidden),
       ),
     );
   }
