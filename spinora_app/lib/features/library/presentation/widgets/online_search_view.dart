@@ -179,8 +179,37 @@ class OnlineSearchView extends ConsumerWidget {
               song: song,
               isCurrent: isCurrent,
               isPlaying: isCurrent && playerState.isPlaying,
-              onTap: () {
-                ref.read(playerControllerProvider.notifier).playSong(song);
+              onTap: () async {
+                final messenger = ScaffoldMessenger.maybeOf(context);
+                await ref.read(playerControllerProvider.notifier).playSong(song);
+                final error = ref.read(playerControllerProvider).errorMessage;
+                if (error != null && error.isNotEmpty) {
+                  messenger?.showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF2A1520),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Colors.redAccent),
+                      ),
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              error,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
               },
               onPlayNext: () {
                 ref.read(playerControllerProvider.notifier).playSongNext(song);

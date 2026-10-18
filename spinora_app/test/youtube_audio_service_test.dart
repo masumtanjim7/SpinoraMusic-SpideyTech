@@ -1,12 +1,28 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:spinora/core/audio/track.dart';
 import 'package:spinora/core/database/app_database.dart';
 import 'package:spinora/features/online/data/youtube_audio_service.dart';
 import 'package:spinora/features/player/application/lyrics_controller.dart';
 import 'package:spinora/features/player/application/player_controller.dart';
 import 'package:spinora/features/library/presentation/widgets/online_search_view.dart';
+
+class _MockHttpClient extends http.BaseClient {
+  _MockHttpClient(this.responseBody);
+  final String responseBody;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(responseBody)),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+}
 
 void main() {
   group('YoutubeAudioService virtual ID & mapping tests', () {
@@ -19,6 +35,85 @@ void main() {
       expect(id1 < 0, true, reason: 'Virtual ID must be negative to avoid Drift collision');
       expect(id3 < 0, true, reason: 'Virtual ID must be negative to avoid Drift collision');
       expect(id1 != id3, true);
+    });
+
+    test('ensureHttps upgrades http:// URLs to https:// and leaves https:// intact', () {
+      expect(
+        YoutubeAudioService.ensureHttps('http://rr1---sn-abc.googlevideo.com/videoplayback?id=123'),
+        'https://rr1---sn-abc.googlevideo.com/videoplayback?id=123',
+      );
+      expect(
+        YoutubeAudioService.ensureHttps('https://rr1---sn-abc.googlevideo.com/videoplayback?id=123'),
+        'https://rr1---sn-abc.googlevideo.com/videoplayback?id=123',
+      );
+      expect(
+        YoutubeAudioService.ensureHttps('file:///path/to/audio.mp3'),
+        'file:///path/to/audio.mp3',
+      );
+    });
+
+    test('parseDurationText correctly parses mm:ss and hh:mm:ss to milliseconds', () {
+      expect(YoutubeAudioService.parseDurationText('3:45'), 225000);
+      expect(YoutubeAudioService.parseDurationText('1:02:05'), 3725000);
+      expect(YoutubeAudioService.parseDurationText('0:45'), 45000);
+      expect(YoutubeAudioService.parseDurationText(''), 0);
+      expect(YoutubeAudioService.parseDurationText(null), 0);
+    });
+
+    test('searchSongs falls back cleanly to InnerTube on queries like aaj without crashing', () async {
+      final mockInnerTubeJson = jsonEncode({
+        'contents': {
+          'twoColumnSearchResultsRenderer': {
+            'primaryContents': {
+              'sectionListRenderer': {
+                'contents': [
+                  {
+                    'itemSectionRenderer': {
+                      'contents': [
+                        {
+                          'videoRenderer': {
+                            'videoId': 'mockAaj123',
+                            'title': {
+                              'runs': [
+                                {'text': 'Aaj Ki Raat (From Stree 2)'}
+                              ]
+                            },
+                            'ownerText': {
+                              'runs': [
+                                {'text': 'Saregama Music'}
+                              ]
+                            },
+                            'lengthText': {'simpleText': '3:48'},
+                            'thumbnail': {
+                              'thumbnails': [
+                                {
+                                  'url':
+                                      'https://i.ytimg.com/vi/mockAaj123/hqdefault.jpg'
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      });
+
+      final mockClient = _MockHttpClient(mockInnerTubeJson);
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final results = await service.searchSongs('aaj');
+      expect(results, isNotEmpty);
+      expect(results.first.filePath, 'yt://mockAaj123');
+      expect(results.first.title, 'Aaj Ki Raat (From Stree 2)');
+      expect(results.first.artist, 'Saregama Music');
+      expect(results.first.duration, 228000);
+      expect(results.first.album, 'YouTube Stream');
+      service.dispose();
     });
 
     test('Track.fromSong correctly flags yt:// as TrackSource.online without file:// prefix', () {

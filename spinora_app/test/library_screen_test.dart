@@ -502,7 +502,7 @@ void main() {
   testWidgets(
       'LibraryScreen opens Sort Bottom Sheet and switches sort options',
       (tester) async {
-    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.physicalSize = const Size(1600, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
@@ -553,6 +553,7 @@ void main() {
     // Tap sort chip button in the filter bar
     final sortButton = find.byTooltip('Change sorting order');
     expect(sortButton, findsOneWidget);
+    await tester.ensureVisible(sortButton);
     await tester.tap(sortButton);
     await tester.pumpAndSettle();
 

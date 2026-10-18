@@ -169,21 +169,38 @@ Task 2.6 DONE (Offline Track Metadata Editor & Library Track Management):
   - 0 analyzer issues and all 65 unit/widget tests passing.
 Task 2.7 DONE (Phase 2: Hybrid Online Audio Search & Streaming via `youtube_explode_dart`):
   - Dependency: Added `youtube_explode_dart: 3.1.0` to `pubspec.yaml`;
-  - Created `YoutubeAudioService` (`lib/features/online/data/youtube_audio_service.dart`) wrapping `YoutubeExplode`:
-    * `searchSongs(query)`: searches YouTube videos matching query, filtering out mixes >25 min, mapping into unified `Song` with deterministic negative virtual IDs (`generateVirtualId`), high-res thumbnail artwork (`video.thumbnails.highResUrl`), and `filePath` formatted as `yt://$videoId`;
-    * `getAudioStreamUrl(videoId)`: resolves direct audio stream URL via `manifest.audioOnly.withHighestBitrate().url.toString()`;
-    * Exposed via `youtubeAudioServiceProvider` and reactive `onlineSearchResultsProvider`;
-  - Hybrid Player Controller Support (`lib/features/player/application/player_controller.dart`):
-    * In `PlayerController`: automatically detects `yt://` tracks, sets `isBuffering: true`, resolves direct HTTPS stream URL via `YoutubeAudioService`, and creates `AudioSource.uri(..., tag: MediaItem(...))` with smooth transition to playback;
-    * In `Track.fromSong`: recognizes `yt://` and HTTP(S) paths, setting `TrackSource.online` without prepending `file://`;
-    * Online Synced Lyrics: added in-memory `onlineLyricsCacheProvider` and `refetchOnlineLyrics(track)` in `LyricsController`, enabling LRCLIB synced lyrics to display seamlessly on live streams;
-    * Network artwork support in `SongArtwork` (`lib/features/library/presentation/widgets/song_artwork.dart`) using `Image.network` with smooth glassmorphic placeholder and fallback icon;
+  - Resilient Stream Extraction (`lib/features/online/data/youtube_audio_service.dart`):
+    * `getAudioStreamUrl(videoId)` uses multi-client manifest resolution (`ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr, YoutubeApiClient.android]`) to bypass HTTP 403 blocks;
+    * Prioritizes MP4 (`m4a` / `mp4a`) audio-only streams with highest bitrate (`.withHighestBitrate()`) for reliable Android ExoPlayer playback, with clean fallback to generic audioOnly, muxed, and highest-bitrate audio streams;
+    * Detailed debug logging for stream resolution and errors;
+    * Resolved ExoPlayer HTTP 403 Forbidden & Cleartext HTTP traffic error: enabled `android:usesCleartextTraffic="true"` in `AndroidManifest.xml` and loaded `AudioSource.uri(Uri.parse(streamUrl), tag: mediaItem)` without custom headers for direct unproxied native HTTPS playback;
+    * Manifest optimization: `YoutubeAudioService.getAudioStreamUrl` uses `[YoutubeApiClient.androidVr, YoutubeApiClient.ios]` first for unthrottled `mp4` streams, enforces `https://` via `ensureHttps`, and prioritizes MP4 container `audioOnly` streams;
+    * Resilient retry: automatic single retry with fallback stream from `YoutubeAudioService` before surfacing error to user;
+    * UI responsiveness: Immediately sets `currentTrack` and `isBuffering: true` (`isLoading: true`) on track tap so Mini-Player and Now Playing show loading spinner instantly;
+    * Guarded queue loading: never passes unresolved `yt://` URIs or entire 20-track lists into `player.setAudioSources(...)` (avoiding ExoPlayer unknown protocol errors and timeout issues); resolves current stream and loads active source into `player.setAudioSource(...)`;
+    * Safe queue navigation (`next`, `previous`, `jumpToIndex`, `playNext`, `removeFromQueue`, `toggleShuffle`) with on-demand online track resolution;
+    * Guarded local Drift queries (`_recordPlayback`, `_persistCurrentSession`): strictly skips or ignores negative virtual IDs (`song.id < 0` / `yt://`) so local SQLite tables are never corrupted;
+    * Error feedback: surfaces clear floating SnackBar on playback failure in `OnlineSearchView`;
   - Online Search UI (`lib/features/library/presentation/library_screen.dart` & `widgets/online_search_view.dart`):
-    * Added `YouTube Stream` chip (`LibraryFilter.onlineSearch`) with neon red badge and horizontal scrollable placement;
-    * Debounced search bar (500ms debounce + search action) querying YouTube streams in real time;
-    * Created `OnlineSearchView`: prompt card with 6 trending music suggestion chips, loading spinner with live manifest messaging, error retry card, and glassmorphic song cards with "STREAM" neon badge, duration formatting, and one-tap playback;
+    * Debounced 500ms search bar querying YouTube streams in real time;
+    * Glassmorphic result cards with network thumbnails, duration, neon `"STREAM"` badge, and one-tap playback;
   - Strict safety: all row text wrapped in `Expanded`, controllers cleanly disposed in `State.dispose()`, and `.withValues(alpha: ...)` used everywhere;
-  - 0 analyzer issues and all 72 unit/widget tests passing.
+  - 0 analyzer issues and all 73 unit/widget tests passing.
+Task 2.7b DONE (YouTube Local Proxy Server, Multi-Client Manifest Chunk Probe & InnerTube Search Crash Fix):
+  - Local HTTP Loopback Proxy Server (`lib/features/online/data/youtube_audio_service.dart`):
+    * Resolved ExoPlayer `HttpDataSource$InvalidResponseCodeException: Response code: 403` on `googlevideo.com` URLs:
+      Instead of passing raw `googlevideo.com` URLs to native ExoPlayer (which gets throttled/blocked with HTTP 403 by YouTube due to ExoPlayer's DefaultHttpDataSource lacking YouTube's chunking signature and headers), `YoutubeAudioService` hosts a lightweight loopback `HttpServer.bind(InternetAddress.loopbackIPv4, 0)` serving streams at `http://127.0.0.1:<port>/stream/<videoId>`.
+    * Native Chunk Streaming & Fast Temp Cache: Streams bytes natively via Dart's `_yt.videos.streamsClient.get(streamInfo)` directly to ExoPlayer's `HttpResponse` while simultaneously saving the byte stream to `${Directory.systemTemp.path}/spinora_yt_cache/yt_<videoId>.m4a` for instant subsequent playback and offline caching.
+    * HTTP Range Requests & Seeking (206 Partial Content): Implemented full byte range parsing (`Range: bytes=start-end`), `Accept-Ranges: bytes`, `Content-Range`, and `Content-Length` headers so ExoPlayer can seek forward and backward through cached files with zero latency.
+    * Multi-Client Manifest & Live Chunk Probe: Sequentially queries clients (`ios`, `android`, `safari`, `tv`) and proactively validates the stream candidate with `_yt.videos.streamsClient.get(candidate).first` chunk probe, instantly discarding dead/403 clients and selecting a 100% working audio stream.
+  - Short Query Search Crash Fix (`NoSuchMethodError: Class '_Map<String, dynamic>' has no instance method 'getT'`):
+    * Handled unparsed rich shelves in `youtube_explode_dart` on short queries like `"aaj"`: wraps `_yt.search.search(query)` in try-catch and automatically falls back to YouTube's public InnerTube JSON search endpoint (`https://www.youtube.com/youtubei/v1/search`), cleanly parsing `videoRenderer` items, formatted durations, artists, and high-res thumbnails.
+  - UI Consolidation (`lib/features/library/presentation/library_screen.dart`):
+    * Removed duplicate "YouTube Search" container badge and consolidated filter category chip into a single clean `"YouTube Stream"` chip positioned right after `Albums` in the horizontal category bar.
+  - Tests & Analysis:
+    * Added comprehensive unit tests in `test/youtube_audio_service_test.dart` for duration parsing and hermetic InnerTube fallback search with `_MockHttpClient`.
+    * Updated `test/library_screen_test.dart` with `ensureVisible` for the sort button in the horizontally scrolling filter bar.
+    * 0 analyzer issues (`flutter analyze` with 0 issues) and all 75 tests passing (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

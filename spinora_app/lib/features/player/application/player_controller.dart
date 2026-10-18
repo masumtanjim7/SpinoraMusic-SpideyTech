@@ -67,6 +67,7 @@ class PlayerState {
   bool get hasPrevious => queue.isNotEmpty && currentIndex > 0;
   bool get isSleepTimerActive =>
       remainingSleepDuration != null || stopAtEndOfTrack;
+  bool get isLoading => isBuffering;
 
   double get progressRatio {
     if (duration.inMilliseconds <= 0) return 0.0;
@@ -79,6 +80,7 @@ class PlayerState {
     List<Track>? originalQueue,
     int? currentIndex,
     bool? isPlaying,
+    bool? isLoading,
     bool? isBuffering,
     bool? isShuffled,
     LoopMode? loopMode,
@@ -102,7 +104,7 @@ class PlayerState {
       originalQueue: originalQueue ?? this.originalQueue,
       currentIndex: currentIndex ?? this.currentIndex,
       isPlaying: isPlaying ?? this.isPlaying,
-      isBuffering: isBuffering ?? this.isBuffering,
+      isBuffering: isLoading ?? isBuffering ?? this.isBuffering,
       isShuffled: isShuffled ?? this.isShuffled,
       loopMode: loopMode ?? this.loopMode,
       position: position ?? this.position,
@@ -262,9 +264,11 @@ class PlayerController extends Notifier<PlayerState> {
     _lastRecordedTrackId = track.id;
     _lastRecordedTime = now;
 
-    if (track.source == TrackSource.local && track.id.startsWith('local_')) {
+    if (track.source == TrackSource.local &&
+        track.id.startsWith('local_') &&
+        !track.uri.startsWith('yt://')) {
       final songId = int.tryParse(track.id.replaceFirst('local_', ''));
-      if (songId != null) {
+      if (songId != null && songId > 0) {
         try {
           final db = ref.read(appDatabaseProvider);
           db.recordSongPlay(songId);
@@ -321,9 +325,12 @@ class PlayerController extends Notifier<PlayerState> {
     _lastPersistedTime = now;
 
     final songId = (currentTrack.source == TrackSource.local &&
-            currentTrack.id.startsWith('local_'))
+            currentTrack.id.startsWith('local_') &&
+            !currentTrack.uri.startsWith('yt://'))
         ? int.tryParse(currentTrack.id.replaceFirst('local_', ''))
         : null;
+
+    if (songId != null && songId <= 0) return;
 
     try {
       final db = ref.read(appDatabaseProvider);
@@ -437,22 +444,46 @@ class PlayerController extends Notifier<PlayerState> {
   final Map<String, String> _resolvedStreamUrls = {};
 
   /// Resolves direct HTTPS stream URL for online tracks (e.g. `yt://<videoId>`).
-  Future<String> _resolveTrackStreamUrl(Track track) async {
+  Future<String> _resolveTrackStreamUrl(
+    Track track, {
+    bool forceFallback = false,
+  }) async {
     if (!track.uri.startsWith('yt://')) {
       return track.uri;
     }
-    if (_resolvedStreamUrls.containsKey(track.uri)) {
+    if (!forceFallback && _resolvedStreamUrls.containsKey(track.uri)) {
       return _resolvedStreamUrls[track.uri]!;
     }
     final videoId = track.uri.replaceFirst('yt://', '');
     final service = ref.read(youtubeAudioServiceProvider);
-    final streamUrl = await service.getAudioStreamUrl(videoId);
+    final streamUrl = await service.getAudioStreamUrl(videoId, fallback: forceFallback);
     _resolvedStreamUrls[track.uri] = streamUrl;
     return streamUrl;
   }
 
   AudioSource _buildAudioSource(Track track) {
     final uriString = _resolvedStreamUrls[track.uri] ?? track.uri;
+    final isOnline = track.uri.startsWith('yt://') ||
+        uriString.startsWith('http://') ||
+        uriString.startsWith('https://');
+
+    if (isOnline) {
+      final parsed = (uriString.startsWith('/') && !uriString.startsWith('//'))
+          ? Uri.file(uriString)
+          : Uri.parse(uriString);
+      return AudioSource.uri(
+        parsed,
+        tag: MediaItem(
+          id: track.uri,
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          duration: Duration(milliseconds: track.durationMs),
+          artUri: _parseArtUri(track.artworkUri),
+        ),
+      );
+    }
+
     final sourceUri = Uri.parse(uriString);
     return AudioSource.uri(
       sourceUri,
@@ -478,7 +509,9 @@ class PlayerController extends Notifier<PlayerState> {
 
   /// Plays a given [Track], optionally initializing a new track [queue].
   Future<void> playTrack(Track track, {List<Track>? queue}) async {
-    final activeQueue = queue ?? (state.queue.isEmpty ? [track] : state.queue);
+    final activeQueue = queue != null
+        ? List<Track>.from(queue)
+        : (state.queue.isEmpty ? [track] : List<Track>.from(state.queue));
     var index = activeQueue.indexWhere((t) => t.id == track.id);
     if (index == -1) {
       index = activeQueue.length;
@@ -487,20 +520,81 @@ class PlayerController extends Notifier<PlayerState> {
 
     final isOnline = track.uri.startsWith('yt://');
 
+    // 1) Immediately update UI state to show selected currentTrack and set isBuffering = true
     state = state.copyWith(
       currentTrack: track,
       queue: List.unmodifiable(activeQueue),
       currentIndex: index,
       isBuffering: isOnline,
+      isPlaying: false,
       clearError: true,
     );
 
     try {
       if (isOnline) {
-        await _resolveTrackStreamUrl(track);
+        final mediaItem = MediaItem(
+          id: track.uri,
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          duration: Duration(milliseconds: track.durationMs),
+          artUri: _parseArtUri(track.artworkUri),
+        );
+
+        try {
+          // 2) Extract videoId and await getAudioStreamUrl (first attempt)
+          final streamUrl = await _resolveTrackStreamUrl(track);
+          final streamUri = (streamUrl.startsWith('/') && !streamUrl.startsWith('//'))
+              ? Uri.file(streamUrl)
+              : Uri.parse(streamUrl);
+
+          // 3) Load resolved URL without custom headers so ExoPlayer connects directly over HTTP/HTTPS/file
+          final audioSource = AudioSource.uri(
+            streamUri,
+            tag: mediaItem,
+          );
+
+          await player.setAudioSource(audioSource);
+          await player.play();
+        } catch (initialError, initialStackTrace) {
+          debugPrint(
+            '[PlayerController] Initial online stream playback failed ($initialError). Retrying with fallback stream...',
+          );
+          if (kDebugMode) {
+            debugPrint(initialStackTrace.toString());
+          }
+          // Invalidate cached stream URL
+          _resolvedStreamUrls.remove(track.uri);
+
+          // Retry once with fallback stream from YoutubeAudioService
+          final fallbackStreamUrl = await _resolveTrackStreamUrl(
+            track,
+            forceFallback: true,
+          );
+          final fallbackUri = (fallbackStreamUrl.startsWith('/') && !fallbackStreamUrl.startsWith('//'))
+              ? Uri.file(fallbackStreamUrl)
+              : Uri.parse(fallbackStreamUrl);
+          final fallbackAudioSource = AudioSource.uri(
+            fallbackUri,
+            tag: mediaItem,
+          );
+
+          await player.setAudioSource(fallbackAudioSource);
+          await player.play();
+        }
+
+        _recordPlayback(track);
+
+        // Auto-fetch lyrics online in background
+        ref
+            .read(lyricsControllerProvider.notifier)
+            .triggerAutoFetchForTrack(track);
+        return;
       }
 
-      if (activeQueue.length > 1) {
+      // Local playback branch
+      final hasOnlineInQueue = activeQueue.any((t) => t.uri.startsWith('yt://'));
+      if (activeQueue.length > 1 && !hasOnlineInQueue) {
         final sources = activeQueue.map(_buildAudioSource).toList();
         await player.setAudioSources(sources, initialIndex: index);
       } else {
@@ -575,21 +669,24 @@ class PlayerController extends Notifier<PlayerState> {
       currentIndex: newCurrentIndex,
     );
 
-    try {
-      final sources = newQueue.map(_buildAudioSource).toList();
-      await player.setAudioSources(
-        sources,
-        initialIndex: newCurrentIndex,
-        initialPosition: state.position,
-      );
-    } catch (e, st) {
-      debugPrint('[PlayerController] Error updating audio sources on playNext: $e');
-      FirebaseCrashlytics.instance.recordError(
-        e,
-        st,
-        reason: 'playNext audio sources error',
-        fatal: false,
-      );
+    final hasOnline = newQueue.any((t) => t.uri.startsWith('yt://'));
+    if (!hasOnline) {
+      try {
+        final sources = newQueue.map(_buildAudioSource).toList();
+        await player.setAudioSources(
+          sources,
+          initialIndex: newCurrentIndex,
+          initialPosition: state.position,
+        );
+      } catch (e, st) {
+        debugPrint('[PlayerController] Error updating audio sources on playNext: $e');
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          st,
+          reason: 'playNext audio sources error',
+          fatal: false,
+        );
+      }
     }
   }
 
@@ -604,42 +701,32 @@ class PlayerController extends Notifier<PlayerState> {
     if (index == state.currentIndex) return;
 
     final targetTrack = state.queue[index];
-    final isOnline = targetTrack.uri.startsWith('yt://');
+    final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
 
-    state = state.copyWith(
-      currentIndex: index,
-      currentTrack: targetTrack,
-      isBuffering: isOnline && !_resolvedStreamUrls.containsKey(targetTrack.uri),
-    );
-
-    try {
-      if (isOnline && !_resolvedStreamUrls.containsKey(targetTrack.uri)) {
-        await _resolveTrackStreamUrl(targetTrack);
-        final sources = state.queue.map(_buildAudioSource).toList();
-        await player.setAudioSources(
-          sources,
-          initialIndex: index,
-          initialPosition: Duration.zero,
-        );
-      } else {
-        await player.seek(Duration.zero, index: index);
-      }
-
-      if (!state.isPlaying) {
-        await player.play();
-      }
-
-      ref
-          .read(lyricsControllerProvider.notifier)
-          .triggerAutoFetchForTrack(targetTrack);
-    } catch (e, st) {
-      debugPrint('[PlayerController] Error jumping to index $index: $e');
-      FirebaseCrashlytics.instance.recordError(
-        e,
-        st,
-        reason: 'jumpToIndex error',
-        fatal: false,
+    if (!hasOnline && (player.hasPrevious || player.hasNext)) {
+      state = state.copyWith(
+        currentIndex: index,
+        currentTrack: targetTrack,
       );
+      try {
+        await player.seek(Duration.zero, index: index);
+        if (!state.isPlaying) {
+          await player.play();
+        }
+        ref
+            .read(lyricsControllerProvider.notifier)
+            .triggerAutoFetchForTrack(targetTrack);
+      } catch (e, st) {
+        debugPrint('[PlayerController] Error seeking in queue: $e');
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          st,
+          reason: 'jumpToIndex seek error',
+          fatal: false,
+        );
+      }
+    } else {
+      await playTrack(targetTrack, queue: state.queue);
     }
   }
 
@@ -753,14 +840,17 @@ class PlayerController extends Notifier<PlayerState> {
       );
 
       if (shuffled.length > 1) {
-        try {
-          final sources = shuffled.map(_buildAudioSource).toList();
-          await player.setAudioSources(
-            sources,
-            initialIndex: newIndex,
-            initialPosition: state.position,
-          );
-        } catch (_) {}
+        final hasOnline = shuffled.any((t) => t.uri.startsWith('yt://'));
+        if (!hasOnline) {
+          try {
+            final sources = shuffled.map(_buildAudioSource).toList();
+            await player.setAudioSources(
+              sources,
+              initialIndex: newIndex,
+              initialPosition: state.position,
+            );
+          } catch (_) {}
+        }
       }
     } else {
       final original = state.originalQueue ?? state.queue;
@@ -774,14 +864,17 @@ class PlayerController extends Notifier<PlayerState> {
       );
 
       if (original.length > 1) {
-        try {
-          final sources = original.map(_buildAudioSource).toList();
-          await player.setAudioSources(
-            sources,
-            initialIndex: newIndex,
-            initialPosition: state.position,
-          );
-        } catch (_) {}
+        final hasOnline = original.any((t) => t.uri.startsWith('yt://'));
+        if (!hasOnline) {
+          try {
+            final sources = original.map(_buildAudioSource).toList();
+            await player.setAudioSources(
+              sources,
+              initialIndex: newIndex,
+              initialPosition: state.position,
+            );
+          } catch (_) {}
+        }
       }
     }
   }
@@ -884,17 +977,18 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> next() async {
     if (!state.hasNext) {
       if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
-        await playTrack(state.queue.first);
+        await playTrack(state.queue.first, queue: state.queue);
       }
       return;
     }
 
-    if (player.hasNext) {
+    final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
+    if (!hasOnline && player.hasNext) {
       await player.seekToNext();
     } else {
       final nextIndex = state.currentIndex + 1;
       final nextTrack = state.queue[nextIndex];
-      await playTrack(nextTrack);
+      await playTrack(nextTrack, queue: state.queue);
     }
   }
 
@@ -910,12 +1004,13 @@ class PlayerController extends Notifier<PlayerState> {
       return;
     }
 
-    if (player.hasPrevious) {
+    final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
+    if (!hasOnline && player.hasPrevious) {
       await player.seekToPrevious();
     } else {
       final prevIndex = state.currentIndex - 1;
       final prevTrack = state.queue[prevIndex];
-      await playTrack(prevTrack);
+      await playTrack(prevTrack, queue: state.queue);
     }
   }
 

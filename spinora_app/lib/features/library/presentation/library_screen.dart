@@ -712,33 +712,18 @@ class _LibraryFilterBar extends StatelessWidget {
               onTap: () => onFilterSelected(LibraryFilter.albums),
               activeColor: Colors.tealAccent,
             ),
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: 'YouTube Stream',
+              icon: Icons.travel_explore_rounded,
+              isSelected: selectedFilter == LibraryFilter.onlineSearch,
+              onTap: () => onFilterSelected(LibraryFilter.onlineSearch),
+              activeColor: Colors.redAccent,
+            ),
             const SizedBox(width: 12),
 
             // Counter badge according to active tab
-            if (selectedFilter == LibraryFilter.onlineSearch)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.redAccent.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Text(
-                  'YouTube Search',
-                  style: TextStyle(
-                    color: Colors.redAccent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              )
-            else if (selectedFilter == LibraryFilter.playlists)
+            if (selectedFilter == LibraryFilter.playlists)
               Consumer(
                 builder: (context, ref, _) {
                   final playlists =
@@ -813,7 +798,7 @@ class _LibraryFilterBar extends StatelessWidget {
                   ),
                 ),
               )
-            else
+            else if (selectedFilter != LibraryFilter.onlineSearch)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -897,14 +882,6 @@ class _LibraryFilterBar extends StatelessWidget {
               },
               ),
             ],
-            const SizedBox(width: 8),
-            _FilterChip(
-              label: 'YouTube Stream',
-              icon: Icons.travel_explore_rounded,
-              isSelected: selectedFilter == LibraryFilter.onlineSearch,
-              onTap: () => onFilterSelected(LibraryFilter.onlineSearch),
-              activeColor: Colors.redAccent,
-            ),
           ],
         ),
       ),
