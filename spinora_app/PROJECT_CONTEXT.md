@@ -212,6 +212,24 @@ Task 2.7c DONE (Multi-Stage Unthrottled Online Audio Resolver, Matching User-Age
   - Tests & Analysis:
     * 0 analyzer issues (`flutter analyze` with 0 issues).
     * All 78 tests passed (`flutter test`).
+Task 2.7d DONE (Strict Exact-VideoId 3-Layer Audio Resolver, Zero Song-Swapping & VisitorData Integration):
+  - Completely Eliminated Third-Party Song Swapping:
+    * Stripped out all JioSaavn and third-party catalog text-search fallbacks from `YoutubeAudioService` (`lib/features/online/data/youtube_audio_service.dart`).
+    * Guarantees 100% of streamed audio comes from the exact YouTube `videoId` the user selected.
+  - 3-Layer Exact `videoId` Resolver:
+    1) Layer 1 (`youtube_explode_dart` with `requireWatchPage: false`):
+       Tests individual clients (`safari`, `ios`, `mweb`, `tv`, `android`) sequentially with `requireWatchPage: false` to bypass watch page probing and prevent `stream: 133 / 137` 403 crashes. Selects audio-only stream (mp4 / itag 140 prioritized or highest bitrate) and validates via HTTP Range probe.
+    2) Layer 2 (Direct InnerTube Player API with VisitorData):
+       Fetches `visitorData` token from `https://www.youtube.com/youtubei/v1/visitor_id`, then queries `https://www.youtube.com/youtubei/v1/player` with client contexts (`WEB_EMBEDDED_PLAYER`, `TVHTML5_SIMPLY_EMBEDDED_PLAYER`, `IOS`, `ANDROID_VR`, `ANDROID_TESTSUITE`) for the exact `videoId`. Validates unencrypted `adaptiveFormats` audio URL via `Range: bytes=0-1024` with matching `User-Agent`.
+    3) Layer 3 (Exact `videoId` Piped / Invidious API Endpoints):
+       Queries public Piped & Invidious instances strictly by exact `videoId` (`https://pipedapi.kavin.rocks/streams/$videoId`, `https://inv.tux.pizza/api/v1/videos/$videoId`, etc.) and validates stream candidates.
+  - Proxy & Streaming:
+    * Supports both `/stream/<videoId>` and `/yt/<videoId>` routes on local loopback proxy (`http://127.0.0.1:<port>`).
+    * Direct HTTP streaming to ExoPlayer with matching client `User-Agent`, 206 Partial Content range forwarding, and background file caching to `${Directory.systemTemp.path}/spinora_yt_cache/yt_<videoId>.m4a`.
+    * Clean `debugPrint` logs noting which Layer resolved the exact `videoId`.
+  - Tests & Analysis:
+    * 0 analyzer issues (`flutter analyze` with 0 issues).
+    * All 79 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

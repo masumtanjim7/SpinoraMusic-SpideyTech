@@ -199,7 +199,70 @@ void main() {
       service.dispose();
     });
 
-    test('getAudioStreamUrl falls back to JioSaavn 320kbps MP4 when YouTube requires login', () async {
+    test('getAudioStreamUrl resolves exact videoId via Layer 2 InnerTube with visitorData', () async {
+      final mockVisitorJson = jsonEncode({
+        'responseContext': {
+          'visitorData': 'mockVisitorData123',
+        },
+      });
+
+      final mockInnerTubePlayerJson = jsonEncode({
+        'playabilityStatus': {'status': 'OK'},
+        'streamingData': {
+          'adaptiveFormats': [
+            {
+              'itag': 140,
+              'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+              'bitrate': 129000,
+              'contentLength': '3456789',
+              'url': 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=mockExactVideoId&itag=140',
+            },
+          ],
+        },
+      });
+
+      final mockClient = _MockHttpClient((req) async {
+        final urlStr = req.url.toString();
+        if (urlStr.contains('visitor_id')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockVisitorJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (urlStr.contains('youtubei/v1/player')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockInnerTubePlayerJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (urlStr.contains('googlevideo.com')) {
+          return http.StreamedResponse(
+            Stream.value([1, 2, 3, 4]),
+            206,
+            headers: {
+              'content-type': 'audio/mp4',
+              'content-range': 'bytes 0-3/3456789',
+              'content-length': '4',
+            },
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{}')),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final streamUrl = await service.getAudioStreamUrl('mockExactVideoId');
+      expect(streamUrl.startsWith('http://127.0.0.1:'), true);
+      expect(streamUrl.contains('/stream/mockExactVideoId'), true);
+      service.dispose();
+    });
+
+    test('getAudioStreamUrl resolves exact videoId via Layer 3 Invidious / Piped when Layers 1 & 2 fail', () async {
       final mockUnplayableJson = jsonEncode({
         'playabilityStatus': {
           'status': 'LOGIN_REQUIRED',
@@ -207,52 +270,46 @@ void main() {
         },
       });
 
-      final mockSaavnSearchJson = jsonEncode({
-        'results': [
+      final mockPipedStreamJson = jsonEncode({
+        'audioStreams': [
           {
-            'title': 'Hello',
-            'more_info': {
-              'encrypted_media_url': 'mockEncryptedSaavnMedia123',
-            },
+            'url': 'https://mock.piped.video/stream/mockExactVideo3?itag=140',
+            'format': 'M4A',
+            'bitrate': 128000,
+            'contentLength': 4567890,
+            'mimeType': 'audio/mp4',
           },
         ],
       });
 
-      final mockSaavnAuthJson = jsonEncode({
-        'status': 'success',
-        'auth_url': 'https://ac.cf.saavncdn.com/mock_320.mp4?mock=true',
-      });
+      bool saavnSearchCalled = false;
 
       final mockClient = _MockHttpClient((req) async {
         final urlStr = req.url.toString();
-        if (urlStr.contains('youtubei/v1/player') || urlStr.contains('api/v1/videos')) {
+        if (urlStr.contains('jiosaavn.com')) {
+          saavnSearchCalled = true;
+        }
+        if (urlStr.contains('youtubei/v1/player') || urlStr.contains('visitor_id')) {
           return http.StreamedResponse(
             Stream.value(utf8.encode(mockUnplayableJson)),
             200,
             headers: {'content-type': 'application/json'},
           );
         }
-        if (urlStr.contains('search.getResults')) {
+        if (urlStr.contains('pipedapi') || urlStr.contains('/streams/')) {
           return http.StreamedResponse(
-            Stream.value(utf8.encode(mockSaavnSearchJson)),
+            Stream.value(utf8.encode(mockPipedStreamJson)),
             200,
             headers: {'content-type': 'application/json'},
           );
         }
-        if (urlStr.contains('song.generateAuthToken')) {
-          return http.StreamedResponse(
-            Stream.value(utf8.encode(mockSaavnAuthJson)),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }
-        if (urlStr.contains('saavncdn.com')) {
+        if (urlStr.contains('mock.piped.video')) {
           return http.StreamedResponse(
             Stream.value([1, 2, 3, 4]),
             206,
             headers: {
               'content-type': 'audio/mp4',
-              'content-range': 'bytes 0-3/5000000',
+              'content-range': 'bytes 0-3/4567890',
               'content-length': '4',
             },
           );
@@ -266,12 +323,13 @@ void main() {
 
       final service = YoutubeAudioService(httpClient: mockClient);
       final streamUrl = await service.getAudioStreamUrl(
-        'mockBlockedVid',
-        title: 'Hello',
-        artist: 'Lionel Richie',
+        'mockExactVideo3',
+        title: 'Adele - Hello',
+        artist: 'Adele',
       );
       expect(streamUrl.startsWith('http://127.0.0.1:'), true);
-      expect(streamUrl.contains('/stream/mockBlockedVid'), true);
+      expect(streamUrl.contains('/stream/mockExactVideo3'), true);
+      expect(saavnSearchCalled, false, reason: 'Third-party text search must NEVER be called to swap songs');
       service.dispose();
     });
 
