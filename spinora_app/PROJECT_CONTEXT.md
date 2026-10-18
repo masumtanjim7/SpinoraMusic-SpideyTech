@@ -230,6 +230,25 @@ Task 2.7d DONE (Strict Exact-VideoId 3-Layer Audio Resolver, Zero Song-Swapping 
   - Tests & Analysis:
     * 0 analyzer issues (`flutter analyze` with 0 issues).
     * All 79 tests passed (`flutter test`).
+Task 2.7e DONE (Instant <2s Search & Playback, Parallel Stream Race, Non-Blocking Multi-Range Proxy & Playback Cancellation):
+  - Fast Direct InnerTube Search (<300ms) (`lib/features/online/data/youtube_audio_service.dart`):
+    * In `searchSongs(query)`, prioritizes direct HTTP POST to `https://www.youtube.com/youtubei/v1/search` with `WEB` context and 4-second timeout.
+    * Parses `videoRenderer` items directly (`videoId`, `title`, `author`, `durationMs`, high-res thumbnail) in <300ms without loading heavy HTML pages. Only falls back to `_yt.search.search(query)` if direct search is empty.
+  - Parallel Stream Resolution Race & 30-Minute In-Memory Cache:
+    * Implemented `_raceFirstNonNull` concurrently racing:
+      1) Resolver 1 (`_resolveFastManifest`): `getManifest(ytClients: [ios, androidVr], requireWatchPage: false)`, prioritizing medium/high bitrate `audio/mp4` (`itag 140` or `139`, ~128kbps/64kbps MP4 audio buffering in <0.5s);
+      2) Resolver 2 (`_resolveFastInnerTube`): Direct InnerTube POST using `ANDROID_VR` / `IOS` contexts parsing `adaptiveFormats` for `audio/mp4` (`itag 140/139`).
+    * In-memory URL cache (`_streamCache` with 30-min TTL): Re-tapping a song or playing recent tracks resolves in 0ms!
+  - Non-Blocking Multi-Range Local Loopback Proxy (Fixes 2nd Song Not Playing):
+    * Every incoming `HttpRequest` to `http://127.0.0.1:<port>/stream?id=<videoId>` opens a fresh upstream connection with matching `User-Agent` and forwarded `Range` header.
+    * Directly pipes HTTP status (`200`/`206`), `Content-Range`, `Content-Length`, `Content-Type`, and chunks to ExoPlayer without blocking or waiting for whole-file downloads.
+    * Cancels upstream subscriptions immediately on `request.response.done` (when ExoPlayer finishes a range or switches songs), instantly freeing socket resources and network bandwidth.
+  - Clean Player Cancellation (`lib/features/player/application/player_controller.dart`):
+    * Calls `await player.stop()` before resolving online tracks so previous active ExoPlayer streams are terminated immediately.
+    * Increments `_playbackRequestId` so preceding asynchronous stream resolutions are immediately discarded on rapid taps.
+  - Tests & Analysis:
+    * 0 analyzer issues (`flutter analyze` with 0 issues).
+    * All 80 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

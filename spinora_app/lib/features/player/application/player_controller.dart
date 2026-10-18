@@ -539,6 +539,11 @@ class PlayerController extends Notifier<PlayerState> {
 
     try {
       if (isOnline) {
+        // Stop any active playback immediately to release previous ExoPlayer connections
+        try {
+          await player.stop();
+        } catch (_) {}
+
         final mediaItem = MediaItem(
           id: track.uri,
           title: track.title,

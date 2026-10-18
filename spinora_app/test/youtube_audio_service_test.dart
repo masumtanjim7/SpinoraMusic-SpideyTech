@@ -195,7 +195,8 @@ void main() {
       final service = YoutubeAudioService(httpClient: mockClient);
       final streamUrl = await service.getAudioStreamUrl('mockVideo123');
       expect(streamUrl.startsWith('http://127.0.0.1:'), true);
-      expect(streamUrl.contains('/stream/mockVideo123'), true);
+      expect(streamUrl.contains('mockVideo123'), true);
+      expect(streamUrl.contains('/stream'), true);
       service.dispose();
     });
 
@@ -258,7 +259,8 @@ void main() {
       final service = YoutubeAudioService(httpClient: mockClient);
       final streamUrl = await service.getAudioStreamUrl('mockExactVideoId');
       expect(streamUrl.startsWith('http://127.0.0.1:'), true);
-      expect(streamUrl.contains('/stream/mockExactVideoId'), true);
+      expect(streamUrl.contains('mockExactVideoId'), true);
+      expect(streamUrl.contains('/stream'), true);
       service.dispose();
     });
 
@@ -328,8 +330,56 @@ void main() {
         artist: 'Adele',
       );
       expect(streamUrl.startsWith('http://127.0.0.1:'), true);
-      expect(streamUrl.contains('/stream/mockExactVideo3'), true);
+      expect(streamUrl.contains('mockExactVideo3'), true);
+      expect(streamUrl.contains('/stream'), true);
       expect(saavnSearchCalled, false, reason: 'Third-party text search must NEVER be called to swap songs');
+      service.dispose();
+    });
+
+    test('getAudioStreamUrl caches resolved stream in memory for instant subsequent playback', () async {
+      int networkCalls = 0;
+      final mockInnerTubePlayerJson = jsonEncode({
+        'playabilityStatus': {'status': 'OK'},
+        'streamingData': {
+          'adaptiveFormats': [
+            {
+              'itag': 140,
+              'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+              'bitrate': 129000,
+              'contentLength': '3456789',
+              'url': 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=mockCachedVid&itag=140',
+            },
+          ],
+        },
+      });
+
+      final mockClient = _MockHttpClient((req) async {
+        networkCalls++;
+        if (req.url.host.contains('googlevideo.com')) {
+          return http.StreamedResponse(
+            Stream.value([1, 2, 3, 4]),
+            206,
+            headers: {
+              'content-type': 'audio/mp4',
+              'content-range': 'bytes 0-3/3456789',
+              'content-length': '4',
+            },
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(mockInnerTubePlayerJson)),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final firstUrl = await service.getAudioStreamUrl('mockCachedVid');
+      final callsAfterFirst = networkCalls;
+
+      final secondUrl = await service.getAudioStreamUrl('mockCachedVid');
+      expect(firstUrl, secondUrl);
+      expect(networkCalls, callsAfterFirst, reason: 'Second call must return from in-memory cache in 0ms');
       service.dispose();
     });
 
