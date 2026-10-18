@@ -11,13 +11,22 @@ import 'package:spinora/features/player/application/player_controller.dart';
 import 'package:spinora/features/library/presentation/widgets/online_search_view.dart';
 
 class _MockHttpClient extends http.BaseClient {
-  _MockHttpClient(this.responseBody);
-  final String responseBody;
+  _MockHttpClient([this._handler, this._responseBody]);
+  final Future<http.StreamedResponse> Function(http.BaseRequest request)? _handler;
+  final String? _responseBody;
+
+  factory _MockHttpClient.withBody(String responseBody) {
+    return _MockHttpClient(null, responseBody);
+  }
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final handler = _handler;
+    if (handler != null) {
+      return handler(request);
+    }
     return http.StreamedResponse(
-      Stream.value(utf8.encode(responseBody)),
+      Stream.value(utf8.encode(_responseBody ?? '{}')),
       200,
       headers: {'content-type': 'application/json'},
     );
@@ -35,6 +44,27 @@ void main() {
       expect(id1 < 0, true, reason: 'Virtual ID must be negative to avoid Drift collision');
       expect(id3 < 0, true, reason: 'Virtual ID must be negative to avoid Drift collision');
       expect(id1 != id3, true);
+    });
+
+    test('cleanSongQuery removes YouTube fluff and formats clean query', () {
+      expect(
+        YoutubeAudioService.cleanSongQuery(
+          'Lionel Richie - Hello (Official Music Video)',
+          'LionelRichieVEVO',
+        ),
+        'Lionel Richie Hello',
+      );
+      expect(
+        YoutubeAudioService.cleanSongQuery(
+          'Aaj Ki Raat (From Stree 2) [Official Video] | 4K',
+          'Saregama Music',
+        ),
+        'Saregama Music Aaj Ki Raat From Stree 2',
+      );
+      expect(
+        YoutubeAudioService.cleanSongQuery('Lofi Chill Beats [24/7 Live Stream]'),
+        'Lofi Chill Beats',
+      );
     });
 
     test('ensureHttps upgrades http:// URLs to https:// and leaves https:// intact', () {
@@ -104,7 +134,7 @@ void main() {
         }
       });
 
-      final mockClient = _MockHttpClient(mockInnerTubeJson);
+      final mockClient = _MockHttpClient.withBody(mockInnerTubeJson);
       final service = YoutubeAudioService(httpClient: mockClient);
       final results = await service.searchSongs('aaj');
       expect(results, isNotEmpty);
@@ -113,6 +143,135 @@ void main() {
       expect(results.first.artist, 'Saregama Music');
       expect(results.first.duration, 228000);
       expect(results.first.album, 'YouTube Stream');
+      service.dispose();
+    });
+
+    test('getAudioStreamUrl parses direct InnerTube audio without probing streams 133 or 137', () async {
+      final mockInnerTubePlayerJson = jsonEncode({
+        'playabilityStatus': {'status': 'OK'},
+        'streamingData': {
+          'adaptiveFormats': [
+            {
+              'itag': 137, // 1080p video stream (the one that 403s on YouTube)
+              'mimeType': 'video/mp4; codecs="avc1.640028"',
+              'bitrate': 2500000,
+            },
+            {
+              'itag': 133, // 240p video stream (the other one that 403s)
+              'mimeType': 'video/mp4; codecs="avc1.4d400d"',
+              'bitrate': 250000,
+            },
+            {
+              'itag': 140, // Audio stream!
+              'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+              'bitrate': 129000,
+              'contentLength': '3456789',
+              'url': 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=mockVideo123&itag=140',
+            },
+          ],
+        },
+      });
+
+      final mockClient = _MockHttpClient((req) async {
+        // Range probe check
+        if (req.url.host.contains('googlevideo.com')) {
+          return http.StreamedResponse(
+            Stream.value([1, 2, 3, 4]),
+            206,
+            headers: {
+              'content-type': 'audio/mp4',
+              'content-range': 'bytes 0-3/3456789',
+              'content-length': '4',
+            },
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(mockInnerTubePlayerJson)),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final streamUrl = await service.getAudioStreamUrl('mockVideo123');
+      expect(streamUrl.startsWith('http://127.0.0.1:'), true);
+      expect(streamUrl.contains('/stream/mockVideo123'), true);
+      service.dispose();
+    });
+
+    test('getAudioStreamUrl falls back to JioSaavn 320kbps MP4 when YouTube requires login', () async {
+      final mockUnplayableJson = jsonEncode({
+        'playabilityStatus': {
+          'status': 'LOGIN_REQUIRED',
+          'reason': 'Sign in to confirm you’re not a bot',
+        },
+      });
+
+      final mockSaavnSearchJson = jsonEncode({
+        'results': [
+          {
+            'title': 'Hello',
+            'more_info': {
+              'encrypted_media_url': 'mockEncryptedSaavnMedia123',
+            },
+          },
+        ],
+      });
+
+      final mockSaavnAuthJson = jsonEncode({
+        'status': 'success',
+        'auth_url': 'https://ac.cf.saavncdn.com/mock_320.mp4?mock=true',
+      });
+
+      final mockClient = _MockHttpClient((req) async {
+        final urlStr = req.url.toString();
+        if (urlStr.contains('youtubei/v1/player') || urlStr.contains('api/v1/videos')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockUnplayableJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (urlStr.contains('search.getResults')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockSaavnSearchJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (urlStr.contains('song.generateAuthToken')) {
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockSaavnAuthJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (urlStr.contains('saavncdn.com')) {
+          return http.StreamedResponse(
+            Stream.value([1, 2, 3, 4]),
+            206,
+            headers: {
+              'content-type': 'audio/mp4',
+              'content-range': 'bytes 0-3/5000000',
+              'content-length': '4',
+            },
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{}')),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final streamUrl = await service.getAudioStreamUrl(
+        'mockBlockedVid',
+        title: 'Hello',
+        artist: 'Lionel Richie',
+      );
+      expect(streamUrl.startsWith('http://127.0.0.1:'), true);
+      expect(streamUrl.contains('/stream/mockBlockedVid'), true);
       service.dispose();
     });
 

@@ -442,6 +442,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   final Map<String, String> _resolvedStreamUrls = {};
+  int _playbackRequestId = 0;
 
   /// Resolves direct HTTPS stream URL for online tracks (e.g. `yt://<videoId>`).
   Future<String> _resolveTrackStreamUrl(
@@ -456,7 +457,12 @@ class PlayerController extends Notifier<PlayerState> {
     }
     final videoId = track.uri.replaceFirst('yt://', '');
     final service = ref.read(youtubeAudioServiceProvider);
-    final streamUrl = await service.getAudioStreamUrl(videoId, fallback: forceFallback);
+    final streamUrl = await service.getAudioStreamUrl(
+      videoId,
+      title: track.title,
+      artist: track.artist,
+      fallback: forceFallback,
+    );
     _resolvedStreamUrls[track.uri] = streamUrl;
     return streamUrl;
   }
@@ -509,6 +515,7 @@ class PlayerController extends Notifier<PlayerState> {
 
   /// Plays a given [Track], optionally initializing a new track [queue].
   Future<void> playTrack(Track track, {List<Track>? queue}) async {
+    final requestId = ++_playbackRequestId;
     final activeQueue = queue != null
         ? List<Track>.from(queue)
         : (state.queue.isEmpty ? [track] : List<Track>.from(state.queue));
@@ -544,6 +551,11 @@ class PlayerController extends Notifier<PlayerState> {
         try {
           // 2) Extract videoId and await getAudioStreamUrl (first attempt)
           final streamUrl = await _resolveTrackStreamUrl(track);
+          if (requestId != _playbackRequestId) {
+            debugPrint('[PlayerController] Discarding outdated playback request #$requestId for ${track.title}');
+            return;
+          }
+
           final streamUri = (streamUrl.startsWith('/') && !streamUrl.startsWith('//'))
               ? Uri.file(streamUrl)
               : Uri.parse(streamUrl);
@@ -555,8 +567,13 @@ class PlayerController extends Notifier<PlayerState> {
           );
 
           await player.setAudioSource(audioSource);
+          if (requestId != _playbackRequestId) return;
+
           await player.play();
+          if (requestId != _playbackRequestId) return;
         } catch (initialError, initialStackTrace) {
+          if (requestId != _playbackRequestId) return;
+
           debugPrint(
             '[PlayerController] Initial online stream playback failed ($initialError). Retrying with fallback stream...',
           );
@@ -571,6 +588,8 @@ class PlayerController extends Notifier<PlayerState> {
             track,
             forceFallback: true,
           );
+          if (requestId != _playbackRequestId) return;
+
           final fallbackUri = (fallbackStreamUrl.startsWith('/') && !fallbackStreamUrl.startsWith('//'))
               ? Uri.file(fallbackStreamUrl)
               : Uri.parse(fallbackStreamUrl);
@@ -580,7 +599,10 @@ class PlayerController extends Notifier<PlayerState> {
           );
 
           await player.setAudioSource(fallbackAudioSource);
+          if (requestId != _playbackRequestId) return;
+
           await player.play();
+          if (requestId != _playbackRequestId) return;
         }
 
         _recordPlayback(track);
@@ -602,6 +624,8 @@ class PlayerController extends Notifier<PlayerState> {
         await player.setAudioSource(audioSource);
       }
 
+      if (requestId != _playbackRequestId) return;
+
       await player.play();
       _recordPlayback(track);
 
@@ -610,6 +634,8 @@ class PlayerController extends Notifier<PlayerState> {
           .read(lyricsControllerProvider.notifier)
           .triggerAutoFetchForTrack(track);
     } catch (e, st) {
+      if (requestId != _playbackRequestId) return;
+
       debugPrint('[PlayerController] Error playing track "${track.title}": $e');
       FirebaseCrashlytics.instance.recordError(
         e,

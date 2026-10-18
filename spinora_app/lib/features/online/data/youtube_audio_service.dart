@@ -9,8 +9,25 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../../../../core/database/app_database.dart';
 
-/// Service wrapping [YoutubeExplode] to provide online YouTube audio search
-/// and direct live audio streaming via a local HTTP proxy server and temp caching.
+/// Fully resolved direct audio stream with associated client headers and MIME metadata.
+class ResolvedAudioStream {
+  const ResolvedAudioStream({
+    required this.url,
+    required this.userAgent,
+    this.referer,
+    this.mimeType = 'audio/mp4',
+    this.contentLength,
+  });
+
+  final String url;
+  final String userAgent;
+  final String? referer;
+  final String mimeType;
+  final int? contentLength;
+}
+
+/// Service providing online YouTube audio search and multi-stage unthrottled audio streaming
+/// via a local HTTP proxy server with Range support, matching client headers, and temp caching.
 class YoutubeAudioService {
   YoutubeAudioService({
     YoutubeExplode? ytClient,
@@ -21,7 +38,7 @@ class YoutubeAudioService {
   final YoutubeExplode _yt;
   final http.Client _httpClient;
   HttpServer? _proxyServer;
-  final Map<String, AudioStreamInfo> _activeStreamInfos = {};
+  final Map<String, ResolvedAudioStream> _activeResolvedStreams = {};
 
   /// Returns the local port the proxy is listening on, if started.
   int? get proxyPort => _proxyServer?.port;
@@ -39,6 +56,50 @@ class YoutubeAudioService {
   /// so it never collides with positive Drift auto-increment IDs.
   static int generateVirtualId(String videoId) {
     return -1 * (videoId.hashCode.abs() % 2147483647 + 1);
+  }
+
+  /// Cleans titles and artist names into concise queries suitable for music fallback lookups.
+  static String cleanSongQuery(String title, [String? artist]) {
+    String cleaned = title;
+    // Remove brackets containing common YouTube fluff like "(Official Video)", "[Music Video]", "[24/7 Live Stream]", etc.
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'[\(\[\{][^\)\]\}]*?(?:official|music|video|audio|lyric|lyrics|visualizer|hd|4k|remix|full|clean|extended|explicit|live|performance|prod\.|produced|stream|version)[^\)\]\}]*?[\)\]\}]',
+        caseSensitive: false,
+      ),
+      ' ',
+    );
+    // Remove trailing delimiters like "- Official Video" or "| 4K"
+    cleaned = cleaned.replaceAll(
+      RegExp(r'[\-\|\–\—]\s*(?:official|music|video|audio|lyrics).*$', caseSensitive: false),
+      ' ',
+    );
+    // Remove "feat." or "ft."
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\b(?:ft|feat)\.?\s+[^\(\[\-]+', caseSensitive: false),
+      ' ',
+    );
+    // Remove standalone quality/type words like 4K, HD, 1080p, Official, Video
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\b(?:4k|8k|hd|1080p|720p|audio|video|official)\b', caseSensitive: false),
+      ' ',
+    );
+    // Remove characters that confuse search APIs
+    cleaned = cleaned.replaceAll(
+      RegExp(r'[^\w\s\u0600-\u06FF\u0980-\u09FF\u0900-\u097F]'),
+      ' ',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (artist != null && artist.isNotEmpty) {
+      final cleanArtist = artist.replaceAll(RegExp(r'VEVO|Official|Topic', caseSensitive: false), '').trim();
+      final normCleaned = cleaned.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      final normArtist = cleanArtist.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      if (cleanArtist.isNotEmpty && !normCleaned.contains(normArtist)) {
+        cleaned = '$cleanArtist $cleaned';
+      }
+    }
+    return cleaned.trim();
   }
 
   /// Ensures the lightweight local loopback HTTP proxy server is running.
@@ -72,123 +133,27 @@ class YoutubeAudioService {
 
       // 1. If file is already fully cached, serve with full Range support
       if (cacheFile.existsSync() && cacheFile.lengthSync() > 10000) {
-        final totalLength = cacheFile.lengthSync();
-        final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
-
-        request.response.headers.contentType = ContentType('audio', 'mp4');
-        request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-
-        if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
-          final parts = rangeHeader.substring(6).split('-');
-          final start = int.tryParse(parts[0]) ?? 0;
-          final end = (parts.length > 1 && parts[1].isNotEmpty)
-              ? int.tryParse(parts[1])
-              : totalLength - 1;
-          final effectiveEnd = (end ?? totalLength - 1).clamp(start, totalLength - 1);
-          final chunkLength = effectiveEnd - start + 1;
-
-          request.response.statusCode = HttpStatus.partialContent;
-          request.response.headers.set(
-            HttpHeaders.contentRangeHeader,
-            'bytes $start-$effectiveEnd/$totalLength',
-          );
-          request.response.headers.contentLength = chunkLength;
-
-          if (request.method == 'HEAD') {
-            await request.response.close();
-            return;
-          }
-
-          await request.response.addStream(cacheFile.openRead(start, effectiveEnd + 1));
-          await request.response.close();
-          return;
-        }
-
-        request.response.statusCode = HttpStatus.ok;
-        request.response.headers.contentLength = totalLength;
-
-        if (request.method == 'HEAD') {
-          await request.response.close();
-          return;
-        }
-
-        await request.response.addStream(cacheFile.openRead());
-        await request.response.close();
+        await _serveLocalFile(request, cacheFile);
         return;
       }
 
-      // 2. Not yet cached: stream through _yt.videos.streamsClient.get(streamInfo)
-      final streamInfo = _activeStreamInfos[videoId] ?? await _resolveBestStreamInfo(videoId);
-      if (streamInfo == null) {
-        debugPrint('[YoutubeAudioService] Stream info missing for $videoId');
+      // 2. Lookup or resolve the stream
+      var resolved = _activeResolvedStreams[videoId];
+      if (resolved == null) {
+        resolved = await _resolveAudioStream(videoId);
+        if (resolved != null) {
+          _activeResolvedStreams[videoId] = resolved;
+        }
+      }
+
+      if (resolved == null) {
+        debugPrint('[YoutubeAudioService] Could not resolve audio stream for $videoId');
         request.response.statusCode = HttpStatus.notFound;
         await request.response.close();
         return;
       }
 
-      final mimeType = streamInfo.codec.mimeType;
-      final contentType = mimeType.contains('webm')
-          ? ContentType('audio', 'webm')
-          : ContentType('audio', 'mp4');
-
-      request.response.headers.contentType = contentType;
-      request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-      if (streamInfo.size.totalBytes > 0) {
-        request.response.headers.contentLength = streamInfo.size.totalBytes;
-      }
-
-      if (request.method == 'HEAD') {
-        request.response.statusCode = HttpStatus.ok;
-        await request.response.close();
-        return;
-      }
-
-      final byteStream = _yt.videos.streamsClient.get(streamInfo);
-      final tempFile = File('${_cacheDir.path}/yt_$videoId.tmp');
-      final fileSink = tempFile.openWrite();
-
-      bool clientDisconnected = false;
-      try {
-        await for (final chunk in byteStream) {
-          if (!clientDisconnected) {
-            try {
-              request.response.add(chunk);
-            } catch (_) {
-              clientDisconnected = true;
-            }
-          }
-          fileSink.add(chunk);
-        }
-        if (!clientDisconnected) {
-          await request.response.close();
-        }
-        await fileSink.flush();
-        await fileSink.close();
-
-        // If download succeeded and has substantial data, rename to complete cache file
-        if (tempFile.existsSync() && tempFile.lengthSync() > 10000) {
-          if (cacheFile.existsSync()) {
-            try {
-              cacheFile.deleteSync();
-            } catch (_) {}
-          }
-          await tempFile.rename(cacheFile.path);
-          debugPrint('[YoutubeAudioService] Cached stream file for $videoId (${cacheFile.lengthSync()} bytes)');
-        }
-      } catch (e) {
-        debugPrint('[YoutubeAudioService] Stream piping interrupted for $videoId: $e');
-        try {
-          await request.response.close();
-        } catch (_) {}
-        try {
-          await fileSink.close();
-        } catch (_) {}
-        if (tempFile.existsSync()) {
-          try {
-            tempFile.deleteSync();
-          } catch (_) {}
-        }
-      }
+      await _streamFromRemote(request, videoId, resolved);
     } catch (e, st) {
       debugPrint('[YoutubeAudioService] Error processing proxy request: $e');
       if (kDebugMode) debugPrint(st.toString());
@@ -199,10 +164,162 @@ class YoutubeAudioService {
     }
   }
 
+  /// Serves a locally cached audio file with full HTTP 206 Partial Content range support.
+  Future<void> _serveLocalFile(HttpRequest request, File cacheFile) async {
+    final totalLength = cacheFile.lengthSync();
+    final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
+
+    request.response.headers.contentType = ContentType('audio', 'mp4');
+    request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+
+    if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
+      final parts = rangeHeader.substring(6).split('-');
+      final start = int.tryParse(parts[0]) ?? 0;
+      final end = (parts.length > 1 && parts[1].isNotEmpty)
+          ? int.tryParse(parts[1])
+          : totalLength - 1;
+      final effectiveEnd =
+          (end ?? totalLength - 1).clamp(start, totalLength - 1);
+      final chunkLength = effectiveEnd - start + 1;
+
+      request.response.statusCode = HttpStatus.partialContent;
+      request.response.headers.set(
+        HttpHeaders.contentRangeHeader,
+        'bytes $start-$effectiveEnd/$totalLength',
+      );
+      request.response.headers.contentLength = chunkLength;
+
+      if (request.method == 'HEAD') {
+        await request.response.close();
+        return;
+      }
+
+      await request.response.addStream(cacheFile.openRead(start, effectiveEnd + 1));
+      await request.response.close();
+      return;
+    }
+
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentLength = totalLength;
+
+    if (request.method == 'HEAD') {
+      await request.response.close();
+      return;
+    }
+
+    await request.response.addStream(cacheFile.openRead());
+    await request.response.close();
+  }
+
+  /// Pipes remote stream bytes directly to ExoPlayer with matching client headers
+  /// while concurrently caching to disk.
+  Future<void> _streamFromRemote(
+    HttpRequest request,
+    String videoId,
+    ResolvedAudioStream resolved,
+  ) async {
+    final cacheFile = File('${_cacheDir.path}/yt_$videoId.m4a');
+    final tempFile = File('${_cacheDir.path}/yt_$videoId.tmp');
+
+    final upstreamRequest = http.Request(request.method, Uri.parse(resolved.url));
+    upstreamRequest.headers['User-Agent'] = resolved.userAgent;
+    if (resolved.referer != null) {
+      upstreamRequest.headers['Referer'] = resolved.referer!;
+    }
+    final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
+    if (rangeHeader != null) {
+      upstreamRequest.headers[HttpHeaders.rangeHeader] = rangeHeader;
+    }
+
+    final upstreamResponse = await _httpClient.send(upstreamRequest);
+
+    if (upstreamResponse.statusCode == HttpStatus.forbidden) {
+      debugPrint('[YoutubeAudioService] Upstream returned 403 for $videoId on ${resolved.url}');
+      _activeResolvedStreams.remove(videoId);
+      request.response.statusCode = HttpStatus.forbidden;
+      await request.response.close();
+      return;
+    }
+
+    request.response.statusCode = upstreamResponse.statusCode;
+    final cType = upstreamResponse.headers['content-type'] ?? resolved.mimeType;
+    try {
+      request.response.headers.contentType = ContentType.parse(cType);
+    } catch (_) {
+      request.response.headers.contentType = ContentType('audio', 'mp4');
+    }
+    request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+
+    if (upstreamResponse.headers['content-range'] != null) {
+      request.response.headers.set(
+        HttpHeaders.contentRangeHeader,
+        upstreamResponse.headers['content-range']!,
+      );
+    }
+    if (upstreamResponse.contentLength != null && upstreamResponse.contentLength! > 0) {
+      request.response.headers.contentLength = upstreamResponse.contentLength!;
+    }
+
+    if (request.method == 'HEAD') {
+      await request.response.close();
+      return;
+    }
+
+    // Only cache if reading from the beginning
+    final bool shouldCache = (upstreamResponse.statusCode == HttpStatus.ok ||
+        (rangeHeader != null && rangeHeader.startsWith('bytes=0-')));
+
+    IOSink? fileSink;
+    if (shouldCache) {
+      fileSink = tempFile.openWrite();
+    }
+
+    bool clientDisconnected = false;
+    try {
+      await for (final chunk in upstreamResponse.stream) {
+        if (!clientDisconnected) {
+          try {
+            request.response.add(chunk);
+          } catch (_) {
+            clientDisconnected = true;
+          }
+        }
+        fileSink?.add(chunk);
+      }
+      if (!clientDisconnected) {
+        await request.response.close();
+      }
+      if (fileSink != null) {
+        await fileSink.flush();
+        await fileSink.close();
+        if (tempFile.existsSync() && tempFile.lengthSync() > 10000) {
+          if (cacheFile.existsSync()) {
+            try {
+              cacheFile.deleteSync();
+            } catch (_) {}
+          }
+          await tempFile.rename(cacheFile.path);
+          debugPrint('[YoutubeAudioService] Successfully cached $videoId (${cacheFile.lengthSync()} bytes)');
+        }
+      }
+    } catch (e) {
+      debugPrint('[YoutubeAudioService] Error streaming from remote for $videoId: $e');
+      try {
+        await request.response.close();
+      } catch (_) {}
+      try {
+        await fileSink?.close();
+      } catch (_) {}
+      if (tempFile.existsSync()) {
+        try {
+          tempFile.deleteSync();
+        } catch (_) {}
+      }
+    }
+  }
+
   /// Searches YouTube videos matching [query], filters out overly long mixes,
   /// and maps each result into a unified Drift [Song] data model.
-  /// If the internal `_yt.search.search` fails on short queries (e.g. `_Map.getT` error),
-  /// it automatically falls back to YouTube's InnerTube search.
   Future<List<Song>> searchSongs(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
@@ -212,13 +329,11 @@ class YoutubeAudioService {
       final songs = <Song>[];
 
       for (final video in searchResults) {
-        // Filter out live streams or mixes longer than 25 minutes
         final duration = video.duration;
         if (duration != null && duration.inMinutes > 25) {
           continue;
         }
 
-        // High resolution thumbnail fallback
         final thumbnail = video.thumbnails.highResUrl.isNotEmpty
             ? video.thumbnails.highResUrl
             : video.thumbnails.standardResUrl;
@@ -321,7 +436,6 @@ class YoutubeAudioService {
                 videoRenderer['lengthText']?['simpleText'] as String?;
             final durationMs = parseDurationText(lengthText);
 
-            // Filter out mixes longer than 25 minutes
             if (durationMs > 1500000) {
               continue;
             }
@@ -383,106 +497,411 @@ class YoutubeAudioService {
     return url;
   }
 
-  /// Resolves the best working audio stream info across multiple [YoutubeApiClient]s,
-  /// performing a quick verification check so 403-blocked clients are skipped.
-  Future<AudioStreamInfo?> _resolveBestStreamInfo(
-    String videoId, {
-    bool fallback = false,
-  }) async {
-    final clientsToTry = fallback
-        ? [
-            YoutubeApiClient.safari,
-            YoutubeApiClient.tv,
-            YoutubeApiClient.android,
-            YoutubeApiClient.ios,
-          ]
-        : [
-            YoutubeApiClient.ios,
-            YoutubeApiClient.android,
-            YoutubeApiClient.safari,
-            YoutubeApiClient.tv,
-          ];
+  /// Stage A: Directly queries YouTube InnerTube player endpoint for direct audio formats
+  /// without probing video streams 133 or 137.
+  Future<ResolvedAudioStream?> _resolveDirectInnerTubeAudio(String videoId) async {
+    final clientConfigs = [
+      (
+        clientName: 'ANDROID_VR',
+        userAgent:
+            'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
+        context: {
+          'client': {
+            'clientName': 'ANDROID_VR',
+            'clientVersion': '1.60.19',
+            'deviceMake': 'Oculus',
+            'deviceModel': 'Quest',
+            'androidSdkVersion': 34,
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+      ),
+      (
+        clientName: 'IOS',
+        userAgent:
+            'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
+        context: {
+          'client': {
+            'clientName': 'IOS',
+            'clientVersion': '19.45.4',
+            'deviceMake': 'Apple',
+            'deviceModel': 'iPhone16,2',
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+      ),
+      (
+        clientName: 'ANDROID_TESTSUITE',
+        userAgent:
+            'com.google.android.youtube/1.9 (Linux; U; Android 9; test-user Build/PI)',
+        context: {
+          'client': {
+            'clientName': 'ANDROID_TESTSUITE',
+            'clientVersion': '1.9',
+            'androidSdkVersion': 30,
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+      ),
+    ];
 
-    for (final client in clientsToTry) {
+    for (final cfg in clientConfigs) {
       try {
-        debugPrint('[YoutubeAudioService] Fetching manifest with $client for video: $videoId');
-        final manifest = await _yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [client],
+        debugPrint('[YoutubeAudioService] Probing InnerTube client ${cfg.clientName} for $videoId');
+        final response = await _httpClient.post(
+          Uri.parse('https://www.youtube.com/youtubei/v1/player?prettyPrint=false'),
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': cfg.userAgent,
+          },
+          body: jsonEncode({
+            'context': cfg.context,
+            'videoId': videoId,
+            'playbackContext': {
+              'contentPlaybackContext': {
+                'html5Preference': 'HTML5_PREF_WANTS',
+              }
+            }
+          }),
         );
-        final audioStreams = manifest.audioOnly;
-        if (audioStreams.isEmpty) continue;
 
-        AudioStreamInfo candidate;
-        final mp4Streams = audioStreams
-            .where((s) => s.container.name.toLowerCase() == 'mp4')
-            .toList();
-        if (mp4Streams.isNotEmpty) {
-          candidate = mp4Streams.withHighestBitrate();
-        } else {
-          candidate = audioStreams.withHighestBitrate();
+        if (response.statusCode != 200) {
+          debugPrint('[YoutubeAudioService] InnerTube ${cfg.clientName} returned HTTP ${response.statusCode}');
+          continue;
         }
 
-        // Quick stream check: verify that the first chunk can be fetched without 403
-        final testStream = _yt.videos.streamsClient.get(candidate);
-        await testStream.first;
-        debugPrint(
-            '[YoutubeAudioService] Verified working client $client for $videoId (${candidate.container.name}, ${candidate.bitrate})');
-        return candidate;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final playability = data['playabilityStatus'] as Map<String, dynamic>?;
+        if (playability != null && playability['status'] != 'OK') {
+          debugPrint('[YoutubeAudioService] InnerTube ${cfg.clientName} unplayable: ${playability['reason']}');
+          continue;
+        }
+
+        final streamingData = data['streamingData'] as Map<String, dynamic>?;
+        if (streamingData == null) continue;
+
+        final rawFormats = <Map<String, dynamic>>[];
+        if (streamingData['adaptiveFormats'] is List) {
+          rawFormats.addAll(
+            (streamingData['adaptiveFormats'] as List).cast<Map<String, dynamic>>(),
+          );
+        }
+        if (streamingData['formats'] is List) {
+          rawFormats.addAll(
+            (streamingData['formats'] as List).cast<Map<String, dynamic>>(),
+          );
+        }
+
+        // Filter for audio streams with direct, unencrypted URL
+        final candidateFormats = rawFormats.where((f) {
+          final mime = (f['mimeType'] as String? ?? '').toLowerCase();
+          final isAudio = mime.startsWith('audio/') || f['audioQuality'] != null;
+          final hasDirectUrl = f['url'] != null && (f['url'] as String).isNotEmpty;
+          final isEncrypted = f['signatureCipher'] != null || f['cipher'] != null;
+          return isAudio && hasDirectUrl && !isEncrypted;
+        }).toList();
+
+        if (candidateFormats.isEmpty) continue;
+
+        // Sort: prefer mp4/itag 140, then higher bitrate
+        candidateFormats.sort((a, b) {
+          final mimeA = (a['mimeType'] as String? ?? '').toLowerCase();
+          final mimeB = (b['mimeType'] as String? ?? '').toLowerCase();
+          final aIsMp4 = mimeA.contains('mp4') || a['itag'] == 140;
+          final bIsMp4 = mimeB.contains('mp4') || b['itag'] == 140;
+          if (aIsMp4 && !bIsMp4) return -1;
+          if (!aIsMp4 && bIsMp4) return 1;
+
+          final bitrateA = (a['bitrate'] as num?)?.toInt() ?? 0;
+          final bitrateB = (b['bitrate'] as num?)?.toInt() ?? 0;
+          return bitrateB.compareTo(bitrateA);
+        });
+
+        for (final format in candidateFormats) {
+          final rawUrl = format['url'] as String;
+          final mime = (format['mimeType'] as String? ?? 'audio/mp4').split(';').first.trim();
+          final clen = int.tryParse(format['contentLength']?.toString() ?? '');
+
+          // Verify with quick range check using the matching User-Agent
+          try {
+            final testReq = await _httpClient.get(
+              Uri.parse(rawUrl),
+              headers: {
+                'User-Agent': cfg.userAgent,
+                'Range': 'bytes=0-1023',
+              },
+            );
+            if (testReq.statusCode == 200 || testReq.statusCode == 206) {
+              debugPrint(
+                '[YoutubeAudioService] InnerTube ${cfg.clientName} direct audio stream verified for $videoId (itag: ${format['itag']})',
+              );
+              return ResolvedAudioStream(
+                url: rawUrl,
+                userAgent: cfg.userAgent,
+                mimeType: mime,
+                contentLength: clen,
+              );
+            } else {
+              debugPrint('[YoutubeAudioService] Stream range check returned ${testReq.statusCode}');
+            }
+          } catch (e) {
+            debugPrint('[YoutubeAudioService] Stream probe error: $e');
+          }
+        }
       } catch (e) {
-        debugPrint('[YoutubeAudioService] Client $client failed for $videoId: $e');
+        debugPrint('[YoutubeAudioService] InnerTube ${cfg.clientName} error for $videoId: $e');
       }
     }
+    return null;
+  }
 
-    // Fallback to default getManifest
+  /// Stage B: Resolves direct unthrottled audio stream from reliable public Invidious instances.
+  Future<ResolvedAudioStream?> _resolveInvidiousAudio(String videoId) async {
+    const invidiousInstances = [
+      'https://inv.nadeko.net',
+      'https://invidious.nerdvpn.de',
+      'https://inv.tux.pizza',
+      'https://invidious.private.coffee',
+    ];
+
+    const defaultUa =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    for (final instance in invidiousInstances) {
+      try {
+        debugPrint('[YoutubeAudioService] Checking Invidious instance $instance for $videoId');
+        final res = await _httpClient
+            .get(
+              Uri.parse('$instance/api/v1/videos/$videoId'),
+              headers: {'User-Agent': defaultUa},
+            )
+            .timeout(const Duration(seconds: 4));
+
+        if (res.statusCode != 200) continue;
+
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final adaptive = (data['adaptiveFormats'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+        final audioFormats = adaptive.where((f) {
+          final type = (f['type'] as String? ?? '').toLowerCase();
+          final url = f['url'] as String?;
+          return type.startsWith('audio/') && url != null && url.isNotEmpty;
+        }).toList();
+
+        if (audioFormats.isEmpty) continue;
+
+        audioFormats.sort((a, b) {
+          final isA140 = a['itag'] == 140 || (a['type'] as String? ?? '').contains('mp4');
+          final isB140 = b['itag'] == 140 || (b['type'] as String? ?? '').contains('mp4');
+          if (isA140 && !isB140) return -1;
+          if (!isA140 && isB140) return 1;
+          final brA = (a['bitrate'] as num?)?.toInt() ?? 0;
+          final brB = (b['bitrate'] as num?)?.toInt() ?? 0;
+          return brB.compareTo(brA);
+        });
+
+        for (final af in audioFormats) {
+          final rawUrl = af['url'] as String;
+          final clen = int.tryParse(af['clen']?.toString() ?? '');
+          try {
+            final testRes = await _httpClient.get(
+              Uri.parse(rawUrl),
+              headers: {
+                'User-Agent': defaultUa,
+                'Range': 'bytes=0-1023',
+              },
+            ).timeout(const Duration(seconds: 3));
+
+            if (testRes.statusCode == 200 || testRes.statusCode == 206) {
+              debugPrint('[YoutubeAudioService] Verified audio stream from Invidious ($instance)');
+              return ResolvedAudioStream(
+                url: rawUrl,
+                userAgent: defaultUa,
+                mimeType: (af['type'] as String? ?? 'audio/mp4').split(';').first.trim(),
+                contentLength: clen,
+              );
+            }
+          } catch (_) {}
+        }
+      } catch (e) {
+        debugPrint('[YoutubeAudioService] Invidious instance $instance failed: $e');
+      }
+    }
+    return null;
+  }
+
+  /// Stage C: Queries high-speed 320kbps music API fallback (JioSaavn) for instant playback.
+  Future<ResolvedAudioStream?> _resolveJioSaavnAudio({
+    required String title,
+    String? artist,
+  }) async {
+    final query = cleanSongQuery(title, artist);
+    if (query.isEmpty) return null;
+
+    debugPrint('[YoutubeAudioService] Resolving high-speed 320kbps music fallback for "$query"...');
+    const ua =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    const referer = 'https://www.jiosaavn.com/';
+
     try {
-      debugPrint('[YoutubeAudioService] Attempting default getManifest for $videoId');
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      if (manifest.audioOnly.isNotEmpty) {
-        final mp4Streams = manifest.audioOnly
-            .where((s) => s.container.name.toLowerCase() == 'mp4')
-            .toList();
-        final candidate = mp4Streams.isNotEmpty
-            ? mp4Streams.withHighestBitrate()
-            : manifest.audioOnly.withHighestBitrate();
-        final testStream = _yt.videos.streamsClient.get(candidate);
-        await testStream.first;
-        debugPrint('[YoutubeAudioService] Verified working stream from default manifest for $videoId');
-        return candidate;
-      } else if (manifest.muxed.isNotEmpty) {
-        final candidate = manifest.muxed.withHighestBitrate();
-        final testStream = _yt.videos.streamsClient.get(candidate);
-        await testStream.first;
-        return candidate;
+      final searchUrl = Uri.parse(
+        'https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=5&p=1&q=${Uri.encodeComponent(query)}',
+      );
+      final searchRes = await _httpClient
+          .get(searchUrl, headers: {'User-Agent': ua})
+          .timeout(const Duration(seconds: 4));
+
+      if (searchRes.statusCode != 200) return null;
+
+      final data = jsonDecode(searchRes.body) as Map<String, dynamic>;
+      final results = data['results'] as List?;
+      if (results == null || results.isEmpty) return null;
+
+      for (final item in results.take(3)) {
+        final song = item as Map<String, dynamic>;
+        final encUrl = song['more_info']?['encrypted_media_url'] as String?;
+        if (encUrl == null || encUrl.isEmpty) continue;
+
+        final authUrl = Uri.parse(
+          'https://www.jiosaavn.com/api.php?__call=song.generateAuthToken&_format=json&_marker=0&api_version=4&ctx=android&url=${Uri.encodeComponent(encUrl)}&bitrate=320',
+        );
+        final authRes = await _httpClient
+            .get(authUrl, headers: {'User-Agent': ua})
+            .timeout(const Duration(seconds: 4));
+
+        if (authRes.statusCode != 200) continue;
+
+        final authData = jsonDecode(authRes.body) as Map<String, dynamic>;
+        final streamUrl = authData['auth_url'] as String?;
+        if (streamUrl != null && streamUrl.isNotEmpty) {
+          try {
+            final test = await _httpClient.get(
+              Uri.parse(streamUrl),
+              headers: {
+                'User-Agent': ua,
+                'Referer': referer,
+                'Range': 'bytes=0-1023',
+              },
+            ).timeout(const Duration(seconds: 3));
+
+            if (test.statusCode == 200 || test.statusCode == 206) {
+              debugPrint('[YoutubeAudioService] Verified 320kbps music fallback stream from JioSaavn for "$title"');
+              return ResolvedAudioStream(
+                url: streamUrl,
+                userAgent: ua,
+                referer: referer,
+                mimeType: 'audio/mp4',
+              );
+            }
+          } catch (_) {}
+        }
       }
     } catch (e) {
-      debugPrint('[YoutubeAudioService] Default getManifest failed for $videoId: $e');
+      debugPrint('[YoutubeAudioService] JioSaavn fallback error: $e');
     }
+    return null;
+  }
+
+  /// Fallback to youtube_explode_dart manifest resolution with try-catch.
+  Future<ResolvedAudioStream?> _resolveYoutubeExplodeAudio(String videoId) async {
+    try {
+      final manifest = await _yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [YoutubeApiClient.ios, YoutubeApiClient.android],
+      );
+      final audioStreams = manifest.audioOnly;
+      if (audioStreams.isNotEmpty) {
+        final candidate = audioStreams.withHighestBitrate();
+        final testStream = _yt.videos.streamsClient.get(candidate);
+        await testStream.first;
+        return ResolvedAudioStream(
+          url: candidate.url.toString(),
+          userAgent:
+              'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
+          mimeType: candidate.codec.mimeType,
+          contentLength: candidate.size.totalBytes,
+        );
+      }
+    } catch (e) {
+      debugPrint('[YoutubeAudioService] youtube_explode getManifest failed for $videoId: $e');
+    }
+    return null;
+  }
+
+  /// Multi-stage audio resolver executing Stage A, Stage B, Stage C, and Stage D in order.
+  Future<ResolvedAudioStream?> _resolveAudioStream(
+    String videoId, {
+    String? title,
+    String? artist,
+    bool fallback = false,
+  }) async {
+    // 1. Stage A: Direct InnerTube player API (avoids video streams 133/137)
+    if (!fallback) {
+      final innerTubeStream = await _resolveDirectInnerTubeAudio(videoId);
+      if (innerTubeStream != null) return innerTubeStream;
+    }
+
+    // 2. Stage B: Invidious audio stream
+    final invidiousStream = await _resolveInvidiousAudio(videoId);
+    if (invidiousStream != null) return invidiousStream;
+
+    // 3. Stage C: High-speed 320kbps music API fallback (JioSaavn)
+    if (title != null && title.isNotEmpty) {
+      final saavnStream = await _resolveJioSaavnAudio(title: title, artist: artist);
+      if (saavnStream != null) return saavnStream;
+    } else {
+      try {
+        final video = await _yt.videos.get(videoId);
+        final saavnStream = await _resolveJioSaavnAudio(title: video.title, artist: video.author);
+        if (saavnStream != null) return saavnStream;
+      } catch (_) {}
+    }
+
+    // 4. Fallback to youtube_explode_dart
+    final ytExplodeStream = await _resolveYoutubeExplodeAudio(videoId);
+    if (ytExplodeStream != null) return ytExplodeStream;
 
     return null;
   }
 
-  /// Fetches audio stream and returns the local loopback proxy URL for ExoPlayer.
-  /// ExoPlayer streams from our local proxy which handles chunking and YouTube headers natively.
-  Future<String> getAudioStreamUrl(String videoId, {bool fallback = false}) async {
+  /// Resolves the audio stream and returns the local loopback proxy URL for ExoPlayer.
+  /// ExoPlayer streams from our local proxy which handles Range requests, chunking,
+  /// and exact matching client User-Agents without HTTP 403 errors.
+  Future<String> getAudioStreamUrl(
+    String videoId, {
+    String? title,
+    String? artist,
+    bool fallback = false,
+  }) async {
     await _ensureProxyServer();
 
     final cacheFile = File('${_cacheDir.path}/yt_$videoId.m4a');
     if (cacheFile.existsSync() && cacheFile.lengthSync() > 10000) {
-      debugPrint('[YoutubeAudioService] Serving from local cache: ${cacheFile.path}');
+      debugPrint('[YoutubeAudioService] Serving from local disk cache: ${cacheFile.path}');
       return 'http://127.0.0.1:${_proxyServer!.port}/stream/$videoId';
     }
 
     if (fallback) {
-      _activeStreamInfos.remove(videoId);
+      _activeResolvedStreams.remove(videoId);
     }
 
-    final streamInfo = await _resolveBestStreamInfo(videoId, fallback: fallback);
-    if (streamInfo == null) {
-      throw Exception('Failed to resolve playable audio stream for video $videoId');
+    var resolved = _activeResolvedStreams[videoId];
+    if (resolved == null || fallback) {
+      resolved = await _resolveAudioStream(
+        videoId,
+        title: title,
+        artist: artist,
+        fallback: fallback,
+      );
+      if (resolved == null) {
+        throw Exception('Failed to resolve playable audio stream for video $videoId');
+      }
+      _activeResolvedStreams[videoId] = resolved;
     }
 
-    _activeStreamInfos[videoId] = streamInfo;
     return 'http://127.0.0.1:${_proxyServer!.port}/stream/$videoId';
   }
 

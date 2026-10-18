@@ -197,10 +197,21 @@ Task 2.7b DONE (YouTube Local Proxy Server, Multi-Client Manifest Chunk Probe & 
     * Handled unparsed rich shelves in `youtube_explode_dart` on short queries like `"aaj"`: wraps `_yt.search.search(query)` in try-catch and automatically falls back to YouTube's public InnerTube JSON search endpoint (`https://www.youtube.com/youtubei/v1/search`), cleanly parsing `videoRenderer` items, formatted durations, artists, and high-res thumbnails.
   - UI Consolidation (`lib/features/library/presentation/library_screen.dart`):
     * Removed duplicate "YouTube Search" container badge and consolidated filter category chip into a single clean `"YouTube Stream"` chip positioned right after `Albums` in the horizontal category bar.
+Task 2.7c DONE (Multi-Stage Unthrottled Online Audio Resolver, Matching User-Agent Proxy & Duplicate Tap Guard):
+  - Multi-Stage Audio Resolver (`lib/features/online/data/youtube_audio_service.dart`):
+    * Solved `YoutubeExplodeException: Video ... returned 403 (stream: 133 / 137)`:
+      Replaced `getManifest()` probing (which crashed when YouTube returned 403 on video streams 133 or 137) with a multi-stage direct audio resolver pipeline:
+      1) Stage A (Direct InnerTube Player API): Directly posts to `https://www.youtube.com/youtubei/v1/player` with client contexts (`ANDROID_VR`, `IOS`, `ANDROID_TESTSUITE`). Parses `streamingData.adaptiveFormats` directly from JSON, selecting audio streams (itag 140 / 251) with direct `url` fields without ever requesting or probing video streams 133 or 137!
+      2) Stage B (Local Proxy with Matching Client User-Agent): Attaches the exact matching `User-Agent` from Stage A (and Range header from ExoPlayer) when requesting `googlevideo.com` from our local loopback proxy (`http://127.0.0.1:<port>/stream/<videoId>`), forwarding 200/206 Partial Content, Content-Range, Content-Length, and Accept-Ranges back to ExoPlayer while caching to disk.
+      3) Stage C (High-Speed 320kbps Music Fallback API): If YouTube requires bot login (`LOGIN_REQUIRED`) or lacks unencrypted URLs, automatically queries JioSaavn's public CDN search using `cleanSongQuery(title, artist)` and generates an unthrottled 320kbps MP4 audio stream URL with Range support.
+      4) Stage D (Invidious & youtube_explode_dart Fallbacks): Queries Invidious instances (`inv.nadeko.net`, etc.) and safe `getManifest` as resilient fallback stages.
+  - Duplicate Tap & Race Condition Guard (`lib/features/player/application/player_controller.dart`):
+    * Added `_playbackRequestId` counter in `PlayerController.playTrack`.
+    * If a user rapidly taps multiple online songs, preceding asynchronous stream resolutions are immediately discarded, ensuring only the latest tapped track loads into `_audioPlayer`.
+    * Passes track `title` and `artist` into `getAudioStreamUrl` for instant fallback resolution.
   - Tests & Analysis:
-    * Added comprehensive unit tests in `test/youtube_audio_service_test.dart` for duration parsing and hermetic InnerTube fallback search with `_MockHttpClient`.
-    * Updated `test/library_screen_test.dart` with `ensureVisible` for the sort button in the horizontally scrolling filter bar.
-    * 0 analyzer issues (`flutter analyze` with 0 issues) and all 75 tests passing (`flutter test`).
+    * 0 analyzer issues (`flutter analyze` with 0 issues).
+    * All 78 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
