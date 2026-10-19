@@ -39,6 +39,8 @@ class MiniPlayer extends ConsumerWidget {
 
     final tt = Theme.of(context).textTheme;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
       child: GestureDetector(
@@ -47,19 +49,21 @@ class MiniPlayer extends ConsumerWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.purpleAccent.withValues(alpha: 0.25),
-                blurRadius: 18,
-                spreadRadius: 1,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 14,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: isDark
+                ? [
+                    BoxShadow(
+                      color: AppColors.purpleAccent.withValues(alpha: 0.25),
+                      blurRadius: 18,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 14,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : AppTheme.lightCardShadow,
           ),
           child: GlassCard(
             borderRadius: BorderRadius.circular(24),
@@ -67,7 +71,7 @@ class MiniPlayer extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Subtle neon progress indicator line along the top curved edge
+                // Subtle progress indicator line along the top curved edge
                 ClipRRect(
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(24)),
@@ -75,9 +79,11 @@ class MiniPlayer extends ConsumerWidget {
                     height: 3,
                     child: LinearProgressIndicator(
                       value: playerState.progressRatio,
-                      backgroundColor: Colors.white.withValues(alpha: 0.08),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.cyanAccent,
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.06),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isDark ? AppColors.cyanAccent : const Color(0xFF7C3AED),
                       ),
                     ),
                   ),
@@ -111,7 +117,9 @@ class MiniPlayer extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: tt.bodyMedium?.copyWith(
-                                color: Colors.white,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F111A),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -121,7 +129,9 @@ class MiniPlayer extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: tt.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.65),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.65)
+                                    : const Color(0xFF5C6275),
                               ),
                             ),
                           ],
@@ -134,7 +144,9 @@ class MiniPlayer extends ConsumerWidget {
                             .read(playerControllerProvider.notifier)
                             .previous(),
                         icon: const Icon(Icons.skip_previous_rounded),
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.85)
+                            : const Color(0xFF0F111A).withValues(alpha: 0.85),
                         iconSize: 22,
                         visualDensity: VisualDensity.compact,
                         tooltip: 'Previous',
@@ -146,11 +158,22 @@ class MiniPlayer extends ConsumerWidget {
                         height: 40,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: AppColors.purpleGradient,
+                          gradient: isDark
+                              ? AppColors.purpleGradient
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFF7C3AED),
+                                    Color(0xFFE63946),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.purpleAccent
-                                  .withValues(alpha: 0.5),
+                              color: (isDark
+                                      ? AppColors.purpleAccent
+                                      : const Color(0xFF7C3AED))
+                                  .withValues(alpha: 0.4),
                               blurRadius: 10,
                               spreadRadius: 1,
                             ),
@@ -189,8 +212,12 @@ class MiniPlayer extends ConsumerWidget {
                             : null,
                         icon: const Icon(Icons.skip_next_rounded),
                         color: playerState.hasNext
-                            ? Colors.white.withValues(alpha: 0.85)
-                            : Colors.white.withValues(alpha: 0.25),
+                            ? (isDark
+                                ? Colors.white.withValues(alpha: 0.85)
+                                : const Color(0xFF0F111A).withValues(alpha: 0.85))
+                            : (isDark
+                                ? Colors.white.withValues(alpha: 0.25)
+                                : const Color(0xFF5C6275).withValues(alpha: 0.25)),
                         iconSize: 22,
                         visualDensity: VisualDensity.compact,
                         tooltip: 'Next',

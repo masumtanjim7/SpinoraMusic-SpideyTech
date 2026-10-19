@@ -206,7 +206,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         searchQuery.isNotEmpty || selectedFilter != LibraryFilter.all;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Ambient background lighting orbs for glass refraction

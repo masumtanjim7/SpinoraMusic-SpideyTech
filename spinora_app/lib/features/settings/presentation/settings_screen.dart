@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../features/library/data/audio_scanner_service.dart';
 import '../../../features/player/application/player_controller.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
+import '../application/theme_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings Screen — Lucid Glass Dashboard
@@ -27,25 +29,33 @@ class SettingsScreen extends ConsumerWidget {
     final songsAsync = ref.watch(localSongsStreamProvider);
     final playerState = ref.watch(playerControllerProvider);
     final trackCount = songsAsync.value?.length ?? 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08070F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Ambient blobs
-          _buildAmbientBlobs(),
+          _buildAmbientBlobs(isDark),
           SafeArea(
             child: Column(
               children: [
-                _buildHeader(context, profile),
+                _buildHeader(context, profile, isDark),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Appearance
+                        const _SectionLabel(label: 'APPEARANCE'),
+                        const SizedBox(height: 12),
+                        const _AppearanceTile(),
+
+                        const SizedBox(height: 28),
+
                         // ── Audio
-                        _SectionLabel(label: 'AUDIO'),
+                        const _SectionLabel(label: 'AUDIO'),
                         const SizedBox(height: 12),
                         _SettingsTile(
                           icon: Icons.graphic_eq_rounded,
@@ -82,7 +92,7 @@ class SettingsScreen extends ConsumerWidget {
                         const SizedBox(height: 28),
 
                         // ── Library
-                        _SectionLabel(label: 'LIBRARY'),
+                        const _SectionLabel(label: 'LIBRARY'),
                         const SizedBox(height: 12),
                         _SettingsTile(
                           icon: Icons.library_music_rounded,
@@ -101,8 +111,9 @@ class SettingsScreen extends ConsumerWidget {
                                   ),
                                 )
                               : Icon(Icons.refresh_rounded,
-                                  color:
-                                      Colors.white.withValues(alpha: 0.35),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.35)
+                                      : const Color(0xFF5C6275),
                                   size: 20),
                           onTap: scanState.isScanning
                               ? null
@@ -114,21 +125,21 @@ class SettingsScreen extends ConsumerWidget {
                         const SizedBox(height: 28),
 
                         // ── Profile
-                        _SectionLabel(label: 'PROFILE'),
+                        const _SectionLabel(label: 'PROFILE'),
                         const SizedBox(height: 12),
                         _ProfileQuickTile(profile: profile),
 
                         const SizedBox(height: 28),
 
                         // ── Lyrics
-                        _SectionLabel(label: 'LYRICS'),
+                        const _SectionLabel(label: 'LYRICS'),
                         const SizedBox(height: 12),
                         const _LyricsTile(),
 
                         const SizedBox(height: 28),
 
                         // ── About
-                        _SectionLabel(label: 'ABOUT'),
+                        const _SectionLabel(label: 'ABOUT'),
                         const SizedBox(height: 12),
                         _VersionBadge(
                             version: _appVersion, appName: _appName),
@@ -146,7 +157,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, UserProfile? profile) {
+  Widget _buildHeader(
+      BuildContext context, UserProfile? profile, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(children: [
@@ -154,9 +166,15 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: Colors.white.withValues(alpha: 0.06),
-            border:
-                Border.all(color: Colors.white.withValues(alpha: 0.09)),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.85),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.09)
+                  : Colors.white.withValues(alpha: 0.95),
+            ),
+            boxShadow: isDark ? null : AppTheme.lightCardShadow,
           ),
           child: const Icon(Icons.settings_rounded,
               color: Color(0xFF8B5CF6), size: 20),
@@ -164,14 +182,16 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Settings',
+            Text('Settings',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: isDark ? Colors.white : const Color(0xFF0F111A),
                     fontSize: 20,
                     fontWeight: FontWeight.w800)),
             Text(profile?.displayName ?? 'Music Lover',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.45),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.45)
+                        : const Color(0xFF5C6275),
                     fontSize: 12)),
           ]),
         ),
@@ -179,43 +199,257 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAmbientBlobs() {
+  Widget _buildAmbientBlobs(bool isDark) {
     return Stack(children: [
       Positioned(
-          top: -60,
-          right: -60,
-          child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.13),
-                    Colors.transparent
-                  ])))),
+        top: -60,
+        right: -60,
+        child: Container(
+          width: 280,
+          height: 280,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: isDark
+                  ? [
+                      const Color(0xFF8B5CF6).withValues(alpha: 0.13),
+                      Colors.transparent,
+                    ]
+                  : [
+                      const Color(0xFFDDD6FE).withValues(alpha: 0.35),
+                      Colors.transparent,
+                    ],
+            ),
+          ),
+        ),
+      ),
       Positioned(
-          bottom: 100,
-          left: -40,
-          child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.08),
-                    Colors.transparent
-                  ])))),
+        bottom: 100,
+        left: -40,
+        child: Container(
+          width: 220,
+          height: 220,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: isDark
+                  ? [
+                      const Color(0xFF10B981).withValues(alpha: 0.08),
+                      Colors.transparent,
+                    ]
+                  : [
+                      const Color(0xFFFDE8EF).withValues(alpha: 0.40),
+                      Colors.transparent,
+                    ],
+            ),
+          ),
+        ),
+      ),
     ]);
   }
 
   void _openEqualizer(BuildContext context, WidgetRef ref) {
-    // Opens the hardware equalizer sheet if available via player
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Open Now Playing → EQ to adjust equalizer'),
         backgroundColor: const Color(0xFF1A1A2E),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Appearance Tile (Dark Mode vs Light Mode Apple Lucid Glass)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AppearanceTile extends ConsumerWidget {
+  const _AppearanceTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.85),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.95),
+          width: isDark ? 1.0 : 1.2,
+        ),
+        boxShadow: isDark ? null : AppTheme.lightCardShadow,
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(11),
+                  color: isDark
+                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.2)
+                      : const Color(0xFFE63946).withValues(alpha: 0.15),
+                ),
+                child: Icon(
+                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: isDark
+                      ? const Color(0xFF8B5CF6)
+                      : const Color(0xFFE63946),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isDark ? 'Dark Mode' : 'Light Mode (Apple Lucid Glass)',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F111A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isDark
+                          ? 'Deep cosmos base & neon accents'
+                          : 'Pearl-white acrylic, frosted glass & slate',
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.45)
+                            : const Color(0xFF5C6275),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Switch(
+                value: isDark,
+                onChanged: (val) {
+                  ref
+                      .read(themeModeProvider.notifier)
+                      .setTheme(val ? ThemeMode.dark : ThemeMode.light);
+                },
+                activeThumbColor: const Color(0xFF8B5CF6),
+                inactiveThumbColor: const Color(0xFFE63946),
+                inactiveTrackColor:
+                    const Color(0xFFE63946).withValues(alpha: 0.25),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Interactive Segmented Option Chips: [🌙 Dark Cosmos] [☀️ Light Lucid Glass]
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => ref
+                      .read(themeModeProvider.notifier)
+                      .setTheme(ThemeMode.dark),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: isDark
+                          ? const Color(0xFF8B5CF6).withValues(alpha: 0.22)
+                          : Colors.black.withValues(alpha: 0.04),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF8B5CF6).withValues(alpha: 0.5)
+                            : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.nightlight_round,
+                          size: 14,
+                          color: isDark
+                              ? const Color(0xFF8B5CF6)
+                              : const Color(0xFF5C6275),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Dark Cosmos',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                isDark ? FontWeight.w700 : FontWeight.w500,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF5C6275),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => ref
+                      .read(themeModeProvider.notifier)
+                      .setTheme(ThemeMode.light),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: !isDark
+                          ? const Color(0xFF7C3AED).withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.04),
+                      border: Border.all(
+                        color: !isDark
+                            ? const Color(0xFF7C3AED).withValues(alpha: 0.45)
+                            : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.wb_sunny_rounded,
+                          size: 14,
+                          color: !isDark
+                              ? const Color(0xFF7C3AED)
+                              : Colors.white60,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Lucid Light',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                !isDark ? FontWeight.w700 : FontWeight.w500,
+                            color: !isDark
+                                ? const Color(0xFF0F111A)
+                                : Colors.white60,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -231,9 +465,12 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(label,
         style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.35),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.35)
+                : const Color(0xFF5C6275).withValues(alpha: 0.8),
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.8));
@@ -263,14 +500,24 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.white.withValues(alpha: 0.85),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.95),
+            width: isDark ? 1.0 : 1.2,
+          ),
+          boxShadow: isDark ? null : AppTheme.lightCardShadow,
         ),
         child: Row(children: [
           Container(
@@ -285,8 +532,8 @@ class _SettingsTile extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F111A),
                       fontSize: 14,
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
@@ -294,7 +541,9 @@ class _SettingsTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.45)
+                          : const Color(0xFF5C6275),
                       fontSize: 11)),
             ]),
           ),
@@ -318,10 +567,10 @@ class _SleepTimerTile extends StatelessWidget {
   final WidgetRef ref;
 
   String _formatDuration(Duration? d) {
-    if (d == null) return '';
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '${d.inHours > 0 ? '${d.inHours}:' : ''}$m:$s';
+    if (d == null) return '0:00';
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -374,6 +623,7 @@ class _ProfileQuickTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatarPath = profile?.avatarPath;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => EditProfileSheet.show(context),
@@ -381,8 +631,16 @@ class _ProfileQuickTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.white.withValues(alpha: 0.85),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.95),
+            width: isDark ? 1.0 : 1.2,
+          ),
+          boxShadow: isDark ? null : AppTheme.lightCardShadow,
         ),
         child: Row(children: [
           Container(
@@ -411,8 +669,8 @@ class _ProfileQuickTile extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(profile?.displayName ?? 'Music Lover',
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F111A),
                       fontSize: 14,
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
@@ -420,13 +678,18 @@ class _ProfileQuickTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.45)
+                          : const Color(0xFF5C6275),
                       fontSize: 11)),
             ]),
           ),
           const SizedBox(width: 10),
           Icon(Icons.edit_rounded,
-              color: Colors.white.withValues(alpha: 0.3), size: 18),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : const Color(0xFF5C6275),
+              size: 18),
         ]),
       ),
     );
@@ -437,7 +700,6 @@ class _ProfileQuickTile extends StatelessWidget {
 // Lyrics Settings Tile
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Simple notifier-backed provider for the auto-fetch toggle
 class AutoFetchLyricsNotifier extends Notifier<bool> {
   @override
   bool build() => true;
@@ -454,6 +716,7 @@ class _LyricsTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final autoFetch = ref.watch(autoFetchLyricsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(children: [
       // Auto-fetch toggle
@@ -461,8 +724,16 @@ class _LyricsTile extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.white.withValues(alpha: 0.85),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.95),
+            width: isDark ? 1.0 : 1.2,
+          ),
+          boxShadow: isDark ? null : AppTheme.lightCardShadow,
         ),
         child: Row(children: [
           Container(
@@ -475,16 +746,20 @@ class _LyricsTile extends ConsumerWidget {
                 color: Color(0xFF3B82F6), size: 18),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Auto-Fetch Synced Lyrics',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: isDark ? Colors.white : const Color(0xFF0F111A),
                       fontSize: 14,
                       fontWeight: FontWeight.w600)),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text('Fetch LRC lyrics automatically on playback',
-                  style: TextStyle(color: Color(0x66FFFFFF), fontSize: 11)),
+                  style: TextStyle(
+                      color: isDark
+                          ? const Color(0x66FFFFFF)
+                          : const Color(0xFF5C6275),
+                      fontSize: 11)),
             ]),
           ),
           const SizedBox(width: 10),
@@ -505,31 +780,42 @@ class _LyricsTile extends ConsumerWidget {
         iconColor: const Color(0xFFFF758F),
         title: 'Clear Lyrics Cache',
         subtitle: 'Remove all cached lyrics from database',
-        trailingWidget:
-            Icon(Icons.chevron_right_rounded,
-                color: Colors.white.withValues(alpha: 0.25), size: 20),
+        trailingWidget: Icon(Icons.chevron_right_rounded,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.25)
+                : const Color(0xFF5C6275),
+            size: 20),
         onTap: () => _clearLyricsCache(context, ref),
       ),
     ]);
   }
 
   void _clearLyricsCache(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF12101E),
+        backgroundColor: isDark ? const Color(0xFF12101E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Clear Lyrics Cache',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        title: Text('Clear Lyrics Cache',
+            style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F111A),
+                fontWeight: FontWeight.w700)),
         content: Text(
             'This will remove all stored lyrics. They will be re-fetched when songs play.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6))),
+            style: TextStyle(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.6)
+                    : const Color(0xFF5C6275))),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text('Cancel',
-                  style:
-                      TextStyle(color: Colors.white.withValues(alpha: 0.5)))),
+                  style: TextStyle(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : const Color(0xFF5C6275)))),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -564,20 +850,23 @@ class _VersionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF8B5CF6).withValues(alpha: 0.08),
-            const Color(0xFFFF758F).withValues(alpha: 0.04),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.white.withValues(alpha: 0.85),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF8B5CF6).withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.95),
+          width: isDark ? 1.0 : 1.2,
         ),
-        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.18)),
+        boxShadow: isDark ? null : AppTheme.lightCardShadow,
       ),
       child: Column(children: [
         // Animated spinning logo
@@ -604,16 +893,18 @@ class _VersionBadge extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Text('Spinora Music',
+        Text('Spinora Music',
             style: TextStyle(
-                color: Colors.white,
+                color: isDark ? Colors.white : const Color(0xFF0F111A),
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5)),
         const SizedBox(height: 4),
         Text('by SpideyTech • v$version',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : const Color(0xFF5C6275),
                 fontSize: 12)),
         const SizedBox(height: 12),
         Container(

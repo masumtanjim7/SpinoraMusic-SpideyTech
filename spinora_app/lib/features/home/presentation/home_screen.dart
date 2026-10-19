@@ -65,10 +65,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final profile = profileAsync.value;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08070F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          _buildAmbientBlobs(),
+          _buildAmbientBlobs(context),
           SafeArea(
             child: Column(
               children: [
@@ -95,7 +95,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildAmbientBlobs() {
+  Widget _buildAmbientBlobs(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Stack(children: [
       Positioned(
           top: -40,
@@ -106,7 +108,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.18),
+                    (isDark ? const Color(0xFF8B5CF6) : const Color(0xFF7C3AED))
+                        .withValues(alpha: isDark ? 0.18 : 0.08),
                     Colors.transparent
                   ])))),
       Positioned(
@@ -118,7 +121,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
-                    const Color(0xFFFF758F).withValues(alpha: 0.12),
+                    (isDark ? const Color(0xFFFF758F) : const Color(0xFFFF85A1))
+                        .withValues(alpha: isDark ? 0.12 : 0.07),
                     Colors.transparent
                   ])))),
       Positioned(
@@ -130,7 +134,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
-                    const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                    (isDark ? const Color(0xFF3B82F6) : const Color(0xFF60A5FA))
+                        .withValues(alpha: isDark ? 0.1 : 0.06),
                     Colors.transparent
                   ])))),
     ]);
@@ -158,6 +163,8 @@ class _TopHeader extends ConsumerWidget {
     final name = profile?.displayName ?? 'Music Lover';
     final tt = Theme.of(context).textTheme;
     final avatarPath = profile?.avatarPath;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 16, 0),
@@ -191,11 +198,15 @@ class _TopHeader extends ConsumerWidget {
         const Spacer(),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(_greeting(),
-              style: tt.labelSmall
-                  ?.copyWith(color: Colors.white.withValues(alpha: 0.45))),
+              style: tt.labelSmall?.copyWith(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.45)
+                      : const Color(0xFF5C6275))),
           Text(name,
-              style: tt.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
+              style: tt.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: isDark ? Colors.white : const Color(0xFF0F111A))),
         ]),
         const SizedBox(width: 12),
         GestureDetector(
@@ -269,6 +280,11 @@ class _DashboardBody extends ConsumerWidget {
     }
     final topArtists = artistMap.values.take(8).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark
+        ? Colors.white.withValues(alpha: 0.4)
+        : const Color(0xFF5C6275);
+
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(0, 20, 0, hasMiniplayer ? 110 : 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -296,7 +312,7 @@ class _DashboardBody extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text('SMART PICKS',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: labelColor,
                   letterSpacing: 1.6,
                   fontWeight: FontWeight.w700)),
         ),
@@ -341,7 +357,7 @@ class _DashboardBody extends ConsumerWidget {
               Expanded(
                 child: Text('YOUR ROTATION',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: labelColor,
                         letterSpacing: 1.6,
                         fontWeight: FontWeight.w700)),
               ),
@@ -366,7 +382,7 @@ class _DashboardBody extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('ARTISTS IN YOUR ORBIT',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: labelColor,
                     letterSpacing: 1.6,
                     fontWeight: FontWeight.w700)),
           ),
@@ -381,7 +397,7 @@ class _DashboardBody extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('RECENTLY PLAYED',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: labelColor,
                     letterSpacing: 1.6,
                     fontWeight: FontWeight.w700)),
           ),
@@ -1121,7 +1137,9 @@ class _ArtistsOrbitRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : const Color(0xFF5C6275),
                           fontSize: 10,
                           fontWeight: FontWeight.w500)),
                 ),
@@ -1146,6 +1164,7 @@ class _RecentList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tt = Theme.of(context).textTheme;
     final display = songs.take(8).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: display.map((s) {
@@ -1166,12 +1185,21 @@ class _RecentList extends ConsumerWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: isCurrentTrack
-                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.04),
+                    ? const Color(0xFF8B5CF6).withValues(alpha: isDark ? 0.12 : 0.10)
+                    : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.85)),
                 border: Border.all(
                     color: isCurrentTrack
                         ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
-                        : Colors.white.withValues(alpha: 0.07)),
+                        : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white.withValues(alpha: 0.9))),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
               ),
               child: Row(children: [
                 SongArtwork.fromSong(s,
@@ -1187,13 +1215,15 @@ class _RecentList extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: tt.bodyMedium?.copyWith(
-                                color: Colors.white,
+                                color: isDark ? Colors.white : const Color(0xFF0F111A),
                                 fontWeight: FontWeight.w600)),
                         Text(s.artist,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: tt.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.5))),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.5)
+                                    : const Color(0xFF5C6275))),
                       ]),
                 ),
                 if (isCurrentTrack)
@@ -1201,7 +1231,10 @@ class _RecentList extends ConsumerWidget {
                       color: Color(0xFF8B5CF6), size: 18)
                 else
                   Icon(Icons.play_circle_outline_rounded,
-                      color: Colors.white.withValues(alpha: 0.3), size: 20),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.3)
+                          : const Color(0xFF5C6275).withValues(alpha: 0.6),
+                      size: 20),
               ]),
             ),
           ),
@@ -1225,11 +1258,29 @@ class _GlassBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0C18).withValues(alpha: 0.92),
-        border:
-            Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
+        color: isDark
+            ? const Color(0xFF0D0C18).withValues(alpha: 0.92)
+            : Colors.white.withValues(alpha: 0.92),
+        border: Border(
+          top: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : const Color(0xFF0F111A).withValues(alpha: 0.08),
+          ),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
       ),
       child: SafeArea(
         top: false,
@@ -1285,6 +1336,12 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor =
+        isDark ? const Color(0xFF8B5CF6) : const Color(0xFF7C3AED);
+    final inactiveColor =
+        isDark ? Colors.white.withValues(alpha: 0.4) : const Color(0xFF5C6275);
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -1297,23 +1354,19 @@ class _NavItem extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: isActive
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.2)
+                  ? activeColor.withValues(alpha: isDark ? 0.2 : 0.12)
                   : Colors.transparent,
             ),
             child: Icon(icon,
                 size: 22,
-                color: isActive
-                    ? const Color(0xFF8B5CF6)
-                    : Colors.white.withValues(alpha: 0.4)),
+                color: isActive ? activeColor : inactiveColor),
           ),
           const SizedBox(height: 2),
           Text(label,
               style: TextStyle(
                   fontSize: 10,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  color: isActive
-                      ? const Color(0xFF8B5CF6)
-                      : Colors.white.withValues(alpha: 0.4))),
+                  color: isActive ? activeColor : inactiveColor)),
         ]),
       ),
     );

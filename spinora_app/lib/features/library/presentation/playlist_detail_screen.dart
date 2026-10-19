@@ -26,7 +26,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Ambient neon glow orbs behind header

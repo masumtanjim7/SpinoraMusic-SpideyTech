@@ -58,13 +58,14 @@ class SmartMixDetailScreen extends ConsumerWidget {
     final playerState = ref.watch(playerControllerProvider);
     final hasMiniplayer = playerState.hasTrack;
     final currentTrackId = playerState.currentTrack?.id;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08070F),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Background ambient gradient blobs
-          _buildAmbientBlobs(),
+          _buildAmbientBlobs(context),
 
           // Main scroll view
           CustomScrollView(
@@ -75,7 +76,7 @@ class SmartMixDetailScreen extends ConsumerWidget {
                 expandedHeight: 290,
                 pinned: true,
                 elevation: 0,
-                backgroundColor: const Color(0xFF08070F),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 leading: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: GestureDetector(
@@ -83,12 +84,26 @@ class SmartMixDetailScreen extends ConsumerWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF08070F).withValues(alpha: 0.65),
+                        color: isDark
+                            ? const Color(0xFF08070F).withValues(alpha: 0.65)
+                            : Colors.white.withValues(alpha: 0.85),
                         border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.18)),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.18)
+                                : Colors.white.withValues(alpha: 0.9)),
+                        boxShadow: isDark
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white, size: 16),
+                      child: Icon(Icons.arrow_back_ios_new_rounded,
+                          color: isDark ? Colors.white : const Color(0xFF0F111A),
+                          size: 16),
                     ),
                   ),
                 ),
@@ -256,21 +271,39 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                     const EdgeInsets.symmetric(vertical: 14),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
-                                  color: Colors.white.withValues(alpha: 0.06),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.06)
+                                      : Colors.white.withValues(alpha: 0.85),
                                   border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.15)),
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.15)
+                                          : Colors.white.withValues(alpha: 0.9)),
+                                  boxShadow: isDark
+                                      ? null
+                                      : [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.05),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.shuffle_rounded,
-                                        color: Colors.white, size: 18),
-                                    SizedBox(width: 6),
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F111A),
+                                        size: 18),
+                                    const SizedBox(width: 6),
                                     Text(
                                       'Shuffle Mix',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F111A),
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
                                       ),
@@ -294,7 +327,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                   .textTheme
                                   .labelSmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.45),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.45)
+                                        : const Color(0xFF5C6275),
                                     letterSpacing: 1.6,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -325,9 +360,22 @@ class SmartMixDetailScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        color: Colors.white.withValues(alpha: 0.04),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.white.withValues(alpha: 0.85),
                         border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08)),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.white.withValues(alpha: 0.9)),
+                        boxShadow: isDark
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
                       child: Column(
                         children: [
@@ -335,10 +383,12 @@ class SmartMixDetailScreen extends ConsumerWidget {
                               color: mix.accentColor.withValues(alpha: 0.5),
                               size: 40),
                           const SizedBox(height: 14),
-                          const Text(
+                          Text(
                             'No songs in this mix yet',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F111A),
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
@@ -348,7 +398,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             'Scan your local music files or play tracks to populate ${mix.title}.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.5)
+                                  : const Color(0xFF5C6275),
                               fontSize: 12,
                             ),
                           ),
@@ -387,13 +439,27 @@ class SmartMixDetailScreen extends ConsumerWidget {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 color: isPlayingThis
-                                    ? mix.accentColor.withValues(alpha: 0.12)
-                                    : Colors.white.withValues(alpha: 0.03),
+                                    ? mix.accentColor.withValues(alpha: isDark ? 0.12 : 0.10)
+                                    : (isDark
+                                        ? Colors.white.withValues(alpha: 0.03)
+                                        : Colors.white.withValues(alpha: 0.85)),
                                 border: Border.all(
                                   color: isPlayingThis
                                       ? mix.accentColor.withValues(alpha: 0.35)
-                                      : Colors.white.withValues(alpha: 0.06),
+                                      : (isDark
+                                          ? Colors.white.withValues(alpha: 0.06)
+                                          : Colors.white.withValues(alpha: 0.9)),
                                 ),
+                                boxShadow: isDark
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.04),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
                               ),
                               child: Row(
                                 children: [
@@ -406,8 +472,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                         : Text(
                                             '${index + 1}',
                                             style: TextStyle(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.35),
+                                              color: isDark
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.35)
+                                                  : const Color(0xFF5C6275),
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -436,7 +504,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                           style: TextStyle(
                                             color: isPlayingThis
                                                 ? mix.accentColor
-                                                : Colors.white,
+                                                : (isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF0F111A)),
                                             fontSize: 14,
                                             fontWeight: isPlayingThis
                                                 ? FontWeight.w700
@@ -449,8 +519,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.5),
+                                            color: isDark
+                                                ? Colors.white
+                                                    .withValues(alpha: 0.5)
+                                                : const Color(0xFF5C6275),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -466,8 +538,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                       Text(
                                         _formatDuration(song.duration),
                                         style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.4),
+                                          color: isDark
+                                              ? Colors.white
+                                                  .withValues(alpha: 0.4)
+                                              : const Color(0xFF5C6275),
                                           fontSize: 12,
                                         ),
                                       ),
@@ -479,14 +553,19 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                           decoration: BoxDecoration(
                                             borderRadius:
                                                 BorderRadius.circular(8),
-                                            color: Colors.white
-                                                .withValues(alpha: 0.06),
+                                            color: isDark
+                                                ? Colors.white
+                                                    .withValues(alpha: 0.06)
+                                                : Colors.black
+                                                    .withValues(alpha: 0.05),
                                           ),
                                           child: Text(
                                             '${song.playCount} plays',
                                             style: TextStyle(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.45),
+                                              color: isDark
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.45)
+                                                  : const Color(0xFF5C6275),
                                               fontSize: 10,
                                             ),
                                           ),
@@ -527,7 +606,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAmbientBlobs() {
+  Widget _buildAmbientBlobs(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Stack(children: [
       Positioned(
         top: -60,
@@ -539,7 +620,7 @@ class SmartMixDetailScreen extends ConsumerWidget {
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                mix.accentColor.withValues(alpha: 0.22),
+                mix.accentColor.withValues(alpha: isDark ? 0.22 : 0.08),
                 Colors.transparent,
               ],
             ),
@@ -556,7 +637,7 @@ class SmartMixDetailScreen extends ConsumerWidget {
             shape: BoxShape.circle,
             gradient: RadialGradient(
               colors: [
-                mix.secondaryColor.withValues(alpha: 0.15),
+                mix.secondaryColor.withValues(alpha: isDark ? 0.15 : 0.06),
                 Colors.transparent,
               ],
             ),
