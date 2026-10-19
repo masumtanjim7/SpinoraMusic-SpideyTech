@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../application/player_controller.dart';
 import '../../domain/equalizer_state.dart';
 
@@ -32,20 +33,27 @@ class EqualizerSheet extends ConsumerWidget {
     final controller = ref.read(playerControllerProvider.notifier);
     final tt = Theme.of(context).textTheme;
     final isEqEnabled = playerState.equalizerEnabled;
+    final isLight = context.isLight;
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A12).withValues(alpha: 0.96),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : const Color(0xFF0A0A12).withValues(alpha: 0.96),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.75),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.75),
             blurRadius: 36,
             spreadRadius: 4,
           ),
@@ -69,7 +77,9 @@ class EqualizerSheet extends ConsumerWidget {
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -88,12 +98,14 @@ class EqualizerSheet extends ConsumerWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.cyanAccent.withValues(
-                            alpha: isEqEnabled ? 0.2 : 0.08,
+                            alpha: isEqEnabled ? 0.2 : (isLight ? 0.08 : 0.08),
                           ),
                           border: Border.all(
                             color: isEqEnabled
                                 ? AppColors.cyanAccent.withValues(alpha: 0.6)
-                                : Colors.white.withValues(alpha: 0.1),
+                                : (isLight
+                                    ? Colors.black.withValues(alpha: 0.08)
+                                    : Colors.white.withValues(alpha: 0.1)),
                           ),
                         ),
                         child: Icon(
@@ -101,7 +113,7 @@ class EqualizerSheet extends ConsumerWidget {
                           size: 20,
                           color: isEqEnabled
                               ? AppColors.cyanAccent
-                              : Colors.white60,
+                              : context.secondaryText,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -113,7 +125,7 @@ class EqualizerSheet extends ConsumerWidget {
                             Text(
                               'AUDIO EQUALIZER',
                               style: tt.titleMedium?.copyWith(
-                                color: Colors.white,
+                                color: context.primaryText,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.4,
                               ),
@@ -127,8 +139,10 @@ class EqualizerSheet extends ConsumerWidget {
                                   : 'Disabled • Hardware Bypass',
                               style: tt.bodySmall?.copyWith(
                                 color: isEqEnabled
-                                    ? AppColors.cyanAccent
-                                    : Colors.white38,
+                                    ? (isLight
+                                        ? const Color(0xFF0D9488)
+                                        : AppColors.cyanAccent)
+                                    : context.secondaryText,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -150,14 +164,16 @@ class EqualizerSheet extends ConsumerWidget {
                   activeThumbColor: AppColors.cyanAccent,
                   activeTrackColor:
                       AppColors.cyanAccent.withValues(alpha: 0.35),
-                  inactiveThumbColor: Colors.white38,
-                  inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
+                  inactiveThumbColor: isLight ? Colors.black38 : Colors.white38,
+                  inactiveTrackColor: isLight
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.08),
                 ),
 
                 // Dismiss Button
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  icon: Icon(Icons.close_rounded, color: context.secondaryText),
                   tooltip: 'Close',
                 ),
               ],
@@ -168,7 +184,7 @@ class EqualizerSheet extends ConsumerWidget {
             Text(
               'PRESETS',
               style: tt.bodySmall?.copyWith(
-                color: Colors.white54,
+                color: context.secondaryText,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
                 fontSize: 10,
@@ -199,20 +215,26 @@ class EqualizerSheet extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.cyanAccent.withValues(alpha: 0.18)
-                              : Colors.white.withValues(alpha: 0.05),
+                              ? AppColors.cyanAccent.withValues(
+                                  alpha: isLight ? 0.16 : 0.18,
+                                )
+                              : (isLight
+                                  ? Colors.black.withValues(alpha: 0.03)
+                                  : Colors.white.withValues(alpha: 0.05)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.cyanAccent.withValues(alpha: 0.7)
-                                : Colors.white.withValues(alpha: 0.1),
+                                : (isLight
+                                    ? Colors.black.withValues(alpha: 0.06)
+                                    : Colors.white.withValues(alpha: 0.1)),
                             width: isSelected ? 1.4 : 1.0,
                           ),
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
                                     color: AppColors.cyanAccent.withValues(
-                                      alpha: 0.25,
+                                      alpha: isLight ? 0.2 : 0.25,
                                     ),
                                     blurRadius: 10,
                                     spreadRadius: 1,
@@ -238,8 +260,10 @@ class EqualizerSheet extends ConsumerWidget {
                               preset.displayName,
                               style: TextStyle(
                                 color: isSelected
-                                    ? AppColors.cyanAccent
-                                    : Colors.white70,
+                                    ? (isLight
+                                        ? const Color(0xFF0D9488)
+                                        : AppColors.cyanAccent)
+                                    : context.primaryText,
                                 fontWeight: isSelected
                                     ? FontWeight.w700
                                     : FontWeight.w500,
@@ -260,12 +284,16 @@ class EqualizerSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.03)
+                    : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isEqEnabled
                       ? AppColors.cyanAccent.withValues(alpha: 0.2)
-                      : Colors.white.withValues(alpha: 0.08),
+                      : (isLight
+                          ? Colors.black.withValues(alpha: 0.06)
+                          : Colors.white.withValues(alpha: 0.08)),
                 ),
               ),
               child: Column(
@@ -282,14 +310,14 @@ class EqualizerSheet extends ConsumerWidget {
                               size: 16,
                               color: isEqEnabled
                                   ? AppColors.cyanAccent
-                                  : Colors.white38,
+                                  : context.secondaryText,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 '5-BAND GRAPHIC EQUALIZER',
                                 style: tt.bodySmall?.copyWith(
-                                  color: Colors.white70,
+                                  color: context.primaryText,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.0,
                                   fontSize: 10,
@@ -304,7 +332,7 @@ class EqualizerSheet extends ConsumerWidget {
                       Text(
                         '±15 dB',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: context.secondaryText,
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
@@ -335,9 +363,11 @@ class EqualizerSheet extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                                 color: isEqEnabled
                                     ? (isNonZero
-                                        ? AppColors.cyanAccent
-                                        : Colors.white70)
-                                    : Colors.white38,
+                                        ? (isLight
+                                            ? const Color(0xFF0D9488)
+                                            : AppColors.cyanAccent)
+                                        : context.primaryText)
+                                    : context.secondaryText,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -352,14 +382,17 @@ class EqualizerSheet extends ConsumerWidget {
                                     trackHeight: 3.5,
                                     activeTrackColor: isEqEnabled
                                         ? AppColors.cyanAccent
-                                        : Colors.white24,
-                                    inactiveTrackColor: Colors.white
-                                        .withValues(alpha: 0.08),
+                                        : (isLight ? Colors.black26 : Colors.white24),
+                                    inactiveTrackColor: isLight
+                                        ? Colors.black.withValues(alpha: 0.08)
+                                        : Colors.white.withValues(alpha: 0.08),
                                     thumbColor: isEqEnabled
                                         ? (isNonZero
                                             ? AppColors.cyanAccent
-                                            : Colors.white)
-                                        : Colors.white38,
+                                            : (isLight
+                                                ? context.primaryText
+                                                : Colors.white))
+                                        : (isLight ? Colors.black26 : Colors.white38),
                                     overlayColor: AppColors.cyanAccent
                                         .withValues(alpha: 0.15),
                                     thumbShape:
@@ -398,8 +431,8 @@ class EqualizerSheet extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.3,
                                 color: isEqEnabled
-                                    ? Colors.white
-                                    : Colors.white38,
+                                    ? context.primaryText
+                                    : context.secondaryText,
                               ),
                             ),
                           ],
@@ -416,12 +449,16 @@ class EqualizerSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.03)
+                    : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: playerState.loudnessGain > 0
                       ? AppColors.purpleAccent.withValues(alpha: 0.35)
-                      : Colors.white.withValues(alpha: 0.08),
+                      : (isLight
+                          ? Colors.black.withValues(alpha: 0.06)
+                          : Colors.white.withValues(alpha: 0.08)),
                 ),
               ),
               child: Column(
@@ -439,8 +476,8 @@ class EqualizerSheet extends ConsumerWidget {
                                 shape: BoxShape.circle,
                                 color: AppColors.purpleAccent.withValues(
                                   alpha: playerState.loudnessGain > 0
-                                      ? 0.2
-                                      : 0.08,
+                                      ? (isLight ? 0.16 : 0.2)
+                                      : (isLight ? 0.06 : 0.08),
                                 ),
                               ),
                               child: Icon(
@@ -448,7 +485,7 @@ class EqualizerSheet extends ConsumerWidget {
                                 size: 18,
                                 color: playerState.loudnessGain > 0
                                     ? AppColors.purpleAccent
-                                    : Colors.white60,
+                                    : context.secondaryText,
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -460,7 +497,7 @@ class EqualizerSheet extends ConsumerWidget {
                                   Text(
                                     'BASS & LOUDNESS BOOST',
                                     style: tt.bodySmall?.copyWith(
-                                      color: Colors.white,
+                                      color: context.primaryText,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 1.0,
                                       fontSize: 11,
@@ -472,7 +509,7 @@ class EqualizerSheet extends ConsumerWidget {
                                   Text(
                                     'Native Hardware LoudnessEnhancer',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.4),
+                                      color: context.secondaryText,
                                       fontSize: 9.5,
                                     ),
                                     maxLines: 1,
@@ -494,13 +531,19 @@ class EqualizerSheet extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: playerState.loudnessGain > 0
-                              ? AppColors.purpleAccent.withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: 0.06),
+                              ? AppColors.purpleAccent.withValues(
+                                  alpha: isLight ? 0.14 : 0.2,
+                                )
+                              : (isLight
+                                  ? Colors.black.withValues(alpha: 0.04)
+                                  : Colors.white.withValues(alpha: 0.06)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: playerState.loudnessGain > 0
                                 ? AppColors.purpleAccent.withValues(alpha: 0.6)
-                                : Colors.white.withValues(alpha: 0.1),
+                                : (isLight
+                                    ? Colors.black.withValues(alpha: 0.08)
+                                    : Colors.white.withValues(alpha: 0.1)),
                           ),
                         ),
                         child: Text(
@@ -512,7 +555,7 @@ class EqualizerSheet extends ConsumerWidget {
                             fontWeight: FontWeight.w800,
                             color: playerState.loudnessGain > 0
                                 ? AppColors.purpleAccent
-                                : Colors.white54,
+                                : context.secondaryText,
                           ),
                         ),
                       ),
@@ -525,8 +568,9 @@ class EqualizerSheet extends ConsumerWidget {
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 4,
                       activeTrackColor: AppColors.purpleAccent,
-                      inactiveTrackColor:
-                          Colors.white.withValues(alpha: 0.08),
+                      inactiveTrackColor: isLight
+                          ? Colors.black.withValues(alpha: 0.08)
+                          : Colors.white.withValues(alpha: 0.08),
                       thumbColor: AppColors.purpleAccent,
                       overlayColor:
                           AppColors.purpleAccent.withValues(alpha: 0.15),
@@ -555,14 +599,14 @@ class EqualizerSheet extends ConsumerWidget {
                         '0 dB (Bypass)',
                         style: TextStyle(
                           fontSize: 9.5,
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: context.secondaryText,
                         ),
                       ),
                       Text(
                         '+5.0 dB',
                         style: TextStyle(
                           fontSize: 9.5,
-                          color: Colors.white.withValues(alpha: 0.25),
+                          color: context.secondaryText,
                         ),
                       ),
                       Text(
@@ -587,15 +631,15 @@ class EqualizerSheet extends ConsumerWidget {
                   controller.applyPreset(EqualizerPreset.flat);
                   controller.setLoudnessGain(0.0);
                 },
-                icon: const Icon(
+                icon: Icon(
                   Icons.restart_alt_rounded,
                   size: 16,
-                  color: Colors.white60,
+                  color: context.secondaryText,
                 ),
-                label: const Text(
+                label: Text(
                   'Reset Equalizer to Flat',
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: context.secondaryText,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),

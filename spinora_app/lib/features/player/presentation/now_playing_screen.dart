@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/audio/track.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
@@ -12,7 +13,7 @@ import 'widgets/audio_tools_sheets.dart';
 import 'widgets/lyrics_view.dart';
 import 'widgets/up_next_queue_sheet.dart';
 
-/// Full-screen dark glassmorphic Now Playing modal sheet.
+/// Full-screen glassmorphic Now Playing modal sheet.
 class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
 
@@ -34,6 +35,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
 
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
     final totalDurationMs = playerState.duration.inMilliseconds;
     final currentPositionMs = _dragPosition?.toInt() ??
         playerState.position.inMilliseconds.clamp(0, totalDurationMs);
@@ -45,10 +47,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final artSize = (shortest * 0.65).clamp(160.0, 320.0);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Dual ambient neon glow blobs behind artwork
+          // Dual ambient glow blobs behind artwork
           Positioned(
             top: 60,
             left: screenSize.width * 0.05,
@@ -61,7 +63,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 gradient: RadialGradient(
                   colors: [
                     AppColors.purpleAccent.withValues(
-                      alpha: playerState.isPlaying ? 0.45 : 0.25,
+                      alpha: isLight
+                          ? (playerState.isPlaying ? 0.22 : 0.12)
+                          : (playerState.isPlaying ? 0.45 : 0.25),
                     ),
                     Colors.transparent,
                   ],
@@ -80,8 +84,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.cyanAccent.withValues(
-                      alpha: playerState.isPlaying ? 0.35 : 0.18,
+                    (isLight ? AppColors.lightAccent : AppColors.cyanAccent)
+                        .withValues(
+                      alpha: isLight
+                          ? (playerState.isPlaying ? 0.18 : 0.08)
+                          : (playerState.isPlaying ? 0.35 : 0.18),
                     ),
                     Colors.transparent,
                   ],
@@ -113,9 +120,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             children: [
                               IconButton(
                                 onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.keyboard_arrow_down_rounded,
-                                  color: Colors.white,
+                                  color: context.primaryText,
                                   size: 32,
                                 ),
                                 tooltip: 'Dismiss',
@@ -123,7 +130,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               Text(
                                 'NOW PLAYING',
                                 style: tt.labelMedium?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: context.secondaryText,
                                   letterSpacing: 2.5,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -138,7 +145,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       : Icons.favorite_border_rounded,
                                   color: track.isFavorite
                                       ? Colors.pinkAccent
-                                      : Colors.white.withValues(alpha: 0.7),
+                                      : context.secondaryText,
                                   size: 26,
                                 ),
                                 tooltip: track.isFavorite
@@ -198,35 +205,52 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(36),
                                               border: Border.all(
-                                                color: Colors.white.withValues(
-                                                  alpha: playerState.isPlaying
-                                                      ? 0.22
-                                                      : 0.10,
-                                                ),
+                                                color: isLight
+                                                    ? Colors.white
+                                                    : Colors.white.withValues(
+                                                        alpha: playerState.isPlaying
+                                                            ? 0.22
+                                                            : 0.10,
+                                                      ),
                                                 width: 1.5,
                                               ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: AppColors.purpleAccent
-                                                      .withValues(
-                                                    alpha: playerState.isPlaying
-                                                        ? 0.40
-                                                        : 0.18,
-                                                  ),
-                                                  blurRadius: 44,
-                                                  spreadRadius: 2,
-                                                ),
-                                                BoxShadow(
-                                                  color: AppColors.cyanAccent
-                                                      .withValues(
-                                                    alpha: playerState.isPlaying
-                                                        ? 0.25
-                                                        : 0.10,
-                                                  ),
-                                                  blurRadius: 28,
-                                                  offset: const Offset(0, 10),
-                                                ),
-                                              ],
+                                              boxShadow: isLight
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: AppColors.purpleAccent
+                                                            .withValues(alpha: 0.18),
+                                                        blurRadius: 36,
+                                                        spreadRadius: 1,
+                                                      ),
+                                                      BoxShadow(
+                                                        color: Colors.black
+                                                            .withValues(alpha: 0.05),
+                                                        blurRadius: 20,
+                                                        offset: const Offset(0, 8),
+                                                      ),
+                                                    ]
+                                                  : [
+                                                      BoxShadow(
+                                                        color: AppColors.purpleAccent
+                                                            .withValues(
+                                                          alpha: playerState.isPlaying
+                                                              ? 0.40
+                                                              : 0.18,
+                                                        ),
+                                                        blurRadius: 44,
+                                                        spreadRadius: 2,
+                                                      ),
+                                                      BoxShadow(
+                                                        color: AppColors.cyanAccent
+                                                            .withValues(
+                                                          alpha: playerState.isPlaying
+                                                              ? 0.25
+                                                              : 0.10,
+                                                        ),
+                                                        blurRadius: 28,
+                                                        offset: const Offset(0, 10),
+                                                      ),
+                                                    ],
                                             ),
                                             child: GlassCard(
                                               width: artSize,
@@ -239,7 +263,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                                 width: double.infinity,
                                                 height: double.infinity,
                                                 borderRadius:
-                                                  BorderRadius.circular(24),
+                                                    BorderRadius.circular(24),
                                                 isCurrent: playerState.isPlaying,
                                                 iconSize: 72,
                                                 heroTag:
@@ -266,7 +290,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: tt.headlineSmall?.copyWith(
-                                    color: Colors.white,
+                                    color: context.primaryText,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: -0.3,
                                   ),
@@ -280,7 +304,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: tt.bodyMedium?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.65),
+                                    color: context.secondaryText,
                                   ),
                                 ),
                               ),
@@ -298,10 +322,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.07),
+                                      color: isLight
+                                          ? Colors.black.withValues(alpha: 0.04)
+                                          : Colors.white.withValues(alpha: 0.07),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.12),
+                                        color: isLight
+                                            ? Colors.black.withValues(alpha: 0.08)
+                                            : Colors.white.withValues(alpha: 0.12),
                                       ),
                                     ),
                                     child: Row(
@@ -312,7 +340,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                               ? Icons.music_note_rounded
                                               : Icons.cloud_rounded,
                                           size: 13,
-                                          color: AppColors.cyanAccent,
+                                          color: context.primaryAccent,
                                         ),
                                         const SizedBox(width: 5),
                                         Text(
@@ -320,8 +348,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                               ? 'LOCAL AUDIO'
                                               : 'STREAMING',
                                           style: tt.labelSmall?.copyWith(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.85),
+                                            color: context.secondaryText,
                                             fontWeight: FontWeight.w700,
                                             letterSpacing: 0.8,
                                             fontSize: 10,
@@ -345,15 +372,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                       decoration: BoxDecoration(
                                         color: track.isFavorite
                                             ? Colors.pinkAccent
-                                                .withValues(alpha: 0.18)
-                                            : Colors.white.withValues(alpha: 0.06),
+                                                .withValues(alpha: isLight ? 0.12 : 0.18)
+                                            : (isLight
+                                                ? Colors.black.withValues(alpha: 0.04)
+                                                : Colors.white.withValues(alpha: 0.06)),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: track.isFavorite
                                               ? Colors.pinkAccent
                                                   .withValues(alpha: 0.45)
-                                              : Colors.white
-                                                  .withValues(alpha: 0.12),
+                                              : (isLight
+                                                  ? Colors.black.withValues(alpha: 0.08)
+                                                  : Colors.white.withValues(alpha: 0.12)),
                                         ),
                                       ),
                                       child: Row(
@@ -361,13 +391,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         children: [
                                           Icon(
                                             track.isFavorite
-                                                ? Icons.favorite_rounded
-                                                : Icons.favorite_border_rounded,
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
                                             size: 13,
                                             color: track.isFavorite
                                                 ? Colors.pinkAccent
-                                                : Colors.white
-                                                    .withValues(alpha: 0.6),
+                                                : context.secondaryText,
                                           ),
                                           const SizedBox(width: 5),
                                           Text(
@@ -377,8 +406,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                             style: tt.labelSmall?.copyWith(
                                               color: track.isFavorite
                                                   ? Colors.pinkAccent
-                                                  : Colors.white
-                                                      .withValues(alpha: 0.6),
+                                                  : context.secondaryText,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.8,
                                               fontSize: 10,
@@ -396,10 +424,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.06),
+                                        color: isLight
+                                            ? Colors.black.withValues(alpha: 0.04)
+                                            : Colors.white.withValues(alpha: 0.06),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.12),
+                                          color: isLight
+                                              ? Colors.black.withValues(alpha: 0.08)
+                                              : Colors.white.withValues(alpha: 0.12),
                                         ),
                                       ),
                                       child: Row(
@@ -414,8 +446,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                           Text(
                                             'TRACK ${playerState.currentIndex + 1}/${playerState.queue.length}',
                                             style: tt.labelSmall?.copyWith(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.75),
+                                              color: context.secondaryText,
                                               fontWeight: FontWeight.w700,
                                               fontSize: 10,
                                             ),
@@ -443,12 +474,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   overlayShape: const RoundSliderOverlayShape(
                                     overlayRadius: 14,
                                   ),
-                                  activeTrackColor: AppColors.cyanAccent,
-                                  inactiveTrackColor:
-                                      Colors.white.withValues(alpha: 0.12),
-                                  thumbColor: AppColors.cyanAccent,
-                                  overlayColor:
-                                      AppColors.cyanAccent.withValues(alpha: 0.2),
+                                  activeTrackColor: context.primaryAccent,
+                                  inactiveTrackColor: isLight
+                                      ? Colors.black.withValues(alpha: 0.08)
+                                      : Colors.white.withValues(alpha: 0.12),
+                                  thumbColor: context.primaryAccent,
+                                  overlayColor: context.primaryAccent.withValues(alpha: 0.2),
                                 ),
                                 child: Slider(
                                   value: totalDurationMs > 0
@@ -483,13 +514,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     Text(
                                       formatDuration(currentPositionMs),
                                       style: tt.labelSmall?.copyWith(
-                                        color: Colors.white.withValues(alpha: 0.6),
+                                        color: context.secondaryText,
                                       ),
                                     ),
                                     Text(
                                       formatDuration(totalDurationMs),
                                       style: tt.labelSmall?.copyWith(
-                                        color: Colors.white.withValues(alpha: 0.6),
+                                        color: context.secondaryText,
                                       ),
                                     ),
                                   ],
@@ -508,18 +539,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(44),
-                              color: Colors.white.withValues(alpha: 0.06),
+                              color: context.glassTileBg,
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: context.glassTileBorder,
                                 width: 1,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.35),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+                              boxShadow: isLight
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.35),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -532,8 +571,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   icon: Icon(
                                     Icons.shuffle_rounded,
                                     color: playerState.isShuffled
-                                        ? AppColors.cyanAccent
-                                        : Colors.white.withValues(alpha: 0.45),
+                                        ? context.primaryAccent
+                                        : context.secondaryText,
                                     size: 22,
                                   ),
                                   tooltip: playerState.isShuffled
@@ -546,9 +585,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   onPressed: () => ref
                                       .read(playerControllerProvider.notifier)
                                       .previous(),
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.skip_previous_rounded,
-                                    color: Colors.white,
+                                    color: context.primaryText,
                                     size: 32,
                                   ),
                                   tooltip: 'Previous Track',
@@ -560,11 +599,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   height: 66,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: AppColors.purpleGradient,
+                                    gradient: isLight
+                                        ? const LinearGradient(
+                                            colors: [
+                                              Color(0xFF7C3AED),
+                                              Color(0xFFE63946),
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          )
+                                        : AppColors.purpleGradient,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.purpleAccent
-                                            .withValues(alpha: 0.6),
+                                        color: (isLight
+                                                ? const Color(0xFF7C3AED)
+                                                : AppColors.purpleAccent)
+                                            .withValues(alpha: isLight ? 0.35 : 0.6),
                                         blurRadius: 22,
                                         spreadRadius: 2,
                                       ),
@@ -604,8 +654,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     Icons.skip_next_rounded,
                                     color: playerState.hasNext ||
                                             playerState.loopMode == LoopMode.all
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.3),
+                                        ? context.primaryText
+                                        : context.secondaryText.withValues(alpha: 0.3),
                                     size: 32,
                                   ),
                                   tooltip: 'Next Track',
@@ -621,8 +671,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         ? Icons.repeat_one_rounded
                                         : Icons.repeat_rounded,
                                     color: playerState.loopMode != LoopMode.off
-                                        ? AppColors.cyanAccent
-                                        : Colors.white.withValues(alpha: 0.45),
+                                        ? context.primaryAccent
+                                        : context.secondaryText,
                                     size: 22,
                                   ),
                                   tooltip:

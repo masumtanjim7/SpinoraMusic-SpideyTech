@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/audio/track.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/formatters.dart';
@@ -54,6 +55,7 @@ class SleepTimerSheet extends ConsumerWidget {
     final playerState = ref.watch(playerControllerProvider);
     final controller = ref.read(playerControllerProvider.notifier);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     final timerPresets = [
       const _TimerOption(label: '15 Minutes', duration: Duration(minutes: 15)),
@@ -64,17 +66,23 @@ class SleepTimerSheet extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : AppColors.surface.withValues(alpha: 0.96),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.7),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.7),
             blurRadius: 32,
             spreadRadius: 4,
           ),
@@ -95,7 +103,9 @@ class SleepTimerSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -124,7 +134,7 @@ class SleepTimerSheet extends ConsumerWidget {
                   Text(
                     'SLEEP TIMER',
                     style: tt.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: context.primaryText,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
                     ),
@@ -133,7 +143,7 @@ class SleepTimerSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -147,13 +157,18 @@ class SleepTimerSheet extends ConsumerWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.deepPurple.withValues(alpha: 0.5),
-                    Colors.white.withValues(alpha: 0.05),
-                  ],
+                  colors: isLight
+                      ? [
+                          AppColors.cyanAccent.withValues(alpha: 0.12),
+                          Colors.white.withValues(alpha: 0.8),
+                        ]
+                      : [
+                          AppColors.deepPurple.withValues(alpha: 0.5),
+                          Colors.white.withValues(alpha: 0.05),
+                        ],
                 ),
                 border: Border.all(
-                  color: AppColors.purpleAccent.withValues(alpha: 0.5),
+                  color: AppColors.cyanAccent.withValues(alpha: isLight ? 0.4 : 0.5),
                 ),
               ),
               child: Row(
@@ -183,14 +198,14 @@ class SleepTimerSheet extends ConsumerWidget {
                               ? 'Pauses at end of current track'
                               : 'Pausing in ${formatCountdown(playerState.remainingSleepDuration ?? Duration.zero)}',
                           style: tt.titleSmall?.copyWith(
-                            color: Colors.white,
+                            color: context.primaryText,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           'Playback will fade/pause automatically',
                           style: tt.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: context.secondaryText,
                           ),
                         ),
                       ],
@@ -277,6 +292,7 @@ class _TimerOptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return InkWell(
       onTap: onTap,
@@ -286,13 +302,17 @@ class _TimerOptionTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.cyanAccent.withValues(alpha: 0.14)
-              : Colors.white.withValues(alpha: 0.05),
+              ? AppColors.cyanAccent.withValues(alpha: isLight ? 0.16 : 0.14)
+              : (isLight
+                  ? Colors.black.withValues(alpha: 0.03)
+                  : Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? AppColors.cyanAccent.withValues(alpha: 0.6)
-                : Colors.white.withValues(alpha: 0.08),
+                : (isLight
+                    ? Colors.black.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.08)),
             width: isSelected ? 1.4 : 1.0,
           ),
         ),
@@ -304,12 +324,14 @@ class _TimerOptionTile extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isSelected
                     ? AppColors.cyanAccent.withValues(alpha: 0.2)
-                    : Colors.white.withValues(alpha: 0.08),
+                    : (isLight
+                        ? Colors.black.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.08)),
               ),
               child: Icon(
                 icon,
                 size: 20,
-                color: isSelected ? AppColors.cyanAccent : Colors.white70,
+                color: isSelected ? AppColors.cyanAccent : context.secondaryText,
               ),
             ),
             const SizedBox(width: 14),
@@ -320,14 +342,16 @@ class _TimerOptionTile extends StatelessWidget {
                   Text(
                     title,
                     style: tt.bodyLarge?.copyWith(
-                      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                      color: isSelected
+                          ? (isLight ? const Color(0xFF0D9488) : Colors.white)
+                          : context.primaryText,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: tt.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: context.secondaryText,
                     ),
                   ),
                 ],
@@ -358,6 +382,7 @@ class PlaybackSpeedSheet extends ConsumerWidget {
     final playerState = ref.watch(playerControllerProvider);
     final controller = ref.read(playerControllerProvider.notifier);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     final speeds = [
       (0.75, '0.75x', 'Slower tempo'),
@@ -369,14 +394,27 @@ class PlaybackSpeedSheet extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : AppColors.surface.withValues(alpha: 0.96),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.7),
+            blurRadius: 32,
+            spreadRadius: 4,
+          ),
+        ],
       ),
       padding: EdgeInsets.fromLTRB(
         20,
@@ -393,7 +431,9 @@ class PlaybackSpeedSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -422,7 +462,7 @@ class PlaybackSpeedSheet extends ConsumerWidget {
                   Text(
                     'PLAYBACK SPEED',
                     style: tt.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: context.primaryText,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
                     ),
@@ -431,7 +471,7 @@ class PlaybackSpeedSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -440,66 +480,79 @@ class PlaybackSpeedSheet extends ConsumerWidget {
 
           // Options
           for (final (speed, label, desc) in speeds) ...[
-            InkWell(
-              onTap: () {
-                controller.setPlaybackSpeed(speed);
-                Navigator.of(context).pop();
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: (playerState.playbackSpeed - speed).abs() < 0.01
-                      ? AppColors.purpleAccent.withValues(alpha: 0.16)
-                      : Colors.white.withValues(alpha: 0.05),
+            Builder(
+              builder: (context) {
+                final isSelected = (playerState.playbackSpeed - speed).abs() < 0.01;
+                return InkWell(
+                  onTap: () {
+                    controller.setPlaybackSpeed(speed);
+                    Navigator.of(context).pop();
+                  },
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: (playerState.playbackSpeed - speed).abs() < 0.01
-                        ? AppColors.purpleAccent.withValues(alpha: 0.7)
-                        : Colors.white.withValues(alpha: 0.08),
-                    width: (playerState.playbackSpeed - speed).abs() < 0.01 ? 1.4 : 1.0,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.purpleAccent.withValues(alpha: isLight ? 0.16 : 0.16)
+                          : (isLight
+                              ? Colors.black.withValues(alpha: 0.03)
+                              : Colors.white.withValues(alpha: 0.05)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.purpleAccent.withValues(alpha: 0.7)
+                            : (isLight
+                                ? Colors.black.withValues(alpha: 0.06)
+                                : Colors.white.withValues(alpha: 0.08)),
+                        width: isSelected ? 1.4 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isLight
+                                ? (isSelected
+                                    ? AppColors.purpleAccent.withValues(alpha: 0.15)
+                                    : Colors.black.withValues(alpha: 0.05))
+                                : Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            label,
+                            style: tt.labelMedium?.copyWith(
+                              color: isSelected
+                                  ? (isLight ? AppColors.purpleAccent : AppColors.cyanAccent)
+                                  : context.primaryText,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            desc,
+                            style: tt.bodyMedium?.copyWith(
+                              color: context.secondaryText,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.purpleAccent,
+                            size: 20,
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        label,
-                        style: tt.labelMedium?.copyWith(
-                          color: (playerState.playbackSpeed - speed).abs() < 0.01
-                              ? AppColors.cyanAccent
-                              : Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        desc,
-                        style: tt.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                    if ((playerState.playbackSpeed - speed).abs() < 0.01)
-                      const Icon(
-                        Icons.check_circle_rounded,
-                        color: AppColors.purpleAccent,
-                        size: 20,
-                      ),
-                  ],
-                ),
-              ),
+                );
+              },
             ),
           ],
         ],
@@ -520,6 +573,7 @@ class TrackInfoSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     final songId = (track.source == TrackSource.local && track.id.startsWith('local_'))
         ? int.tryParse(track.id.replaceFirst('local_', ''))
@@ -530,14 +584,27 @@ class TrackInfoSheet extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.98),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.98)
+            : AppColors.surface.withValues(alpha: 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.7),
+            blurRadius: 32,
+            spreadRadius: 4,
+          ),
+        ],
       ),
       padding: EdgeInsets.fromLTRB(
         20,
@@ -555,7 +622,9 @@ class TrackInfoSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -584,7 +653,7 @@ class TrackInfoSheet extends ConsumerWidget {
                   Text(
                     'TRACK INFORMATION',
                     style: tt.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: context.primaryText,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
                     ),
@@ -593,7 +662,7 @@ class TrackInfoSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -604,10 +673,14 @@ class TrackInfoSheet extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.03)
+                  : Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.08),
               ),
             ),
             child: Column(
@@ -617,19 +690,28 @@ class TrackInfoSheet extends ConsumerWidget {
                   value: track.title,
                   icon: Icons.music_note_rounded,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'Artist',
                   value: track.artist,
                   icon: Icons.person_rounded,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'Album',
                   value: track.album ?? 'Unknown Album',
                   icon: Icons.album_rounded,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'Duration',
                   value: formatDuration(track.durationMs),
@@ -644,10 +726,14 @@ class TrackInfoSheet extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.03)
+                  : Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.08),
               ),
             ),
             child: Column(
@@ -658,7 +744,10 @@ class TrackInfoSheet extends ConsumerWidget {
                   icon: Icons.bar_chart_rounded,
                   accentColor: AppColors.cyanAccent,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'Last Played',
                   value: song?.lastPlayedAt != null
@@ -667,7 +756,10 @@ class TrackInfoSheet extends ConsumerWidget {
                   icon: Icons.history_rounded,
                   accentColor: AppColors.purpleAccent,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'Source',
                   value: track.source == TrackSource.local
@@ -677,7 +769,10 @@ class TrackInfoSheet extends ConsumerWidget {
                       ? Icons.folder_rounded
                       : Icons.cloud_rounded,
                 ),
-                const Divider(height: 18, color: Colors.white10),
+                Divider(
+                  height: 18,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                ),
                 _InfoRow(
                   label: 'File Path',
                   value: song?.filePath ?? track.uri,
@@ -752,7 +847,7 @@ class _InfoRow extends StatelessWidget {
         Icon(
           icon,
           size: 18,
-          color: accentColor ?? Colors.white.withValues(alpha: 0.6),
+          color: accentColor ?? context.secondaryText,
         ),
         const SizedBox(width: 12),
         SizedBox(
@@ -760,7 +855,7 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             label,
             style: tt.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: context.secondaryText,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -770,14 +865,14 @@ class _InfoRow extends StatelessWidget {
               ? SelectableText(
                   value,
                   style: tt.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: context.primaryText,
                     fontFamily: 'monospace',
                   ),
                 )
               : Text(
                   value,
                   style: tt.bodyMedium?.copyWith(
-                    color: accentColor ?? Colors.white.withValues(alpha: 0.9),
+                    color: accentColor ?? context.primaryText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -812,15 +907,21 @@ class AudioToolsActionRow extends ConsumerWidget {
     final isTimerActive = playerState.isSleepTimerActive;
     final remainingTimer = playerState.remainingSleepDuration;
     final speed = playerState.playbackSpeed;
+    final isLight = context.isLight;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.85)
+            : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: isLight
+              ? Colors.white.withValues(alpha: 0.9)
+              : Colors.white.withValues(alpha: 0.08),
         ),
+        boxShadow: isLight ? AppTheme.lightCardShadow : null,
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -879,23 +980,23 @@ class AudioToolsActionRow extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
 
-            // 4. Up Next Queue Quick Button
+            // 5. Up Next Queue Quick Button
             _ToolButton(
               icon: Icons.queue_music_rounded,
               label: 'Queue',
               isActive: false,
-              activeColor: Colors.white70,
+              activeColor: isLight ? context.primaryText : Colors.white70,
               onTap: onOpenQueue,
               tooltip: 'Up Next Queue (${playerState.queue.length})',
             ),
             const SizedBox(width: 8),
 
-            // 5. Song Info Quick Button
+            // 6. Song Info Quick Button
             _ToolButton(
               icon: Icons.info_outline_rounded,
               label: 'Info',
               isActive: false,
-              activeColor: Colors.white70,
+              activeColor: isLight ? context.primaryText : Colors.white70,
               onTap: () => showTrackInfoSheet(context, track),
               tooltip: 'Song Information',
             ),
@@ -925,6 +1026,8 @@ class _ToolButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = context.isLight;
+
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -935,13 +1038,17 @@ class _ToolButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
           decoration: BoxDecoration(
             color: isActive
-                ? activeColor.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.05),
+                ? activeColor.withValues(alpha: isLight ? 0.18 : 0.18)
+                : (isLight
+                    ? Colors.black.withValues(alpha: 0.04)
+                    : Colors.white.withValues(alpha: 0.05)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isActive
                   ? activeColor.withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.1),
+                  : (isLight
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.1)),
             ),
           ),
           child: Row(
@@ -950,7 +1057,9 @@ class _ToolButton extends StatelessWidget {
               Icon(
                 icon,
                 size: 15,
-                color: isActive ? activeColor : Colors.white.withValues(alpha: 0.7),
+                color: isActive
+                    ? activeColor
+                    : (isLight ? context.secondaryText : Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(width: 5),
               Text(
@@ -958,7 +1067,9 @@ class _ToolButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
-                  color: isActive ? activeColor : Colors.white.withValues(alpha: 0.85),
+                  color: isActive
+                      ? (isLight ? const Color(0xFF0F172A) : activeColor)
+                      : context.primaryText,
                   letterSpacing: 0.25,
                 ),
               ),

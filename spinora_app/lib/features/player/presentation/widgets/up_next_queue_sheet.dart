@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../library/presentation/widgets/song_artwork.dart';
 import '../../application/player_controller.dart';
@@ -16,6 +17,7 @@ class UpNextQueueSheet extends ConsumerWidget {
     final queue = playerState.queue;
     final currentIndex = playerState.currentIndex;
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       constraints: BoxConstraints(
@@ -23,14 +25,20 @@ class UpNextQueueSheet extends ConsumerWidget {
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF13111C).withValues(alpha: 0.95),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : const Color(0xFF13111C).withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: isLight
+              ? Colors.black.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.12),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.6),
             blurRadius: 32,
             spreadRadius: 6,
           ),
@@ -48,7 +56,9 @@ class UpNextQueueSheet extends ConsumerWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -77,7 +87,7 @@ class UpNextQueueSheet extends ConsumerWidget {
                 Text(
                   'Up Next Queue',
                   style: tt.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: context.primaryText,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -86,13 +96,17 @@ class UpNextQueueSheet extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: isLight
+                        ? Colors.black.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${queue.length}',
-                    style: const TextStyle(
-                      color: AppColors.cyanAccent,
+                    style: TextStyle(
+                      color: isLight
+                          ? AppColors.purpleAccent
+                          : AppColors.cyanAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -101,9 +115,9 @@ class UpNextQueueSheet extends ConsumerWidget {
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
+                    color: context.secondaryText,
                     size: 26,
                   ),
                   tooltip: 'Close',
@@ -112,7 +126,12 @@ class UpNextQueueSheet extends ConsumerWidget {
             ),
 
             const SizedBox(height: 12),
-            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            Divider(
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.08),
+              height: 1,
+            ),
             const SizedBox(height: 8),
 
             // Queue List or Empty State
@@ -126,13 +145,15 @@ class UpNextQueueSheet extends ConsumerWidget {
                       Icon(
                         Icons.queue_music_rounded,
                         size: 44,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: isLight
+                            ? Colors.black.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.3),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Playback Queue is Empty',
                         style: tt.titleSmall?.copyWith(
-                          color: Colors.white,
+                          color: context.primaryText,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -140,7 +161,7 @@ class UpNextQueueSheet extends ConsumerWidget {
                       Text(
                         'Play a song or playlist from your music library.',
                         style: tt.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: context.secondaryText,
                         ),
                       ),
                     ],
@@ -181,14 +202,22 @@ class UpNextQueueSheet extends ConsumerWidget {
                       },
                       child: Material(
                         color: isCurrent
-                            ? AppColors.purpleAccent.withValues(alpha: 0.16)
-                            : Colors.white.withValues(alpha: 0.04),
+                            ? (isLight
+                                ? AppColors.purpleAccent.withValues(alpha: 0.12)
+                                : AppColors.purpleAccent.withValues(alpha: 0.16))
+                            : (isLight
+                                ? Colors.black.withValues(alpha: 0.02)
+                                : Colors.white.withValues(alpha: 0.04)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                           side: BorderSide(
                             color: isCurrent
-                                ? AppColors.cyanAccent.withValues(alpha: 0.5)
-                                : Colors.white.withValues(alpha: 0.06),
+                                ? (isLight
+                                    ? AppColors.purpleAccent.withValues(alpha: 0.45)
+                                    : AppColors.cyanAccent.withValues(alpha: 0.5))
+                                : (isLight
+                                    ? Colors.black.withValues(alpha: 0.06)
+                                    : Colors.white.withValues(alpha: 0.06)),
                             width: isCurrent ? 1.4 : 1,
                           ),
                         ),
@@ -231,15 +260,19 @@ class UpNextQueueSheet extends ConsumerWidget {
                                                 vertical: 2,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: AppColors.cyanAccent
+                                                color: (isLight
+                                                        ? AppColors.purpleAccent
+                                                        : AppColors.cyanAccent)
                                                     .withValues(alpha: 0.2),
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),
-                                              child: const Text(
+                                              child: Text(
                                                 'NOW',
                                                 style: TextStyle(
-                                                  color: AppColors.cyanAccent,
+                                                  color: isLight
+                                                      ? AppColors.purpleAccent
+                                                      : AppColors.cyanAccent,
                                                   fontSize: 9,
                                                   fontWeight: FontWeight.w800,
                                                   letterSpacing: 0.5,
@@ -254,8 +287,10 @@ class UpNextQueueSheet extends ConsumerWidget {
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 color: isCurrent
-                                                    ? AppColors.cyanAccent
-                                                    : Colors.white,
+                                                    ? (isLight
+                                                        ? AppColors.purpleAccent
+                                                        : AppColors.cyanAccent)
+                                                    : context.primaryText,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 14,
                                               ),
@@ -269,8 +304,7 @@ class UpNextQueueSheet extends ConsumerWidget {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.55),
+                                          color: context.secondaryText,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -282,8 +316,10 @@ class UpNextQueueSheet extends ConsumerWidget {
                                   formatDuration(track.durationMs),
                                   style: TextStyle(
                                     color: isCurrent
-                                        ? AppColors.cyanAccent
-                                        : Colors.white.withValues(alpha: 0.5),
+                                        ? (isLight
+                                            ? AppColors.purpleAccent
+                                            : AppColors.cyanAccent)
+                                        : context.secondaryText,
                                     fontSize: 12,
                                     fontWeight: isCurrent
                                         ? FontWeight.w700
@@ -294,7 +330,7 @@ class UpNextQueueSheet extends ConsumerWidget {
                                 IconButton(
                                   icon: Icon(
                                     Icons.close_rounded,
-                                    color: Colors.white.withValues(alpha: 0.4),
+                                    color: context.secondaryText,
                                     size: 18,
                                   ),
                                   visualDensity: VisualDensity.compact,

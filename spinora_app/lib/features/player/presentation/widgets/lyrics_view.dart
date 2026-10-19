@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/audio/track.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/formatters.dart';
@@ -172,6 +173,7 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     final isFetchingThis = lyricsFetchState.isFetching &&
         (lyricsFetchState.activeSongId == null ||
             lyricsFetchState.activeSongId == songId);
+    final isLight = context.isLight;
     final tt = Theme.of(context).textTheme;
 
     return Container(
@@ -180,23 +182,25 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
+          color: isLight ? Colors.white : Colors.white.withValues(alpha: 0.16),
           width: 1.4,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cyanAccent.withValues(
-              alpha: playerState.isPlaying ? 0.25 : 0.10,
-            ),
-            blurRadius: 36,
-            spreadRadius: 2,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: isLight
+            ? AppTheme.lightCardShadow
+            : [
+                BoxShadow(
+                  color: AppColors.cyanAccent.withValues(
+                    alpha: playerState.isPlaying ? 0.25 : 0.10,
+                  ),
+                  blurRadius: 36,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: GlassCard(
         width: widget.width,
@@ -229,7 +233,7 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                         Text(
                           'LYRICS',
                           style: tt.labelMedium?.copyWith(
-                            color: Colors.white,
+                            color: context.primaryText,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.0,
                           ),
@@ -333,7 +337,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   onPressed: isFetchingThis ? null : () => _triggerRefresh(context),
                   icon: Icon(
                     Icons.refresh_rounded,
-                    color: isFetchingThis ? Colors.white24 : Colors.white70,
+                    color: isFetchingThis
+                        ? (isLight ? Colors.black26 : Colors.white24)
+                        : context.secondaryText,
                   ),
                   tooltip: 'Auto-Fetch / Refresh',
                   iconSize: 18,
@@ -345,9 +351,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                 // Online Search Button
                 IconButton(
                   onPressed: () => _openSearchDialog(context),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.travel_explore_rounded,
-                    color: Colors.white70,
+                    color: context.secondaryText,
                   ),
                   tooltip: 'Search Online (LRCLIB)',
                   iconSize: 18,
@@ -359,9 +365,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                 // Edit / Paste Lyrics Button
                 IconButton(
                   onPressed: () => _openEditDialog(context),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.edit_note_rounded,
-                    color: Colors.white70,
+                    color: context.secondaryText,
                   ),
                   tooltip: 'Edit / Paste Lyrics',
                   iconSize: 18,
@@ -373,9 +379,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                 // Return to Artwork Card Button
                 IconButton(
                   onPressed: widget.onClose,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.photo_rounded,
-                    color: Colors.white70,
+                    color: context.secondaryText,
                   ),
                   tooltip: 'Show Artwork',
                   iconSize: 18,
@@ -387,7 +393,12 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
             ),
 
             const SizedBox(height: 6),
-            const Divider(color: Colors.white10, height: 1),
+            Divider(
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.06)
+                  : Colors.white10,
+              height: 1,
+            ),
             const SizedBox(height: 6),
 
             // Lyrics Body View
@@ -502,12 +513,16 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: isActive
-                                            ? AppColors.cyanAccent
+                                            ? (isLight
+                                                ? const Color(0xFF0D9488)
+                                                : AppColors.cyanAccent)
                                             : (lyrics.isSynced
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.35)
-                                                : Colors.white
-                                                    .withValues(alpha: 0.85)),
+                                                ? (isLight
+                                                    ? Colors.black
+                                                        .withValues(alpha: 0.35)
+                                                    : Colors.white
+                                                        .withValues(alpha: 0.35))
+                                                : context.primaryText),
                                         fontSize: isActive ? 18.5 : 14.5,
                                         fontWeight: isActive
                                             ? FontWeight.w800
@@ -818,6 +833,7 @@ class _NoLyricsPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     if (isFetching) {
       return const _LyricsLoadingView();
@@ -834,13 +850,15 @@ class _NoLyricsPlaceholder extends StatelessWidget {
             Icon(
               Icons.lyrics_outlined,
               size: 26,
-              color: Colors.white.withValues(alpha: 0.25),
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : Colors.white.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 4),
             Text(
               'No Lyrics Available',
               style: tt.titleSmall?.copyWith(
-                color: Colors.white,
+                color: context.primaryText,
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
@@ -850,7 +868,7 @@ class _NoLyricsPlaceholder extends StatelessWidget {
               'Search online or paste synced (.lrc) / plain lyrics for this track.',
               textAlign: TextAlign.center,
               style: tt.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: context.secondaryText,
                 fontSize: 10.5,
               ),
             ),
@@ -925,27 +943,29 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                 ),
                 OutlinedButton.icon(
                   onPressed: onPastePressed,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.add_rounded,
-                    color: Colors.white70,
+                    color: context.secondaryText,
                     size: 13,
                   ),
-                  label: const Text(
+                  label: Text(
                     'Paste Lyrics',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: context.secondaryText,
                       fontWeight: FontWeight.bold,
                       fontSize: 11,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
+                    foregroundColor: context.secondaryText,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 5),
                     visualDensity: VisualDensity.compact,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: isLight
+                          ? Colors.black.withValues(alpha: 0.12)
+                          : Colors.white.withValues(alpha: 0.2),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

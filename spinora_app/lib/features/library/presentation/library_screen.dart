@@ -209,16 +209,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Ambient background lighting orbs for glass refraction
+          // Ambient background lighting orbs for glass refraction (soft glow, no solid clipping circles)
           Positioned(
             top: -50,
             right: -30,
             child: Container(
               width: 250,
               height: 250,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: AppColors.purpleGradient,
+                gradient: RadialGradient(
+                  colors: [
+                    (context.isDarkMode
+                            ? const Color(0xFF8B5CF6)
+                            : const Color(0xFF7C3AED))
+                        .withValues(alpha: context.isDarkMode ? 0.22 : 0.08),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -230,7 +238,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.cyanAccent.withValues(alpha: 0.15),
+                gradient: RadialGradient(
+                  colors: [
+                    (context.isDarkMode
+                            ? const Color(0xFF00E5FF)
+                            : const Color(0xFFFF758F))
+                        .withValues(alpha: context.isDarkMode ? 0.15 : 0.06),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -254,9 +270,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             Navigator.of(context).pop();
                           }
                         },
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+                          color: context.primaryText,
                           size: 20,
                         ),
                         tooltip: 'Back',
@@ -269,7 +285,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             Text(
                               'Music Library',
                               style: tt.titleLarge?.copyWith(
-                                color: Colors.white,
+                                color: context.primaryText,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -281,7 +297,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 error: (error, _) => 'Error loading library',
                               ),
                               style: tt.bodySmall?.copyWith(
-                                color: AppColors.cyanAccent,
+                                color: context.isDarkMode
+                                    ? AppColors.cyanAccent
+                                    : context.secondaryText,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -295,16 +314,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 .read(audioScannerStateProvider.notifier)
                                 .scan(),
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
-                          foregroundColor: AppColors.cyanAccent,
+                          backgroundColor: context.isDarkMode
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.white.withValues(alpha: 0.90),
+                          foregroundColor: context.isDarkMode
+                              ? AppColors.cyanAccent
+                              : context.primaryAccent,
                         ),
                         icon: scanState.isScanning
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppColors.cyanAccent,
+                                  color: context.isDarkMode
+                                      ? AppColors.cyanAccent
+                                      : context.primaryAccent,
                                 ),
                               )
                             : const Icon(Icons.sync_rounded),
@@ -326,26 +351,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.deepPurple.withValues(alpha: 0.4),
+                      color: context.isDarkMode
+                          ? AppColors.deepPurple.withValues(alpha: 0.4)
+                          : context.primaryAccent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppColors.purpleAccent.withValues(alpha: 0.3),
+                        color: context.isDarkMode
+                            ? AppColors.purpleAccent.withValues(alpha: 0.3)
+                            : context.primaryAccent.withValues(alpha: 0.35),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: context.primaryText,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'Scanning storage and indexing metadata...',
-                          style: tt.bodySmall?.copyWith(color: Colors.white),
+                        Expanded(
+                          child: Text(
+                            'Scanning storage and indexing metadata...',
+                            style: tt.bodySmall
+                                ?.copyWith(color: context.primaryText),
+                          ),
                         ),
                       ],
                     ),
@@ -584,34 +616,43 @@ class _GlassSearchBar extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: context.searchBarBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: context.searchBarBorder,
         ),
+        boxShadow: context.isLight
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
       ),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         textInputAction: TextInputAction.search,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        cursorColor: AppColors.cyanAccent,
+        style: TextStyle(color: context.primaryText, fontSize: 14),
+        cursorColor: context.primaryAccent,
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.4),
+            color: context.searchBarHint,
             fontSize: 14,
           ),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color: AppColors.cyanAccent,
+            color: context.primaryAccent,
             size: 20,
           ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.close_rounded, size: 18),
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: context.secondaryText,
                   onPressed: onClear,
                 )
               : null,
@@ -657,6 +698,8 @@ class _LibraryFilterBar extends StatelessWidget {
         selectedFilter == LibraryFilter.favorites ||
         selectedFilter == LibraryFilter.mostPlayed;
 
+    final isLight = context.isLight;
+
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 8),
       child: SingleChildScrollView(
@@ -671,6 +714,7 @@ class _LibraryFilterBar extends StatelessWidget {
               icon: Icons.music_note_rounded,
               isSelected: selectedFilter == LibraryFilter.all,
               onTap: () => onFilterSelected(LibraryFilter.all),
+              activeColor: context.primaryAccent,
             ),
             const SizedBox(width: 8),
             _FilterChip(
@@ -702,7 +746,7 @@ class _LibraryFilterBar extends StatelessWidget {
               icon: Icons.person_rounded,
               isSelected: selectedFilter == LibraryFilter.artists,
               onTap: () => onFilterSelected(LibraryFilter.artists),
-              activeColor: AppColors.cyanAccent,
+              activeColor: isLight ? AppColors.lightAccent : AppColors.cyanAccent,
             ),
             const SizedBox(width: 8),
             _FilterChip(
@@ -710,7 +754,7 @@ class _LibraryFilterBar extends StatelessWidget {
               icon: Icons.album_rounded,
               isSelected: selectedFilter == LibraryFilter.albums,
               onTap: () => onFilterSelected(LibraryFilter.albums),
-              activeColor: Colors.tealAccent,
+              activeColor: isLight ? Colors.teal : Colors.tealAccent,
             ),
             const SizedBox(width: 8),
             _FilterChip(
@@ -734,10 +778,14 @@ class _LibraryFilterBar extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.purpleAccent.withValues(alpha: 0.15),
+                      color: AppColors.purpleAccent.withValues(
+                        alpha: isLight ? 0.10 : 0.15,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.purpleAccent.withValues(alpha: 0.3),
+                        color: AppColors.purpleAccent.withValues(
+                          alpha: isLight ? 0.25 : 0.3,
+                        ),
                       ),
                     ),
                     child: Text(
@@ -759,16 +807,22 @@ class _LibraryFilterBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  color: (isLight ? AppColors.lightAccent : AppColors.cyanAccent)
+                      .withValues(alpha: isLight ? 0.10 : 0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.3),
+                    color: (isLight
+                            ? AppColors.lightAccent
+                            : AppColors.cyanAccent)
+                        .withValues(alpha: isLight ? 0.25 : 0.3),
                   ),
                 ),
                 child: Text(
                   '${uniqueArtists.length} artists',
-                  style: const TextStyle(
-                    color: AppColors.cyanAccent,
+                  style: TextStyle(
+                    color: isLight
+                        ? AppColors.lightAccent
+                        : AppColors.cyanAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
@@ -782,16 +836,18 @@ class _LibraryFilterBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.tealAccent.withValues(alpha: 0.12),
+                  color: (isLight ? Colors.teal : Colors.tealAccent)
+                      .withValues(alpha: isLight ? 0.10 : 0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.tealAccent.withValues(alpha: 0.3),
+                    color: (isLight ? Colors.teal : Colors.tealAccent)
+                        .withValues(alpha: isLight ? 0.25 : 0.3),
                   ),
                 ),
                 child: Text(
                   '${uniqueAlbums.length} albums',
-                  style: const TextStyle(
-                    color: Colors.tealAccent,
+                  style: TextStyle(
+                    color: isLight ? Colors.teal : Colors.tealAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
@@ -805,18 +861,22 @@ class _LibraryFilterBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                  color: context.primaryAccent.withValues(
+                    alpha: isLight ? 0.10 : 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.3),
+                    color: context.primaryAccent.withValues(
+                      alpha: isLight ? 0.25 : 0.3,
+                    ),
                   ),
                 ),
                 child: Text(
                   isSearchingOrFiltering
                       ? '$filteredCount / $totalCount'
                       : '$totalCount tracks',
-                  style: const TextStyle(
-                    color: AppColors.cyanAccent,
+                  style: TextStyle(
+                    color: context.primaryAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
@@ -837,49 +897,50 @@ class _LibraryFilterBar extends StatelessWidget {
                     child: InkWell(
                       onTap: () => showSortBottomSheet(context),
                       borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: context.glassTileBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: context.glassTileBorder,
+                          ),
+                          boxShadow: context.glassTileShadow,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              sortOption.icon,
+                              size: 13,
+                              color: context.primaryAccent,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              sortOption.label,
+                              style: TextStyle(
+                                color: context.primaryText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              isAsc
+                                  ? Icons.arrow_upward_rounded
+                                  : Icons.arrow_downward_rounded,
+                              size: 12,
+                              color: context.primaryAccent,
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            sortOption.icon,
-                            size: 13,
-                            color: AppColors.cyanAccent,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            sortOption.label,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            isAsc
-                                ? Icons.arrow_upward_rounded
-                                : Icons.arrow_downward_rounded,
-                            size: 12,
-                            color: AppColors.cyanAccent,
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
               ),
             ],
           ],
@@ -906,7 +967,9 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = activeColor ?? AppColors.cyanAccent;
+    final isLight = context.isLight;
+    final effectiveColor =
+        activeColor ?? (isLight ? AppColors.lightAccent : AppColors.cyanAccent);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -916,23 +979,42 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected
-              ? effectiveColor.withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.05),
+              ? (isLight
+                  ? effectiveColor.withValues(alpha: 0.12)
+                  : effectiveColor.withValues(alpha: 0.18))
+              : (isLight
+                  ? Colors.white.withValues(alpha: 0.85)
+                  : Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
-                ? effectiveColor.withValues(alpha: 0.7)
-                : Colors.white.withValues(alpha: 0.08),
+                ? (isLight
+                    ? effectiveColor.withValues(alpha: 0.8)
+                    : effectiveColor.withValues(alpha: 0.7))
+                : (isLight
+                    ? Colors.black.withValues(alpha: 0.08)
+                    : Colors.white.withValues(alpha: 0.08)),
             width: isSelected ? 1.4 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: effectiveColor.withValues(alpha: 0.25),
+                    color: effectiveColor.withValues(
+                      alpha: isLight ? 0.20 : 0.25,
+                    ),
                     blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ]
-              : null,
+              : (isLight
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -942,7 +1024,9 @@ class _FilterChip extends StatelessWidget {
               size: 14,
               color: isSelected
                   ? effectiveColor
-                  : Colors.white.withValues(alpha: 0.6),
+                  : (isLight
+                      ? context.secondaryText
+                      : Colors.white.withValues(alpha: 0.6)),
             ),
             const SizedBox(width: 6),
             Text(
@@ -951,8 +1035,10 @@ class _FilterChip extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.7),
+                    ? (isLight ? effectiveColor : Colors.white)
+                    : (isLight
+                        ? context.secondaryText
+                        : Colors.white.withValues(alpha: 0.7)),
               ),
             ),
           ],
@@ -993,19 +1079,23 @@ class _RecentlyPlayedSection extends ConsumerWidget {
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.cyanAccent.withValues(alpha: 0.15),
+                        color: context.primaryAccent.withValues(
+                          alpha: context.isLight ? 0.12 : 0.15,
+                        ),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.history_rounded,
                         size: 15,
-                        color: AppColors.cyanAccent,
+                        color: context.primaryAccent,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'RECENTLY PLAYED',
                       style: tt.labelMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: context.primaryText.withValues(
+                          alpha: context.isLight ? 0.8 : 0.9,
+                        ),
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.5,
                       ),
@@ -1018,13 +1108,15 @@ class _RecentlyPlayedSection extends ConsumerWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: context.isLight
+                        ? Colors.black.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${recentSongs.length}',
                     style: tt.labelSmall?.copyWith(
-                      color: AppColors.cyanAccent,
+                      color: context.primaryAccent,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1101,23 +1193,25 @@ class _RecentlyPlayedCard extends ConsumerWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           color: isCurrent
-              ? AppColors.purpleAccent.withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.05),
+              ? AppColors.purpleAccent.withValues(
+                  alpha: context.isLight ? 0.12 : 0.18,
+                )
+              : context.glassTileBg,
           border: Border.all(
             color: isCurrent
-                ? AppColors.cyanAccent.withValues(alpha: 0.6)
-                : Colors.white.withValues(alpha: 0.1),
+                ? context.primaryAccent.withValues(alpha: 0.6)
+                : context.glassTileBorder,
             width: isCurrent ? 1.5 : 1,
           ),
           boxShadow: isCurrent
               ? [
                   BoxShadow(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.25),
+                    color: context.primaryAccent.withValues(alpha: 0.25),
                     blurRadius: 12,
                     spreadRadius: 1,
                   ),
                 ]
-              : null,
+              : context.glassTileShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1143,9 +1237,9 @@ class _RecentlyPlayedCard extends ConsumerWidget {
                       shape: BoxShape.circle,
                       gradient: isCurrent
                           ? AppColors.purpleGradient
-                          : const LinearGradient(
+                          : LinearGradient(
                               colors: [
-                                AppColors.cyanAccent,
+                                context.primaryAccent,
                                 AppColors.purpleAccent,
                               ],
                             ),
@@ -1153,7 +1247,7 @@ class _RecentlyPlayedCard extends ConsumerWidget {
                         BoxShadow(
                           color: (isCurrent
                                   ? AppColors.purpleAccent
-                                  : AppColors.cyanAccent)
+                                  : context.primaryAccent)
                               .withValues(alpha: 0.6),
                           blurRadius: 8,
                           spreadRadius: 1,
@@ -1179,7 +1273,7 @@ class _RecentlyPlayedCard extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: tt.bodySmall?.copyWith(
-                color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                color: isCurrent ? context.primaryAccent : context.primaryText,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -1190,7 +1284,7 @@ class _RecentlyPlayedCard extends ConsumerWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: tt.labelSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: context.secondaryText,
                 fontSize: 10,
               ),
             ),
@@ -1226,18 +1320,20 @@ class _SongListTile extends ConsumerWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: isCurrent
-            ? AppColors.purpleAccent.withValues(alpha: 0.16)
-            : Colors.white.withValues(alpha: 0.05),
+            ? AppColors.purpleAccent.withValues(
+                alpha: context.isLight ? 0.12 : 0.16,
+              )
+            : context.glassTileBg,
         border: Border.all(
           color: isCurrent
-              ? AppColors.cyanAccent.withValues(alpha: 0.65)
-              : Colors.white.withValues(alpha: 0.08),
+              ? context.primaryAccent.withValues(alpha: 0.65)
+              : context.glassTileBorder,
           width: isCurrent ? 1.5 : 1,
         ),
         boxShadow: isCurrent
             ? [
                 BoxShadow(
-                  color: AppColors.cyanAccent.withValues(alpha: 0.22),
+                  color: context.primaryAccent.withValues(alpha: 0.22),
                   blurRadius: 14,
                   spreadRadius: 0.5,
                 ),
@@ -1247,7 +1343,7 @@ class _SongListTile extends ConsumerWidget {
                   spreadRadius: 1,
                 ),
               ]
-            : null,
+            : context.glassTileShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -1292,7 +1388,9 @@ class _SongListTile extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                         style: tt.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: isCurrent ? AppColors.cyanAccent : Colors.white,
+                          color: isCurrent
+                              ? context.primaryAccent
+                              : context.primaryText,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -1301,7 +1399,7 @@ class _SongListTile extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: context.secondaryText,
                         ),
                       ),
                     ],
@@ -1315,68 +1413,71 @@ class _SongListTile extends ConsumerWidget {
                       _EqualizerIndicator(isPlaying: isPlaying),
                       const SizedBox(width: 8),
                     ],
-                  IconButton(
-                    icon: Icon(
-                      song.isFavorite
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: song.isFavorite
-                          ? Colors.pinkAccent
-                          : Colors.white.withValues(alpha: 0.35),
-                      size: 18,
+                    IconButton(
+                      icon: Icon(
+                        song.isFavorite
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: song.isFavorite
+                            ? Colors.pinkAccent
+                            : (context.isLight
+                                ? Colors.black.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.35)),
+                        size: 18,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                      tooltip: song.isFavorite
+                          ? 'Remove from Favorites'
+                          : 'Add to Favorites',
+                      onPressed: () async {
+                        final db = ref.read(appDatabaseProvider);
+                        await (db.update(db.songs)
+                              ..where((s) => s.id.equals(song.id)))
+                            .write(
+                          SongsCompanion(isFavorite: Value(!song.isFavorite)),
+                        );
+                      },
                     ),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 28, minHeight: 28),
-                    tooltip: song.isFavorite
-                        ? 'Remove from Favorites'
-                        : 'Add to Favorites',
-                    onPressed: () async {
-                      final db = ref.read(appDatabaseProvider);
-                      await (db.update(db.songs)
-                            ..where((s) => s.id.equals(song.id)))
-                          .write(
-                        SongsCompanion(isFavorite: Value(!song.isFavorite)),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    formatDuration(song.duration),
-                    style: tt.labelSmall?.copyWith(
-                      color: isCurrent
-                          ? AppColors.cyanAccent
-                          : AppColors.cyanAccent.withValues(alpha: 0.8),
-                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                    const SizedBox(width: 4),
+                    Text(
+                      formatDuration(song.duration),
+                      style: tt.labelSmall?.copyWith(
+                        color: isCurrent
+                            ? context.primaryAccent
+                            : context.secondaryText,
+                        fontWeight:
+                            isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      size: 18,
+                    const SizedBox(width: 2),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        size: 18,
+                      ),
+                      color: context.secondaryText,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 26, minHeight: 28),
+                      tooltip: 'Song Options',
+                      onPressed: () => showSongOptionsSheet(
+                        context: context,
+                        song: song,
+                      ),
                     ),
-                    color: Colors.white.withValues(alpha: 0.5),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 26, minHeight: 28),
-                    tooltip: 'Song Options',
-                    onPressed: () => showSongOptionsSheet(
-                      context: context,
-                      song: song,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
- }
+    );
+  }
 }
 
 /// Animated 4-bar equalizer icon that bounces rhythmically while playing.
@@ -1516,74 +1617,83 @@ class _PlaylistsView extends ConsumerWidget {
           ),
           children: [
             // Glassmorphic "+ New Playlist" action card
-            Material(
-              color: Colors.white.withValues(alpha: 0.05),
-              shape: RoundedRectangleBorder(
+            Container(
+              decoration: BoxDecoration(
+                color: context.glassTileBg,
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: AppColors.purpleAccent.withValues(alpha: 0.35),
+                border: Border.all(
+                  color: AppColors.purpleAccent.withValues(
+                    alpha: context.isLight ? 0.25 : 0.35,
+                  ),
                 ),
+                boxShadow: context.glassTileShadow,
               ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () =>
-                    showCreatePlaylistDialog(context: context, ref: ref),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.purpleGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  AppColors.purpleAccent.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.add_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Create New Playlist',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+              child: Material(
+                color: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () =>
+                      showCreatePlaylistDialog(context: context, ref: ref),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.purpleGradient,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    AppColors.purpleAccent.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                spreadRadius: 1,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Curate custom mix collections',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.55),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
                         ),
-                      ),
-                      Icon(
-                        Icons.add_circle_outline_rounded,
-                        color: AppColors.cyanAccent.withValues(alpha: 0.8),
-                        size: 22,
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Create New Playlist',
+                                style: TextStyle(
+                                  color: context.primaryText,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Curate custom mix collections',
+                                style: TextStyle(
+                                  color: context.secondaryText,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: context.primaryAccent,
+                          size: 22,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1596,8 +1706,7 @@ class _PlaylistsView extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     'No playlists matching "$searchQuery"',
-                    style:
-                        TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+                    style: TextStyle(color: context.secondaryText),
                   ),
                 ),
               )
@@ -1611,13 +1720,13 @@ class _PlaylistsView extends ConsumerWidget {
                       Icon(
                         Icons.queue_music_rounded,
                         size: 48,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: context.secondaryText,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'No Playlists Created Yet',
                         style: tt.titleSmall?.copyWith(
-                          color: Colors.white,
+                          color: context.primaryText,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1625,7 +1734,7 @@ class _PlaylistsView extends ConsumerWidget {
                       Text(
                         'Tap "+ New Playlist" above to start building your playlists.',
                         style: tt.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: context.secondaryText,
                         ),
                       ),
                     ],
@@ -1667,74 +1776,81 @@ class _PlaylistTile extends ConsumerWidget {
     final count = songCountAsync.asData?.value ?? 0;
     final tt = Theme.of(context).textTheme;
 
-    return Material(
-      color: Colors.white.withValues(alpha: 0.05),
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
+        color: context.glassTileBg,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.08),
+        border: Border.all(
+          color: context.glassTileBorder,
         ),
+        boxShadow: context.glassTileShadow,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => PlaylistDetailScreen(playlist: playlist),
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => PlaylistDetailScreen(playlist: playlist),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.purpleGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.queue_music_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        playlist.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: context.primaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$count ${count == 1 ? 'track' : 'tracks'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
+                          color: context.primaryAccent,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: context.secondaryText,
+                  size: 14,
+                ),
+              ],
             ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: AppColors.purpleGradient,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.queue_music_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      playlist.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: tt.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '$count ${count == 1 ? 'track' : 'tracks'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: tt.bodySmall?.copyWith(
-                        color: AppColors.cyanAccent.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white38,
-                size: 14,
-              ),
-            ],
           ),
         ),
       ),
@@ -1796,13 +1912,13 @@ class _NoSearchResultsView extends StatelessWidget {
               Icon(
                 icon,
                 size: 48,
-                color: Colors.white.withValues(alpha: 0.4),
+                color: context.secondaryText,
               ),
               const SizedBox(height: 14),
               Text(
                 title,
                 style: tt.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: context.primaryText,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1810,7 +1926,7 @@ class _NoSearchResultsView extends StatelessWidget {
               Text(
                 message,
                 style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: context.secondaryText,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1818,9 +1934,9 @@ class _NoSearchResultsView extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onReset,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.cyanAccent,
+                  foregroundColor: context.primaryAccent,
                   side: BorderSide(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                    color: context.primaryAccent.withValues(alpha: 0.5),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1876,7 +1992,7 @@ class _EmptyLibraryView extends StatelessWidget {
               Text(
                 'No Songs Found',
                 style: tt.titleLarge?.copyWith(
-                  color: Colors.white,
+                  color: context.primaryText,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1885,7 +2001,7 @@ class _EmptyLibraryView extends StatelessWidget {
                 'Scan your local storage to index MP3s and audio files into your Spinora library.',
                 textAlign: TextAlign.center,
                 style: tt.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.65),
+                  color: context.secondaryText,
                 ),
               ),
               const SizedBox(height: 24),

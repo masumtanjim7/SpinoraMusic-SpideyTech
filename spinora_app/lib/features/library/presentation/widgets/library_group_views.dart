@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../player/application/player_controller.dart';
 import '../library_screen.dart';
@@ -31,20 +32,25 @@ class SortBottomSheet extends ConsumerWidget {
     final sortNotifier = ref.read(librarySortOptionProvider.notifier);
     final ascNotifier = ref.read(librarySortAscendingProvider.notifier);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.98),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : AppColors.surface.withValues(alpha: 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.7),
+            color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.7),
             blurRadius: 32,
             spreadRadius: 4,
           ),
@@ -65,7 +71,9 @@ class SortBottomSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -82,19 +90,21 @@ class SortBottomSheet extends ConsumerWidget {
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.cyanAccent.withValues(alpha: 0.15),
+                      color: context.primaryAccent.withValues(
+                        alpha: isLight ? 0.12 : 0.15,
+                      ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.sort_rounded,
                       size: 18,
-                      color: AppColors.cyanAccent,
+                      color: context.primaryAccent,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Text(
                     'SORT SONGS',
                     style: tt.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: context.primaryText,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
                     ),
@@ -103,7 +113,7 @@ class SortBottomSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -114,10 +124,14 @@ class SortBottomSheet extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.04)
+                  : Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.08),
               ),
             ),
             child: Row(
@@ -132,12 +146,16 @@ class SortBottomSheet extends ConsumerWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: isAscending
-                            ? AppColors.cyanAccent.withValues(alpha: 0.2)
+                            ? context.primaryAccent.withValues(
+                                alpha: isLight ? 0.15 : 0.2,
+                              )
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isAscending
-                              ? AppColors.cyanAccent.withValues(alpha: 0.6)
+                              ? context.primaryAccent.withValues(
+                                  alpha: isLight ? 0.8 : 0.6,
+                                )
                               : Colors.transparent,
                         ),
                       ),
@@ -148,8 +166,8 @@ class SortBottomSheet extends ConsumerWidget {
                             Icons.arrow_upward_rounded,
                             size: 16,
                             color: isAscending
-                                ? AppColors.cyanAccent
-                                : Colors.white70,
+                                ? context.primaryAccent
+                                : context.secondaryText,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -160,8 +178,8 @@ class SortBottomSheet extends ConsumerWidget {
                                   ? FontWeight.bold
                                   : FontWeight.normal,
                               color: isAscending
-                                  ? AppColors.cyanAccent
-                                  : Colors.white70,
+                                  ? context.primaryAccent
+                                  : context.secondaryText,
                             ),
                           ),
                         ],
@@ -179,12 +197,16 @@ class SortBottomSheet extends ConsumerWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: !isAscending
-                            ? AppColors.purpleAccent.withValues(alpha: 0.2)
+                            ? AppColors.purpleAccent.withValues(
+                                alpha: isLight ? 0.15 : 0.2,
+                              )
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: !isAscending
-                              ? AppColors.purpleAccent.withValues(alpha: 0.6)
+                              ? AppColors.purpleAccent.withValues(
+                                  alpha: isLight ? 0.8 : 0.6,
+                                )
                               : Colors.transparent,
                         ),
                       ),
@@ -196,7 +218,7 @@ class SortBottomSheet extends ConsumerWidget {
                             size: 16,
                             color: !isAscending
                                 ? AppColors.purpleAccent
-                                : Colors.white70,
+                                : context.secondaryText,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -208,7 +230,7 @@ class SortBottomSheet extends ConsumerWidget {
                                   : FontWeight.normal,
                               color: !isAscending
                                   ? AppColors.purpleAccent
-                                  : Colors.white70,
+                                  : context.secondaryText,
                             ),
                           ),
                         ],
@@ -236,15 +258,20 @@ class SortBottomSheet extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: currentSort == option
-                      ? AppColors.cyanAccent.withValues(alpha: 0.12)
-                      : Colors.white.withValues(alpha: 0.05),
+                      ? context.primaryAccent.withValues(
+                          alpha: isLight ? 0.12 : 0.12,
+                        )
+                      : context.glassTileBg,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: currentSort == option
-                        ? AppColors.cyanAccent.withValues(alpha: 0.6)
-                        : Colors.white.withValues(alpha: 0.08),
+                        ? context.primaryAccent.withValues(
+                            alpha: isLight ? 0.8 : 0.6,
+                          )
+                        : context.glassTileBorder,
                     width: currentSort == option ? 1.4 : 1.0,
                   ),
+                  boxShadow: currentSort == option ? null : context.glassTileShadow,
                 ),
                 child: Row(
                   children: [
@@ -253,15 +280,19 @@ class SortBottomSheet extends ConsumerWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: currentSort == option
-                            ? AppColors.cyanAccent.withValues(alpha: 0.2)
-                            : Colors.white.withValues(alpha: 0.08),
+                            ? context.primaryAccent.withValues(
+                                alpha: isLight ? 0.15 : 0.2,
+                              )
+                            : (isLight
+                                ? Colors.black.withValues(alpha: 0.05)
+                                : Colors.white.withValues(alpha: 0.08)),
                       ),
                       child: Icon(
                         option.icon,
                         size: 18,
                         color: currentSort == option
-                            ? AppColors.cyanAccent
-                            : Colors.white70,
+                            ? context.primaryAccent
+                            : context.secondaryText,
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -270,8 +301,8 @@ class SortBottomSheet extends ConsumerWidget {
                         option.label,
                         style: tt.bodyMedium?.copyWith(
                           color: currentSort == option
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.85),
+                              ? (isLight ? context.primaryAccent : Colors.white)
+                              : context.primaryText,
                           fontWeight: currentSort == option
                               ? FontWeight.bold
                               : FontWeight.w500,
@@ -279,9 +310,9 @@ class SortBottomSheet extends ConsumerWidget {
                       ),
                     ),
                     if (currentSort == option)
-                      const Icon(
+                      Icon(
                         Icons.check_circle_rounded,
-                        color: AppColors.cyanAccent,
+                        color: context.primaryAccent,
                         size: 20,
                       ),
                   ],
@@ -341,13 +372,13 @@ class ArtistsGroupedView extends ConsumerWidget {
               Icon(
                 Icons.person_off_rounded,
                 size: 56,
-                color: Colors.white.withValues(alpha: 0.3),
+                color: context.secondaryText,
               ),
               const SizedBox(height: 16),
               Text(
                 'No Artists Found',
                 style: tt.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: context.primaryText,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -358,7 +389,7 @@ class ArtistsGroupedView extends ConsumerWidget {
                     : 'Scan your storage to populate your artist catalog.',
                 textAlign: TextAlign.center,
                 style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: context.secondaryText,
                 ),
               ),
             ],
@@ -390,11 +421,12 @@ class ArtistsGroupedView extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: context.glassTileBg,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: context.glassTileBorder,
               ),
+              boxShadow: context.glassTileShadow,
             ),
             child: Row(
               children: [
@@ -424,7 +456,7 @@ class ArtistsGroupedView extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.titleSmall?.copyWith(
-                          color: Colors.white,
+                          color: context.primaryText,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -432,7 +464,7 @@ class ArtistsGroupedView extends ConsumerWidget {
                       Text(
                         '${artistSongs.length} ${artistSongs.length == 1 ? 'track' : 'tracks'}',
                         style: tt.bodySmall?.copyWith(
-                          color: AppColors.cyanAccent.withValues(alpha: 0.85),
+                          color: context.primaryAccent,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -440,9 +472,9 @@ class ArtistsGroupedView extends ConsumerWidget {
                   ),
                 ),
 
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white38,
+                  color: context.secondaryText,
                   size: 22,
                 ),
               ],
@@ -481,15 +513,20 @@ class _ArtistDetailSheet extends ConsumerWidget {
     final playerController = ref.read(playerControllerProvider.notifier);
     final playerState = ref.watch(playerControllerProvider);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.98),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : AppColors.surface.withValues(alpha: 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
@@ -508,7 +545,9 @@ class _ArtistDetailSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -541,14 +580,14 @@ class _ArtistDetailSheet extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: tt.titleMedium?.copyWith(
-                        color: Colors.white,
+                        color: context.primaryText,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
                       '${songs.length} ${songs.length == 1 ? 'song' : 'songs'} in library',
                       style: tt.bodySmall?.copyWith(
-                        color: AppColors.cyanAccent,
+                        color: context.primaryAccent,
                       ),
                     ),
                   ],
@@ -556,7 +595,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -597,17 +636,20 @@ class _ArtistDetailSheet extends ConsumerWidget {
                     playerController.playPlaylist(shuffled);
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(Icons.shuffle_rounded, color: AppColors.cyanAccent),
-                  label: const Text(
+                  icon: Icon(
+                    Icons.shuffle_rounded,
+                    color: context.primaryAccent,
+                  ),
+                  label: Text(
                     'Shuffle',
                     style: TextStyle(
-                      color: AppColors.cyanAccent,
+                      color: context.primaryAccent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                      color: context.primaryAccent.withValues(alpha: 0.5),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -619,7 +661,10 @@ class _ArtistDetailSheet extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Colors.white10),
+          Divider(
+            height: 1,
+            color: isLight ? Colors.black12 : Colors.white10,
+          ),
           const SizedBox(height: 8),
 
           // Tracks List
@@ -646,14 +691,19 @@ class _ArtistDetailSheet extends ConsumerWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isCurrent
-                          ? AppColors.cyanAccent.withValues(alpha: 0.12)
-                          : Colors.white.withValues(alpha: 0.03),
+                          ? context.primaryAccent.withValues(
+                              alpha: isLight ? 0.12 : 0.12,
+                            )
+                          : context.glassTileBg,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isCurrent
-                            ? AppColors.cyanAccent.withValues(alpha: 0.5)
-                            : Colors.white.withValues(alpha: 0.05),
+                            ? context.primaryAccent.withValues(
+                                alpha: isLight ? 0.8 : 0.5,
+                              )
+                            : context.glassTileBorder,
                       ),
+                      boxShadow: isCurrent ? null : context.glassTileShadow,
                     ),
                     child: Row(
                       children: [
@@ -663,8 +713,8 @@ class _ArtistDetailSheet extends ConsumerWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: isCurrent
-                                ? AppColors.cyanAccent
-                                : Colors.white.withValues(alpha: 0.4),
+                                ? context.primaryAccent
+                                : context.secondaryText,
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -678,8 +728,8 @@ class _ArtistDetailSheet extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: isCurrent
-                                      ? AppColors.cyanAccent
-                                      : Colors.white,
+                                      ? context.primaryAccent
+                                      : context.primaryText,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -690,7 +740,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white.withValues(alpha: 0.5),
+                                    color: context.secondaryText,
                                   ),
                                 ),
                             ],
@@ -700,7 +750,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
                           formatDuration(song.duration),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: context.secondaryText,
                           ),
                         ),
                       ],
@@ -768,13 +818,13 @@ class AlbumsGroupedView extends ConsumerWidget {
               Icon(
                 Icons.album_outlined,
                 size: 56,
-                color: Colors.white.withValues(alpha: 0.3),
+                color: context.secondaryText,
               ),
               const SizedBox(height: 16),
               Text(
                 'No Albums Found',
                 style: tt.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: context.primaryText,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -785,7 +835,7 @@ class AlbumsGroupedView extends ConsumerWidget {
                     : 'Scan your storage to populate your album library.',
                 textAlign: TextAlign.center,
                 style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: context.secondaryText,
                 ),
               ),
             ],
@@ -822,11 +872,12 @@ class AlbumsGroupedView extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: context.glassTileBg,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: context.glassTileBorder,
               ),
+              boxShadow: context.glassTileShadow,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,7 +906,7 @@ class AlbumsGroupedView extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: tt.bodyMedium?.copyWith(
-                    color: Colors.white,
+                    color: context.primaryText,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -870,7 +921,7 @@ class AlbumsGroupedView extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: context.secondaryText,
                         ),
                       ),
                     ),
@@ -880,7 +931,9 @@ class AlbumsGroupedView extends ConsumerWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.purpleAccent.withValues(alpha: 0.15),
+                        color: AppColors.purpleAccent.withValues(
+                          alpha: context.isLight ? 0.10 : 0.15,
+                        ),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -930,15 +983,20 @@ class _AlbumDetailSheet extends ConsumerWidget {
     final playerController = ref.read(playerControllerProvider.notifier);
     final playerState = ref.watch(playerControllerProvider);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.98),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : AppColors.surface.withValues(alpha: 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1.2,
           ),
         ),
@@ -957,7 +1015,9 @@ class _AlbumDetailSheet extends ConsumerWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
+                color: isLight
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -991,7 +1051,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: tt.titleMedium?.copyWith(
-                        color: Colors.white,
+                        color: context.primaryText,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1008,7 +1068,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: Icon(Icons.close_rounded, color: context.secondaryText),
                 tooltip: 'Close',
               ),
             ],
@@ -1033,8 +1093,8 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.cyanAccent,
-                    foregroundColor: Colors.black,
+                    backgroundColor: context.primaryAccent,
+                    foregroundColor: isLight ? Colors.white : Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1050,17 +1110,20 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     playerController.playPlaylist(shuffled);
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(Icons.shuffle_rounded, color: AppColors.cyanAccent),
-                  label: const Text(
+                  icon: Icon(
+                    Icons.shuffle_rounded,
+                    color: context.primaryAccent,
+                  ),
+                  label: Text(
                     'Shuffle',
                     style: TextStyle(
-                      color: AppColors.cyanAccent,
+                      color: context.primaryAccent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                      color: context.primaryAccent.withValues(alpha: 0.5),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -1072,7 +1135,10 @@ class _AlbumDetailSheet extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Colors.white10),
+          Divider(
+            height: 1,
+            color: isLight ? Colors.black12 : Colors.white10,
+          ),
           const SizedBox(height: 8),
 
           // Tracks List
@@ -1099,14 +1165,19 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isCurrent
-                          ? AppColors.purpleAccent.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.03),
+                          ? AppColors.purpleAccent.withValues(
+                              alpha: isLight ? 0.12 : 0.15,
+                            )
+                          : context.glassTileBg,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isCurrent
-                            ? AppColors.purpleAccent.withValues(alpha: 0.6)
-                            : Colors.white.withValues(alpha: 0.05),
+                            ? AppColors.purpleAccent.withValues(
+                                alpha: isLight ? 0.8 : 0.6,
+                              )
+                            : context.glassTileBorder,
                       ),
+                      boxShadow: isCurrent ? null : context.glassTileShadow,
                     ),
                     child: Row(
                       children: [
@@ -1117,7 +1188,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                             fontWeight: FontWeight.bold,
                             color: isCurrent
                                 ? AppColors.purpleAccent
-                                : Colors.white.withValues(alpha: 0.4),
+                                : context.secondaryText,
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -1129,7 +1200,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                             style: TextStyle(
                               color: isCurrent
                                   ? AppColors.purpleAccent
-                                  : Colors.white,
+                                  : context.primaryText,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1138,7 +1209,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                           formatDuration(song.duration),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: context.secondaryText,
                           ),
                         ),
                       ],

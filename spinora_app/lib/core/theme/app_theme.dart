@@ -257,6 +257,8 @@ final spideyDarkTheme = appDarkTheme;
 
 extension LucidGlassThemeExtension on BuildContext {
   bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
+  bool get isDark => isDarkMode;
+  bool get isLight => !isDarkMode;
 
   Color get scaffoldBg =>
       isDarkMode ? AppColors.darkBackground : AppColors.lightBackground;
@@ -272,18 +274,68 @@ extension LucidGlassThemeExtension on BuildContext {
       ? Colors.white.withValues(alpha: 0.12)
       : Colors.white.withValues(alpha: 0.90);
 
+  /// Primary text color: crisp pure white on cosmos, deep charcoal (#0F111A) on lucid light
   Color get primaryText =>
       isDarkMode ? Colors.white : AppColors.lightTextPrimary;
 
+  /// Secondary text color: muted white/slate on cosmos, deep slate (#5C6275) on lucid light
   Color get secondaryText => isDarkMode
       ? Colors.white.withValues(alpha: 0.60)
       : AppColors.lightTextSecondary;
 
+  /// Subtle tertiary text color
+  Color get tertiaryText => isDarkMode
+      ? Colors.white.withValues(alpha: 0.38)
+      : const Color(0xFF5C6275).withValues(alpha: 0.70);
+
+  /// Standard tile background (Song tiles, playlist tiles, artist tiles)
+  Color get glassTileBg => isDarkMode
+      ? Colors.white.withValues(alpha: 0.05)
+      : Colors.white.withValues(alpha: 0.85);
+
+  /// Standard tile border
+  Color get glassTileBorder => isDarkMode
+      ? Colors.white.withValues(alpha: 0.08)
+      : Colors.white.withValues(alpha: 0.90);
+
+  /// Standard tile shadow
+  List<BoxShadow> get glassTileShadow => isDarkMode
+      ? const <BoxShadow>[]
+      : [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+        ];
+
+  /// Search bar surface
+  Color get searchBarBg => isDarkMode
+      ? Colors.white.withValues(alpha: 0.06)
+      : Colors.white.withValues(alpha: 0.88);
+
+  /// Search bar border
+  Color get searchBarBorder => isDarkMode
+      ? Colors.white.withValues(alpha: 0.12)
+      : Colors.white.withValues(alpha: 0.95);
+
+  /// Search bar hint text
+  Color get searchBarHint => isDarkMode
+      ? Colors.white.withValues(alpha: 0.40)
+      : const Color(0xFF5C6275);
+
+  /// Primary accent color
   Color get primaryAccent =>
       isDarkMode ? AppColors.violetAccent : AppColors.lightAccent;
 
+  /// Secondary accent color
   Color get secondaryAccent =>
       isDarkMode ? AppColors.coralAccent : AppColors.lightAccentSecondary;
+
+  /// Cyan/Violet adaptive vibrant highlight
+  Color get vibrantHighlight =>
+      isDarkMode ? AppColors.cyanAccent : AppColors.lightAccent;
 
   List<BoxShadow> get cardShadows =>
       isDarkMode ? AppTheme.darkCardShadow : AppTheme.lightCardShadow;
