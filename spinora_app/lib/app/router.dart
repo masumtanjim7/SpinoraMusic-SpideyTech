@@ -8,6 +8,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/library/presentation/permission_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/profile/application/user_profile_provider.dart';
+import '../features/settings/presentation/settings_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Router provider
@@ -58,6 +59,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/library',
         builder: (context, state) => const LibraryScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

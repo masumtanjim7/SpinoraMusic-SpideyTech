@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,17 +12,53 @@ import '../../../features/player/application/player_controller.dart';
 import '../../../features/player/presentation/mini_player.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
+import '../../../features/settings/presentation/settings_screen.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Home Screen — Lucid Glass Personalized Dashboard
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  int _selectedNav = 0;
+
+  void _onNavTap(int index) {
+    if (index == 1) {
+      context.push('/library');
+      return;
+    }
+    if (index == 2) {
+      context.push('/library');
+      return;
+    }
+    if (index == 3) {
+      EditProfileSheet.show(context);
+      return;
+    }
+    if (index == 4) {
+      Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) => const SettingsScreen(),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _selectedNav = index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
 
@@ -34,9 +71,7 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               children: [
                 _TopHeader(profile: profile),
-                Expanded(
-                  child: _DashboardBody(profile: profile),
-                ),
+                Expanded(child: _DashboardBody(profile: profile)),
               ],
             ),
           ),
@@ -51,28 +86,58 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      bottomNavigationBar: const _GlassBottomNav(),
+      bottomNavigationBar: _GlassBottomNav(
+        selectedIndex: _selectedNav,
+        onTap: _onNavTap,
+      ),
     );
   }
 
   Widget _buildAmbientBlobs() {
     return Stack(children: [
-      Positioned(top: -40, left: -80, child: Container(width: 320, height: 320,
-        decoration: BoxDecoration(shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [const Color(0xFF8B5CF6).withValues(alpha: 0.18), Colors.transparent])))),
-      Positioned(top: 200, right: -60, child: Container(width: 260, height: 260,
-        decoration: BoxDecoration(shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [const Color(0xFFFF758F).withValues(alpha: 0.12), Colors.transparent])))),
-      Positioned(bottom: 120, left: 40, child: Container(width: 200, height: 200,
-        decoration: BoxDecoration(shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [const Color(0xFF3B82F6).withValues(alpha: 0.1), Colors.transparent])))),
+      Positioned(
+          top: -40,
+          left: -80,
+          child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(colors: [
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.18),
+                    Colors.transparent
+                  ])))),
+      Positioned(
+          top: 200,
+          right: -60,
+          child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(colors: [
+                    const Color(0xFFFF758F).withValues(alpha: 0.12),
+                    Colors.transparent
+                  ])))),
+      Positioned(
+          bottom: 120,
+          left: 40,
+          child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(colors: [
+                    const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                    Colors.transparent
+                  ])))),
     ]);
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Top Header
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _TopHeader extends ConsumerWidget {
   const _TopHeader({required this.profile});
@@ -100,35 +165,65 @@ class _TopHeader extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: const LinearGradient(
-              colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight),
-            boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 3))],
+                colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight),
+            boxShadow: [
+              BoxShadow(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3))
+            ],
           ),
           child: const Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.graphic_eq_rounded, color: Colors.white, size: 16),
             SizedBox(width: 6),
-            Text('SPINORA', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.4)),
+            Text('SPINORA',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4)),
           ]),
         ),
         const Spacer(),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(_greeting(), style: tt.labelSmall?.copyWith(color: Colors.white.withValues(alpha: 0.45))),
-          Text(name, style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
+          Text(_greeting(),
+              style: tt.labelSmall
+                  ?.copyWith(color: Colors.white.withValues(alpha: 0.45))),
+          Text(name,
+              style: tt.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
         ]),
         const SizedBox(width: 12),
         GestureDetector(
           onTap: () => EditProfileSheet.show(context),
           child: Container(
-            width: 40, height: 40,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: avatarPath == null ? const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-              image: avatarPath != null ? DecorationImage(image: FileImage(File(avatarPath)), fit: BoxFit.cover) : null,
-              boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.4), blurRadius: 10)],
+              gradient: avatarPath == null
+                  ? const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight)
+                  : null,
+              image: avatarPath != null
+                  ? DecorationImage(
+                      image: FileImage(File(avatarPath)), fit: BoxFit.cover)
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                    blurRadius: 10)
+              ],
             ),
-            child: avatarPath == null ? const Center(child: Icon(Icons.person_rounded, color: Colors.white, size: 20)) : null,
+            child: avatarPath == null
+                ? const Center(
+                    child: Icon(Icons.person_rounded,
+                        color: Colors.white, size: 20))
+                : null,
           ),
         ),
       ]),
@@ -136,9 +231,9 @@ class _TopHeader extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Body
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _DashboardBody extends ConsumerWidget {
   const _DashboardBody({required this.profile});
@@ -159,74 +254,179 @@ class _DashboardBody extends ConsumerWidget {
     final allSongs = songsAsync.value ?? [];
     final recentSongs = recentAsync.value ?? [];
 
-    final mostPlayed = [...allSongs]..sort((a, b) => b.playCount.compareTo(a.playCount));
+    // Top 10 Most Played
+    final mostPlayed = [...allSongs]
+      ..sort((a, b) => b.playCount.compareTo(a.playCount));
     final top10 = mostPlayed.where((s) => s.playCount > 0).take(10).toList();
 
+    // Forgotten Favorites: played but not in last 30 days
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    final forgotten = allSongs.where((s) =>
-      s.playCount > 0 && s.lastPlayedAt != null && s.lastPlayedAt!.isBefore(thirtyDaysAgo)).toList()
+    var forgotten = allSongs
+        .where((s) =>
+            s.playCount > 0 &&
+            s.lastPlayedAt != null &&
+            s.lastPlayedAt!.isBefore(thirtyDaysAgo))
+        .toList()
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
+    // Fill up to 15 with unplayed tracks if fewer than 10 exist
+    if (forgotten.length < 10) {
+      final unplayed = allSongs.where((s) => s.playCount == 0).toList()
+        ..shuffle();
+      final needed = 15 - forgotten.length;
+      forgotten = [...forgotten, ...unplayed.take(needed)];
+    }
 
-    final rotation = recentSongs.take(6).toList();
+    // Late Night Chill: medium-playcount tracks not recently played
+    final lateNight = [...allSongs]
+      ..sort((a, b) => a.playCount.compareTo(b.playCount));
+    final lateNightMix = lateNight.take(12).toList();
+
+    final rotation = recentSongs.take(8).toList();
     final hasMiniplayer = playerState.hasTrack;
+
+    // Top artists: group songs by artist and pick a representative
+    final artistMap = <String, Song>{};
+    for (final s in allSongs) {
+      if (!artistMap.containsKey(s.artist)) {
+        artistMap[s.artist] = s;
+      }
+    }
+    final topArtists = artistMap.values.take(8).toList();
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(0, 20, 0, hasMiniplayer ? 110 : 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Vibe subtitle
         if (profile?.vibeSubtitle != null)
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(profile!.vibeSubtitle,
-              style: TextStyle(color: const Color(0xFFFF758F).withValues(alpha: 0.75),
-                fontSize: 13, fontWeight: FontWeight.w500, fontStyle: FontStyle.italic))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              profile!.vibeSubtitle,
+              style: TextStyle(
+                  color: const Color(0xFFFF758F).withValues(alpha: 0.75),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.italic),
+            ),
+          ),
         const SizedBox(height: 20),
 
-        _HeroCard(allSongs: allSongs, recentSongs: recentSongs),
+        // ── Hero Card
+        _HeroCard(allSongs: allSongs, recentSongs: recentSongs, profile: profile),
         const SizedBox(height: 24),
 
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text('SMART PICKS', style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white.withValues(alpha: 0.4), letterSpacing: 1.6, fontWeight: FontWeight.w700))),
-        const SizedBox(height: 12),
-
-        SizedBox(height: 130,
-          child: ListView(scrollDirection: Axis.horizontal,
+        // ── Smart Picks
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text('SMART PICKS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 200,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
-              _SmartCard(icon: Icons.trending_up_rounded, label: 'Top 10\nMost Played', count: top10.length,
-                gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                onTap: top10.isEmpty ? null : () => _playCollection(ref, top10)),
-              const SizedBox(width: 12),
-              _SmartCard(icon: Icons.history_rounded, label: 'Forgotten\nFavorites', count: forgotten.length,
-                gradient: const LinearGradient(colors: [Color(0xFFFF758F), Color(0xFFFF4D6D)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                onTap: forgotten.isEmpty ? null : () => _playCollection(ref, forgotten)),
-              const SizedBox(width: 12),
-              _SmartCard(icon: Icons.library_music_rounded, label: 'Full\nLibrary', count: allSongs.length,
-                gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF3B82F6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                onTap: () => context.push('/library')),
+              _SmartPickCard(
+                label: 'Top 10\nMost Played',
+                songCount: top10.length,
+                previewSongs: top10.take(4).toList(),
+                accentColor: const Color(0xFF8B5CF6),
+                icon: Icons.trending_up_rounded,
+                onTap: top10.isEmpty ? null : () => _playCollection(ref, top10),
+              ),
+              const SizedBox(width: 14),
+              _SmartPickCard(
+                label: 'Forgotten\nFavorites',
+                songCount: forgotten.length,
+                previewSongs: forgotten.take(4).toList(),
+                accentColor: const Color(0xFFFF758F),
+                icon: Icons.history_rounded,
+                onTap: forgotten.isEmpty
+                    ? null
+                    : () => _playCollection(ref, forgotten),
+              ),
+              const SizedBox(width: 14),
+              _SmartPickCard(
+                label: 'Full\nLibrary',
+                songCount: allSongs.length,
+                previewSongs: allSongs.take(4).toList(),
+                accentColor: const Color(0xFF10B981),
+                icon: Icons.library_music_rounded,
+                onTap: () => context.push('/library'),
+              ),
+              const SizedBox(width: 14),
+              _SmartPickCard(
+                label: 'Late Night\nChill',
+                songCount: lateNightMix.length,
+                previewSongs: lateNightMix.take(4).toList(),
+                accentColor: const Color(0xFF3B82F6),
+                icon: Icons.nightlight_round,
+                onTap: lateNightMix.isEmpty
+                    ? null
+                    : () => _playCollection(ref, lateNightMix),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 28),
 
+        // ── Your Rotation (tall portrait cards)
         if (rotation.isNotEmpty) ...[
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(children: [
-              Text('YOUR ROTATION', style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.4), letterSpacing: 1.6, fontWeight: FontWeight.w700)),
-              const Spacer(),
-              GestureDetector(onTap: () => context.push('/library'),
-                child: Text('See all', style: TextStyle(color: const Color(0xFF8B5CF6).withValues(alpha: 0.85),
-                  fontSize: 12, fontWeight: FontWeight.w600))),
-            ])),
-          const SizedBox(height: 12),
-          _RotationGrid(songs: rotation),
+              Expanded(
+                child: Text('YOUR ROTATION',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        letterSpacing: 1.6,
+                        fontWeight: FontWeight.w700)),
+              ),
+              GestureDetector(
+                onTap: () => context.push('/library'),
+                child: Text('See all',
+                    style: TextStyle(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.85),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          _RotationCarousel(songs: rotation),
           const SizedBox(height: 28),
         ],
 
+        // ── Artists in Your Orbit
+        if (topArtists.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('ARTISTS IN YOUR ORBIT',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    letterSpacing: 1.6,
+                    fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 14),
+          _ArtistsOrbitRow(artists: topArtists, ref: ref, allSongs: allSongs),
+          const SizedBox(height: 28),
+        ],
+
+        // ── Recently Played
         if (recentSongs.isNotEmpty) ...[
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text('RECENTLY PLAYED', style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.4), letterSpacing: 1.6, fontWeight: FontWeight.w700))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('RECENTLY PLAYED',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    letterSpacing: 1.6,
+                    fontWeight: FontWeight.w700)),
+          ),
           const SizedBox(height: 12),
           _RecentList(songs: recentSongs),
         ],
@@ -235,101 +435,385 @@ class _DashboardBody extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Hero Card
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Moonlit Cosmic Hero Painter
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _HeroCard extends ConsumerWidget {
-  const _HeroCard({required this.allSongs, required this.recentSongs});
+class _CosmicHeroPainter extends CustomPainter {
+  const _CosmicHeroPainter({required this.hour, required this.animValue});
+  final int hour;
+  final double animValue; // 0.0 → 1.0 looping
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final isNight = hour >= 21 || hour < 6;
+    final isEvening = hour >= 18;
+
+    // --- Aurora waves ---
+    final auroraColors = isNight
+        ? [const Color(0xFF8B5CF6), const Color(0xFF3B82F6), const Color(0xFF10B981)]
+        : [const Color(0xFFFF758F), const Color(0xFF8B5CF6), const Color(0xFFFF4D6D)];
+
+    for (var i = 0; i < 3; i++) {
+      final phase = animValue * 2 * math.pi + i * (2 * math.pi / 3);
+      final waveY = size.height * 0.55 + math.sin(phase) * 18;
+      final path = Path();
+      path.moveTo(0, waveY);
+      for (double x = 0; x <= size.width; x += 4) {
+        final y = waveY +
+            math.sin((x / size.width) * math.pi * 3 + phase) * 14 -
+            i * 20;
+        path.lineTo(x, y);
+      }
+      path.lineTo(size.width, size.height);
+      path.lineTo(0, size.height);
+      path.close();
+
+      final paint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            auroraColors[i].withValues(alpha: 0.18),
+            auroraColors[(i + 1) % 3].withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+      canvas.drawPath(path, paint);
+    }
+
+    // --- Horizon silhouette ---
+    final horizonPaint = Paint()
+      ..color = (isNight
+              ? const Color(0xFF0D0A1A)
+              : const Color(0xFF1A0D2E))
+          .withValues(alpha: 0.6)
+      ..style = PaintingStyle.fill;
+    final horizonPath = Path();
+    horizonPath.moveTo(0, size.height * 0.72);
+    horizonPath.cubicTo(
+        size.width * 0.2, size.height * 0.65,
+        size.width * 0.5, size.height * 0.70,
+        size.width, size.height * 0.68);
+    horizonPath.lineTo(size.width, size.height);
+    horizonPath.lineTo(0, size.height);
+    horizonPath.close();
+    canvas.drawPath(horizonPath, horizonPaint);
+
+    // --- Moon (night) or Sun glow (day) ---
+    if (isEvening) {
+      final moonX = size.width * 0.78;
+      final moonY = size.height * 0.22;
+      final moonPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.9)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(Offset(moonX, moonY), 14, moonPaint);
+
+      // Glow halo
+      final haloPaint = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.3),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: Offset(moonX, moonY), radius: 36));
+      canvas.drawCircle(Offset(moonX, moonY), 36, haloPaint);
+    }
+
+    // --- Neon mesh glow nodes ---
+    final rng = math.Random(42);
+    final nodeCount = isNight ? 18 : 10;
+    for (var i = 0; i < nodeCount; i++) {
+      final nx = rng.nextDouble() * size.width;
+      final ny = rng.nextDouble() * size.height * 0.65;
+      final sparkle = (math.sin(animValue * 2 * math.pi + i) + 1) / 2;
+      final nodePaint = Paint()
+        ..color = auroraColors[i % auroraColors.length]
+            .withValues(alpha: 0.6 * sparkle + 0.1);
+      canvas.drawCircle(Offset(nx, ny), 1.5, nodePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CosmicHeroPainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero Card — Layered Lucid Glass Visual Hero Banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HeroCard extends ConsumerStatefulWidget {
+  const _HeroCard({
+    required this.allSongs,
+    required this.recentSongs,
+    required this.profile,
+  });
   final List<Song> allSongs;
   final List<Song> recentSongs;
+  final UserProfile? profile;
+
+  @override
+  ConsumerState<_HeroCard> createState() => _HeroCardState();
+}
+
+class _HeroCardState extends ConsumerState<_HeroCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   String _heroLabel() {
     final h = DateTime.now().hour;
+    if (h < 6) return 'LATE NIGHT VIBES';
     if (h < 12) return 'MORNING RITUALS';
     if (h < 17) return 'AFTERNOON DRIVE';
     if (h < 21) return 'EVENING FLOW';
     return 'LATE NIGHT VIBES';
   }
 
+  String _heroHeadline() {
+    final h = DateTime.now().hour;
+    if (h < 6) return 'Stay a little after hours.';
+    if (h < 12) return 'Set the tone for today.';
+    if (h < 17) return 'Keep the momentum going.';
+    if (h < 21) return 'Wind down with good sound.';
+    return 'Stay a little after hours.';
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tt = Theme.of(context).textTheme;
-    final songCount = allSongs.length;
+  Widget build(BuildContext context) {
+    final songCount = widget.allSongs.length;
+    final name = widget.profile?.displayName ?? 'You';
+    final previewSongs = {
+      ...widget.recentSongs.take(3),
+      ...widget.allSongs.take(3),
+    }.take(4).toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: () {
-          if (allSongs.isNotEmpty) {
-            final tracks = allSongs.map(Track.fromSong).toList();
-            ref.read(playerControllerProvider.notifier).playTrack(tracks.first, queue: tracks);
+          if (widget.allSongs.isNotEmpty) {
+            final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
+            ref
+                .read(playerControllerProvider.notifier)
+                .playTrack(tracks.first, queue: tracks);
           } else {
             context.push('/library');
           }
         },
-        child: Container(
-          height: 160,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: const LinearGradient(colors: [Color(0xFF1E0A3C), Color(0xFF0D1A3A)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight),
-            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
-            boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2), blurRadius: 30, offset: const Offset(0, 8))],
-          ),
-          child: Stack(children: [
-            Positioned(right: -30, top: -30, child: Container(width: 160, height: 160,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [const Color(0xFFFF758F).withValues(alpha: 0.15), Colors.transparent])))),
-            Positioned(left: 100, bottom: -20, child: Container(width: 100, height: 100,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [const Color(0xFF8B5CF6).withValues(alpha: 0.2), Colors.transparent])))),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: const Color(0xFFFF758F).withValues(alpha: 0.15),
-                    border: Border.all(color: const Color(0xFFFF758F).withValues(alpha: 0.35))),
-                  child: Text(_heroLabel(), style: const TextStyle(color: Color(0xFFFF758F),
-                    fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.5))),
-                const Spacer(),
-                Text(songCount == 0 ? 'Scan your library' : '$songCount songs ready',
-                  style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.5)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  Text(songCount == 0 ? 'Tap to go to library' : 'Tap to start playing',
-                    style: tt.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.55))),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFFFF758F), Color(0xFF8B5CF6)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5), blurRadius: 12)]),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22)),
-                ]),
-              ]),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: SizedBox(
+            height: 200,
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (_, _) {
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Layer 1: Cosmic background painter
+                    CustomPaint(
+                      painter: _CosmicHeroPainter(
+                        hour: DateTime.now().hour,
+                        animValue: _ctrl.value,
+                      ),
+                    ),
+
+                    // Dark vignette
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            const Color(0xFF1E0A3C).withValues(alpha: 0.55),
+                            const Color(0xFF08070F).withValues(alpha: 0.82),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Border glow
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+
+                    // Foreground content
+                    Padding(
+                      padding: const EdgeInsets.all(22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Badge pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color:
+                                  const Color(0xFFFF758F).withValues(alpha: 0.15),
+                              border: Border.all(
+                                  color: const Color(0xFFFF758F)
+                                      .withValues(alpha: 0.4)),
+                            ),
+                            child: Text(_heroLabel(),
+                                style: const TextStyle(
+                                    color: Color(0xFFFF758F),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.5)),
+                          ),
+
+                          const Spacer(),
+
+                          // Headline
+                          Text(_heroHeadline(),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                  height: 1.2)),
+
+                          const SizedBox(height: 6),
+
+                          // Subtitle + play button row
+                          Row(children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    songCount == 0
+                                        ? 'Tap to scan your library'
+                                        : '$songCount songs ready • For $name',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.55),
+                                        fontSize: 11),
+                                  ),
+                                  if (previewSongs.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    _OverlappingAvatarRow(songs: previewSongs),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Glowing neon play button
+                            Container(
+                              padding: const EdgeInsets.all(11),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: const Color(0xFF8B5CF6)
+                                          .withValues(alpha: 0.6),
+                                      blurRadius: 20,
+                                      spreadRadius: 2),
+                                ],
+                              ),
+                              child: const Icon(Icons.play_arrow_rounded,
+                                  color: Colors.white, size: 26),
+                            ),
+                          ]),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-          ]),
+          ),
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Smart Card
-// ---------------------------------------------------------------------------
+/// Mini row of overlapping circular album art thumbnails
+class _OverlappingAvatarRow extends StatelessWidget {
+  const _OverlappingAvatarRow({required this.songs});
+  final List<Song> songs;
 
-class _SmartCard extends StatelessWidget {
-  const _SmartCard({required this.icon, required this.label, required this.count,
-    required this.gradient, this.onTap});
-  final IconData icon;
+  @override
+  Widget build(BuildContext context) {
+    const size = 26.0;
+    const overlap = 10.0;
+    final display = songs.take(4).toList();
+    return SizedBox(
+      height: size,
+      width: (size + (display.length - 1) * (size - overlap)).clamp(size, 120),
+      child: Stack(
+        children: List.generate(display.length, (i) {
+          return Positioned(
+            left: i * (size - overlap),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: const Color(0xFF08070F).withValues(alpha: 0.8),
+                    width: 1.5),
+              ),
+              child: ClipOval(
+                child: SongArtwork.fromSong(display[i],
+                    size: size, borderRadius: BorderRadius.zero),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Smart Pick Card — Real Album Art Collage + Frosted Glass
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SmartPickCard extends StatelessWidget {
+  const _SmartPickCard({
+    required this.label,
+    required this.songCount,
+    required this.previewSongs,
+    required this.accentColor,
+    required this.icon,
+    this.onTap,
+  });
+
   final String label;
-  final int count;
-  final Gradient gradient;
+  final int songCount;
+  final List<Song> previewSongs;
+  final Color accentColor;
+  final IconData icon;
   final VoidCallback? onTap;
 
   @override
@@ -337,77 +821,335 @@ class _SmartCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 140,
+        width: 160,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
-          color: Colors.white.withValues(alpha: 0.05),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(
+                color: accentColor.withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 6)),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: gradient),
-              child: Icon(icon, color: Colors.white, size: 18)),
-            const Spacer(),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 13,
-              fontWeight: FontWeight.w700, height: 1.3)),
-            const SizedBox(height: 4),
-            Text('$count songs', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
-          ]),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 2x2 album art grid collage background
+              if (previewSongs.length >= 4)
+                _ArtCollageGrid(songs: previewSongs)
+              else if (previewSongs.isNotEmpty)
+                SongArtwork.fromSong(previewSongs.first,
+                    size: 160, borderRadius: BorderRadius.zero, fit: BoxFit.cover)
+              else
+                Container(color: const Color(0xFF13131F)),
+
+              // Neon mesh glow overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topRight,
+                    radius: 1.2,
+                    colors: [
+                      accentColor.withValues(alpha: 0.35),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+
+              // Frosted dark glass vignette from bottom
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF08070F).withValues(alpha: 0.55),
+                      const Color(0xFF08070F).withValues(alpha: 0.88),
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
+                  ),
+                ),
+              ),
+
+              // Border
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                      color: accentColor.withValues(alpha: 0.25), width: 1),
+                ),
+              ),
+
+              // Text content
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Icon badge top-left
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: accentColor.withValues(alpha: 0.25),
+                        border: Border.all(
+                            color: accentColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Icon(icon, color: accentColor, size: 14),
+                    ),
+                    const Spacer(),
+                    Text(label,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
+                            shadows: [
+                              Shadow(
+                                  blurRadius: 8,
+                                  color: Colors.black54,
+                                  offset: Offset(0, 2))
+                            ])),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Expanded(
+                        child: Text('$songCount songs',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 11)),
+                      ),
+                      // Floating play badge
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accentColor.withValues(alpha: 0.85),
+                          boxShadow: [
+                            BoxShadow(
+                                color: accentColor.withValues(alpha: 0.5),
+                                blurRadius: 10)
+                          ],
+                        ),
+                        child: const Icon(Icons.play_arrow_rounded,
+                            color: Colors.white, size: 12),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rotation Grid (2 columns)
-// ---------------------------------------------------------------------------
-
-class _RotationGrid extends ConsumerWidget {
-  const _RotationGrid({required this.songs});
+/// 2×2 grid of album art tiles for collage background
+class _ArtCollageGrid extends StatelessWidget {
+  const _ArtCollageGrid({required this.songs});
   final List<Song> songs;
 
   @override
+  Widget build(BuildContext context) {
+    final s = songs.take(4).toList();
+    return Column(children: [
+      Expanded(
+        child: Row(children: [
+          Expanded(
+              child: SongArtwork.fromSong(s[0],
+                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
+          Expanded(
+              child: SongArtwork.fromSong(s[1],
+                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
+        ]),
+      ),
+      Expanded(
+        child: Row(children: [
+          Expanded(
+              child: SongArtwork.fromSong(s[2],
+                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
+          Expanded(
+              child: SongArtwork.fromSong(s[3],
+                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
+        ]),
+      ),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rotation Carousel — Tall Lucid Glass Portrait Cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RotationCarousel extends ConsumerWidget {
+  const _RotationCarousel({required this.songs});
+  final List<Song> songs;
+
+  String _moodTag(Song s) {
+    if (s.playCount >= 10) return 'Energetic • ${s.playCount} plays';
+    if (s.playCount >= 3) return '${s.playCount} plays';
+    return 'Fresh Track';
+  }
+
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, childAspectRatio: 2.8,
-          crossAxisSpacing: 10, mainAxisSpacing: 10),
+    return SizedBox(
+      height: 220,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: songs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (_, i) {
           final s = songs[i];
+          final isCurrentTrack =
+              ref.watch(playerControllerProvider).currentTrack?.id == 'local_${s.id}';
+
           return GestureDetector(
             onTap: () {
               final track = Track.fromSong(s);
-              ref.read(playerControllerProvider.notifier).playTrack(track, queue: [track]);
+              final queue = songs.map(Track.fromSong).toList();
+              ref
+                  .read(playerControllerProvider.notifier)
+                  .playTrack(track, queue: queue);
             },
             child: Container(
+              width: 140,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color: Colors.white.withValues(alpha: 0.05),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.09))),
-              child: Row(children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
-                  child: SongArtwork.fromSong(s, size: 48, borderRadius: BorderRadius.zero)),
-                const SizedBox(width: 8),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                      color: isCurrentTrack
+                          ? const Color(0xFF8B5CF6).withValues(alpha: 0.4)
+                          : Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6)),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                    Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10)),
-                  ])),
-                const SizedBox(width: 4),
-              ]),
+                    // Full-bleed artwork (top 70%)
+                    SongArtwork.fromSong(s,
+                        width: 140,
+                        height: 220,
+                        borderRadius: BorderRadius.zero,
+                        fit: BoxFit.cover,
+                        isCurrent: isCurrentTrack),
+
+                    // Frosted glass footer overlay
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              const Color(0xFF08070F).withValues(alpha: 0.75),
+                              const Color(0xFF08070F).withValues(alpha: 0.95),
+                            ],
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(s.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 10)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                color: (isCurrentTrack
+                                        ? const Color(0xFF00E5FF)
+                                        : const Color(0xFF8B5CF6))
+                                    .withValues(alpha: 0.2),
+                              ),
+                              child: Text(_moodTag(s),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: isCurrentTrack
+                                          ? const Color(0xFF00E5FF)
+                                          : const Color(0xFF8B5CF6),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Glass play button — bottom-right of image area
+                    Positioned(
+                      right: 8,
+                      bottom: 60,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.18),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                blurRadius: 8)
+                          ],
+                        ),
+                        child: Icon(
+                          isCurrentTrack
+                              ? Icons.equalizer_rounded
+                              : Icons.play_arrow_rounded,
+                          color: isCurrentTrack
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+
+                    // Active track highlight border
+                    if (isCurrentTrack)
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.7),
+                              width: 2),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -416,9 +1158,87 @@ class _RotationGrid extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Artists in Your Orbit — Circular Avatar Row
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ArtistsOrbitRow extends StatelessWidget {
+  const _ArtistsOrbitRow({
+    required this.artists,
+    required this.ref,
+    required this.allSongs,
+  });
+  final List<Song> artists;
+  final WidgetRef ref;
+  final List<Song> allSongs;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 96,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: artists.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 16),
+        itemBuilder: (_, i) {
+          final song = artists[i];
+          return GestureDetector(
+            onTap: () {
+              final artistSongs = allSongs.where((s) => s.artist == song.artist).toList();
+              if (artistSongs.isNotEmpty) {
+                final tracks = artistSongs.map(Track.fromSong).toList();
+                ref
+                    .read(playerControllerProvider.notifier)
+                    .playTrack(tracks.first, queue: tracks);
+              }
+            },
+            child: Column(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4)),
+                    ],
+                    border: Border.all(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                        width: 1.5),
+                  ),
+                  child: ClipOval(
+                    child: SongArtwork.fromSong(song,
+                        size: 60, borderRadius: BorderRadius.zero),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 64,
+                  child: Text(song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Recently Played List
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _RecentList extends ConsumerWidget {
   const _RecentList({required this.songs});
@@ -431,13 +1251,16 @@ class _RecentList extends ConsumerWidget {
 
     return Column(
       children: display.map((s) {
-        final isCurrentTrack = ref.watch(playerControllerProvider).currentTrack?.id == 'local_${s.id}';
+        final isCurrentTrack =
+            ref.watch(playerControllerProvider).currentTrack?.id == 'local_${s.id}';
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           child: GestureDetector(
             onTap: () {
               final track = Track.fromSong(s);
-              ref.read(playerControllerProvider.notifier).playTrack(track, queue: [track]);
+              ref
+                  .read(playerControllerProvider.notifier)
+                  .playTrack(track, queue: [track]);
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
@@ -445,24 +1268,42 @@ class _RecentList extends ConsumerWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: isCurrentTrack
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.04),
-                border: Border.all(color: isCurrentTrack
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
-                  : Colors.white.withValues(alpha: 0.07))),
+                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.04),
+                border: Border.all(
+                    color: isCurrentTrack
+                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
+                        : Colors.white.withValues(alpha: 0.07)),
+              ),
               child: Row(children: [
-                SongArtwork.fromSong(s, size: 44, borderRadius: BorderRadius.circular(10), isCurrent: isCurrentTrack),
+                SongArtwork.fromSong(s,
+                    size: 44,
+                    borderRadius: BorderRadius.circular(10),
+                    isCurrent: isCurrentTrack),
                 const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: tt.bodyMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
-                  Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: tt.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.5))),
-                ])),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tt.bodyMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600)),
+                        Text(s.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tt.bodySmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.5))),
+                      ]),
+                ),
                 if (isCurrentTrack)
-                  const Icon(Icons.equalizer_rounded, color: Color(0xFF8B5CF6), size: 18)
+                  const Icon(Icons.equalizer_rounded,
+                      color: Color(0xFF8B5CF6), size: 18)
                 else
-                  Icon(Icons.play_circle_outline_rounded, color: Colors.white.withValues(alpha: 0.3), size: 20),
+                  Icon(Icons.play_circle_outline_rounded,
+                      color: Colors.white.withValues(alpha: 0.3), size: 20),
               ]),
             ),
           ),
@@ -472,31 +1313,60 @@ class _RecentList extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Glass Bottom Nav Bar
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Glass Bottom Nav Bar (5 tabs)
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _GlassBottomNav extends ConsumerWidget {
-  const _GlassBottomNav();
+class _GlassBottomNav extends StatelessWidget {
+  const _GlassBottomNav({
+    required this.selectedIndex,
+    required this.onTap,
+  });
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0C18).withValues(alpha: 0.9),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07)))),
-      child: SafeArea(top: false,
+        color: const Color(0xFF0D0C18).withValues(alpha: 0.92),
+        border:
+            Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
+      ),
+      child: SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-            _NavItem(icon: Icons.home_rounded, label: 'Home', isActive: true, onTap: () {}),
-            _NavItem(icon: Icons.library_music_rounded, label: 'Library', isActive: false,
-              onTap: () => context.push('/library')),
-            _NavItem(icon: Icons.search_rounded, label: 'Search', isActive: false,
-              onTap: () => context.push('/library')),
-            _NavItem(icon: Icons.person_rounded, label: 'Profile', isActive: false,
-              onTap: () => EditProfileSheet.show(context)),
-          ]),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(
+                  icon: Icons.home_rounded,
+                  label: 'Home',
+                  isActive: selectedIndex == 0,
+                  onTap: () => onTap(0)),
+              _NavItem(
+                  icon: Icons.library_music_rounded,
+                  label: 'Library',
+                  isActive: selectedIndex == 1,
+                  onTap: () => onTap(1)),
+              _NavItem(
+                  icon: Icons.search_rounded,
+                  label: 'Search',
+                  isActive: selectedIndex == 2,
+                  onTap: () => onTap(2)),
+              _NavItem(
+                  icon: Icons.person_rounded,
+                  label: 'Profile',
+                  isActive: selectedIndex == 3,
+                  onTap: () => onTap(3)),
+              _NavItem(
+                  icon: Icons.settings_rounded,
+                  label: 'Settings',
+                  isActive: selectedIndex == 4,
+                  onTap: () => onTap(4)),
+            ],
+          ),
         ),
       ),
     );
@@ -504,8 +1374,12 @@ class _GlassBottomNav extends ConsumerWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label,
-    required this.isActive, required this.onTap});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
   final IconData icon;
   final String label;
   final bool isActive;
@@ -517,20 +1391,31 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: isActive ? const Color(0xFF8B5CF6).withValues(alpha: 0.2) : Colors.transparent),
-            child: Icon(icon, size: 22,
-              color: isActive ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.4))),
+              color: isActive
+                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.2)
+                  : Colors.transparent,
+            ),
+            child: Icon(icon,
+                size: 22,
+                color: isActive
+                    ? const Color(0xFF8B5CF6)
+                    : Colors.white.withValues(alpha: 0.4)),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 10,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-            color: isActive ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.4))),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                  color: isActive
+                      ? const Color(0xFF8B5CF6)
+                      : Colors.white.withValues(alpha: 0.4))),
         ]),
       ),
     );
