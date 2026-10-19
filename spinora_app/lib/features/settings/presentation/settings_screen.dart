@@ -9,6 +9,7 @@ import '../../../features/library/data/audio_scanner_service.dart';
 import '../../../features/player/application/player_controller.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
+import '../application/audio_settings_provider.dart';
 import '../application/theme_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,9 +55,12 @@ class SettingsScreen extends ConsumerWidget {
 
                         const SizedBox(height: 28),
 
-                        // ── Audio
-                        const _SectionLabel(label: 'AUDIO'),
+                        // ── Audio Playback & Crossfade
+                        const _SectionLabel(
+                            label: 'AUDIO PLAYBACK & CROSSFADE'),
                         const SizedBox(height: 12),
+                        const _CrossfadeCard(),
+                        const SizedBox(height: 10),
                         _SettingsTile(
                           icon: Icons.graphic_eq_rounded,
                           iconColor: const Color(0xFF8B5CF6),
@@ -449,6 +453,215 @@ class _AppearanceTile extends ConsumerWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audio Crossfade Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CrossfadeCard extends ConsumerWidget {
+  const _CrossfadeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audioSettings = ref.watch(audioSettingsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final enabled = audioSettings.crossfadeEnabled;
+    final duration = audioSettings.crossfadeDurationSeconds;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.85),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.95),
+          width: isDark ? 1.0 : 1.2,
+        ),
+        boxShadow: isDark ? null : AppTheme.lightCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(11),
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF00E5FF),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enable Audio Crossfade',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F111A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      enabled
+                          ? 'DJ-style smooth fade transitions (${duration.toStringAsFixed(1)}s)'
+                          : 'Seamlessly blend consecutive tracks',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.45)
+                            : const Color(0xFF5C6275),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Switch(
+                value: enabled,
+                onChanged: (val) {
+                  ref
+                      .read(audioSettingsProvider.notifier)
+                      .setCrossfadeEnabled(val);
+                },
+                activeThumbColor: const Color(0xFF00E5FF),
+                activeTrackColor:
+                    const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                inactiveThumbColor:
+                    isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                inactiveTrackColor: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : const Color(0xFFE2E8F0),
+              ),
+            ],
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.06),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Crossfade Duration (1s - 8s)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F111A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3.5,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Text(
+                    '${duration.toStringAsFixed(1)}s',
+                    style: const TextStyle(
+                      color: Color(0xFF00E5FF),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: const Color(0xFF00E5FF),
+                inactiveTrackColor: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : const Color(0xFFE2E8F0),
+                thumbColor: const Color(0xFF00E5FF),
+                overlayColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                trackHeight: 3.5,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 7.0),
+              ),
+              child: Slider(
+                value: duration.clamp(1.0, 8.0),
+                min: 1.0,
+                max: 8.0,
+                divisions: 14,
+                onChanged: (val) {
+                  ref
+                      .read(audioSettingsProvider.notifier)
+                      .setCrossfadeDuration(val);
+                },
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    '1.0s (Subtle)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.35)
+                          : const Color(0xFF8E95A8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: Text(
+                    '8.0s (Club DJ)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.35)
+                          : const Color(0xFF8E95A8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

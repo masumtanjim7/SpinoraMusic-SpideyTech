@@ -11,6 +11,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
 import '../../online/data/youtube_audio_service.dart';
+import '../../settings/application/audio_settings_provider.dart';
 import '../domain/equalizer_state.dart';
 import 'lyrics_controller.dart';
 
@@ -181,6 +182,9 @@ class PlayerController extends Notifier<PlayerState> {
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _sleepTimer;
+  Timer? _fadeInTimer;
+  bool _isFadingOut = false;
+  bool _isFadingIn = false;
   String? _lastRecordedTrackId;
   DateTime? _lastRecordedTime;
   DateTime? _lastPersistedTime;
@@ -192,9 +196,17 @@ class PlayerController extends Notifier<PlayerState> {
     _restoreSavedSession();
     _initAudioEffects();
 
+    ref.listen<AudioSettingsState>(audioSettingsProvider, (prev, next) {
+      if (!next.crossfadeEnabled && (prev?.crossfadeEnabled ?? false)) {
+        _cancelFadeTransitions();
+        player.setVolume(1.0);
+      }
+    });
+
     ref.onDispose(() {
       _sleepTimer?.cancel();
       _sleepTimer = null;
+      _cancelFadeTransitions();
       for (final sub in _subscriptions) {
         sub.cancel();
       }
@@ -202,6 +214,13 @@ class PlayerController extends Notifier<PlayerState> {
     });
 
     return const PlayerState();
+  }
+
+  void _cancelFadeTransitions() {
+    _fadeInTimer?.cancel();
+    _fadeInTimer = null;
+    _isFadingIn = false;
+    _isFadingOut = false;
   }
 
   /// Restores the last active track and playback position from local database on startup.
@@ -411,6 +430,7 @@ class PlayerController extends Notifier<PlayerState> {
       player.positionStream.listen((pos) {
         state = state.copyWith(position: pos);
         _persistCurrentSession();
+        _handleCrossfadeOnPosition(pos);
       }),
     );
 
@@ -436,8 +456,87 @@ class PlayerController extends Notifier<PlayerState> {
           if (state.isPlaying) {
             _recordPlayback(nextTrack);
           }
+          _triggerFadeInIfNeeded();
         }
       }),
+    );
+  }
+
+  void _handleCrossfadeOnPosition(Duration pos) {
+    final audioSettings = ref.read(audioSettingsProvider);
+    if (!audioSettings.crossfadeEnabled || !state.isPlaying) {
+      if (_isFadingOut) {
+        _isFadingOut = false;
+        player.setVolume(1.0);
+      }
+      return;
+    }
+
+    if (_isFadingIn) {
+      return;
+    }
+
+    final duration = state.duration;
+    if (duration == Duration.zero) return;
+
+    final fadeSec = audioSettings.crossfadeDurationSeconds;
+    final fadeMs = (fadeSec * 1000).round();
+
+    if (duration.inMilliseconds <= fadeMs * 2) return;
+
+    final remainingMs = duration.inMilliseconds - pos.inMilliseconds;
+    if (remainingMs <= fadeMs && remainingMs >= 0) {
+      _isFadingOut = true;
+      final volume = calculateFadeOutVolume(
+        position: pos,
+        duration: duration,
+        crossfadeDurationSeconds: fadeSec,
+      );
+      player.setVolume(volume);
+    } else if (_isFadingOut && remainingMs > fadeMs) {
+      _isFadingOut = false;
+      player.setVolume(1.0);
+    }
+  }
+
+  void _triggerFadeInIfNeeded() {
+    final audioSettings = ref.read(audioSettingsProvider);
+    if (!audioSettings.crossfadeEnabled) {
+      _cancelFadeTransitions();
+      player.setVolume(1.0);
+      return;
+    }
+
+    _cancelFadeTransitions();
+    _isFadingIn = true;
+
+    final fadeSec = audioSettings.crossfadeDurationSeconds;
+    const stepIntervalMs = 50;
+    final totalSteps = (fadeSec * 1000 / stepIntervalMs).round().clamp(5, 160);
+    var currentStep = 0;
+
+    player.setVolume(0.0);
+    final stopwatch = Stopwatch()..start();
+
+    _fadeInTimer = Timer.periodic(
+      const Duration(milliseconds: stepIntervalMs),
+      (timer) {
+        currentStep++;
+        final elapsed = stopwatch.elapsed;
+        final volume = calculateFadeInVolume(
+          elapsedSinceStart: elapsed,
+          crossfadeDurationSeconds: fadeSec,
+        );
+
+        player.setVolume(volume);
+
+        if (volume >= 1.0 || currentStep >= totalSteps) {
+          timer.cancel();
+          _fadeInTimer = null;
+          _isFadingIn = false;
+          player.setVolume(1.0);
+        }
+      },
     );
   }
 
@@ -608,6 +707,7 @@ class PlayerController extends Notifier<PlayerState> {
 
           await player.play();
           if (requestId != _playbackRequestId) return;
+          _triggerFadeInIfNeeded();
         }
 
         _recordPlayback(track);
@@ -632,6 +732,7 @@ class PlayerController extends Notifier<PlayerState> {
       if (requestId != _playbackRequestId) return;
 
       await player.play();
+      _triggerFadeInIfNeeded();
       _recordPlayback(track);
 
       // Trigger automatic lyrics fetching for track
@@ -844,12 +945,16 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   Future<void> pause() {
+    _cancelFadeTransitions();
+    player.setVolume(1.0);
     _persistCurrentSession(immediate: true);
     return player.pause();
   }
 
   Future<void> seek(Duration position) async {
     state = state.copyWith(position: position);
+    _cancelFadeTransitions();
+    player.setVolume(1.0);
     await player.seek(position);
     _persistCurrentSession(immediate: true);
   }
@@ -1047,6 +1152,8 @@ class PlayerController extends Notifier<PlayerState> {
 
   Future<void> stop() async {
     cancelSleepTimer();
+    _cancelFadeTransitions();
+    player.setVolume(1.0);
     await player.stop();
     state = const PlayerState();
   }
