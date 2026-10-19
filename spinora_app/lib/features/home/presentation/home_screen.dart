@@ -14,6 +14,8 @@ import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
 import '../../../features/settings/presentation/settings_screen.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
+import '../application/smart_mixes_provider.dart';
+import 'smart_mix_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Home Screen — Lucid Glass Personalized Dashboard
@@ -250,36 +252,10 @@ class _DashboardBody extends ConsumerWidget {
     final songsAsync = ref.watch(localSongsStreamProvider);
     final recentAsync = ref.watch(recentlyPlayedSongsStreamProvider);
     final playerState = ref.watch(playerControllerProvider);
+    final smartMixes = ref.watch(smartMixesProvider);
 
     final allSongs = songsAsync.value ?? [];
     final recentSongs = recentAsync.value ?? [];
-
-    // Top 10 Most Played
-    final mostPlayed = [...allSongs]
-      ..sort((a, b) => b.playCount.compareTo(a.playCount));
-    final top10 = mostPlayed.where((s) => s.playCount > 0).take(10).toList();
-
-    // Forgotten Favorites: played but not in last 30 days
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    var forgotten = allSongs
-        .where((s) =>
-            s.playCount > 0 &&
-            s.lastPlayedAt != null &&
-            s.lastPlayedAt!.isBefore(thirtyDaysAgo))
-        .toList()
-      ..sort((a, b) => b.playCount.compareTo(a.playCount));
-    // Fill up to 15 with unplayed tracks if fewer than 10 exist
-    if (forgotten.length < 10) {
-      final unplayed = allSongs.where((s) => s.playCount == 0).toList()
-        ..shuffle();
-      final needed = 15 - forgotten.length;
-      forgotten = [...forgotten, ...unplayed.take(needed)];
-    }
-
-    // Late Night Chill: medium-playcount tracks not recently played
-    final lateNight = [...allSongs]
-      ..sort((a, b) => a.playCount.compareTo(b.playCount));
-    final lateNightMix = lateNight.take(12).toList();
 
     final rotation = recentSongs.take(8).toList();
     final hasMiniplayer = playerState.hasTrack;
@@ -327,50 +303,32 @@ class _DashboardBody extends ConsumerWidget {
         const SizedBox(height: 14),
         SizedBox(
           height: 200,
-          child: ListView(
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: [
-              _SmartPickCard(
-                label: 'Top 10\nMost Played',
-                songCount: top10.length,
-                previewSongs: top10.take(4).toList(),
-                accentColor: const Color(0xFF8B5CF6),
-                icon: Icons.trending_up_rounded,
-                onTap: top10.isEmpty ? null : () => _playCollection(ref, top10),
-              ),
-              const SizedBox(width: 14),
-              _SmartPickCard(
-                label: 'Forgotten\nFavorites',
-                songCount: forgotten.length,
-                previewSongs: forgotten.take(4).toList(),
-                accentColor: const Color(0xFFFF758F),
-                icon: Icons.history_rounded,
-                onTap: forgotten.isEmpty
+            itemCount: smartMixes.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final mix = smartMixes[index];
+              return _SmartPickCard(
+                mix: mix,
+                onTap: () {
+                  Navigator.of(context).push(
+                    PageRouteBuilder<void>(
+                      pageBuilder: (_, _, _) => SmartMixDetailScreen(mix: mix),
+                      transitionsBuilder: (_, animation, _, child) =>
+                          FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    ),
+                  );
+                },
+                onQuickPlay: mix.songs.isEmpty
                     ? null
-                    : () => _playCollection(ref, forgotten),
-              ),
-              const SizedBox(width: 14),
-              _SmartPickCard(
-                label: 'Full\nLibrary',
-                songCount: allSongs.length,
-                previewSongs: allSongs.take(4).toList(),
-                accentColor: const Color(0xFF10B981),
-                icon: Icons.library_music_rounded,
-                onTap: () => context.push('/library'),
-              ),
-              const SizedBox(width: 14),
-              _SmartPickCard(
-                label: 'Late Night\nChill',
-                songCount: lateNightMix.length,
-                previewSongs: lateNightMix.take(4).toList(),
-                accentColor: const Color(0xFF3B82F6),
-                icon: Icons.nightlight_round,
-                onTap: lateNightMix.isEmpty
-                    ? null
-                    : () => _playCollection(ref, lateNightMix),
-              ),
-            ],
+                    : () => _playCollection(ref, mix.songs),
+              );
+            },
           ),
         ),
         const SizedBox(height: 28),
@@ -796,25 +754,19 @@ class _OverlappingAvatarRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Smart Pick Card — Real Album Art Collage + Frosted Glass
+// Smart Pick Card — Dynamic Artwork Banner + Lucid Glass
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SmartPickCard extends StatelessWidget {
   const _SmartPickCard({
-    required this.label,
-    required this.songCount,
-    required this.previewSongs,
-    required this.accentColor,
-    required this.icon,
+    required this.mix,
     this.onTap,
+    this.onQuickPlay,
   });
 
-  final String label;
-  final int songCount;
-  final List<Song> previewSongs;
-  final Color accentColor;
-  final IconData icon;
+  final SmartMixInfo mix;
   final VoidCallback? onTap;
+  final VoidCallback? onQuickPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -826,161 +778,107 @@ class _SmartPickCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-                color: accentColor.withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 6)),
+              color: mix.accentColor.withValues(alpha: 0.28),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 2x2 album art grid collage background
-              if (previewSongs.length >= 4)
-                _ArtCollageGrid(songs: previewSongs)
-              else if (previewSongs.isNotEmpty)
-                SongArtwork.fromSong(previewSongs.first,
-                    size: 160, borderRadius: BorderRadius.zero, fit: BoxFit.cover)
-              else
-                Container(color: const Color(0xFF13131F)),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Dynamic Artwork Banner (Asset image with CustomPainter Fallback)
+            SmartMixArtworkView(
+              mix: mix,
+              borderRadius: 22,
+              showVignette: true,
+            ),
 
-              // Neon mesh glow overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.topRight,
-                    radius: 1.2,
-                    colors: [
-                      accentColor.withValues(alpha: 0.35),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-
-              // Frosted dark glass vignette from bottom
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      const Color(0xFF08070F).withValues(alpha: 0.55),
-                      const Color(0xFF08070F).withValues(alpha: 0.88),
-                    ],
-                    stops: const [0.0, 0.4, 1.0],
-                  ),
-                ),
-              ),
-
-              // Border
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                      color: accentColor.withValues(alpha: 0.25), width: 1),
-                ),
-              ),
-
-              // Text content
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Icon badge top-left
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: accentColor.withValues(alpha: 0.25),
-                        border: Border.all(
-                            color: accentColor.withValues(alpha: 0.4)),
-                      ),
-                      child: Icon(icon, color: accentColor, size: 14),
+            // Foreground Text Content & Interactive Play Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon badge top-left
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: mix.accentColor.withValues(alpha: 0.3),
+                      border: Border.all(
+                          color: mix.accentColor.withValues(alpha: 0.5)),
                     ),
-                    const Spacer(),
-                    Text(label,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            height: 1.3,
-                            shadows: [
-                              Shadow(
-                                  blurRadius: 8,
-                                  color: Colors.black54,
-                                  offset: Offset(0, 2))
-                            ])),
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      Expanded(
-                        child: Text('$songCount songs',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 11)),
-                      ),
-                      // Floating play badge
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: accentColor.withValues(alpha: 0.85),
-                          boxShadow: [
-                            BoxShadow(
-                                color: accentColor.withValues(alpha: 0.5),
-                                blurRadius: 10)
-                          ],
+                    child: Icon(mix.icon, color: mix.accentColor, size: 14),
+                  ),
+                  const Spacer(),
+
+                  // Mix Title
+                  Text(
+                    mix.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 8,
+                          color: Colors.black87,
+                          offset: Offset(0, 2),
                         ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 12),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Song Count and Floating Play Badge
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${mix.songs.length} songs',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ]),
-                  ],
-                ),
+
+                      // Floating Quick-Play Button
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onQuickPlay ?? onTap,
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: mix.accentColor.withValues(alpha: 0.9),
+                            boxShadow: [
+                              BoxShadow(
+                                color: mix.accentColor.withValues(alpha: 0.6),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded,
+                              color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
-  }
-}
-
-/// 2×2 grid of album art tiles for collage background
-class _ArtCollageGrid extends StatelessWidget {
-  const _ArtCollageGrid({required this.songs});
-  final List<Song> songs;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = songs.take(4).toList();
-    return Column(children: [
-      Expanded(
-        child: Row(children: [
-          Expanded(
-              child: SongArtwork.fromSong(s[0],
-                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
-          Expanded(
-              child: SongArtwork.fromSong(s[1],
-                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
-        ]),
-      ),
-      Expanded(
-        child: Row(children: [
-          Expanded(
-              child: SongArtwork.fromSong(s[2],
-                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
-          Expanded(
-              child: SongArtwork.fromSong(s[3],
-                  borderRadius: BorderRadius.zero, fit: BoxFit.cover)),
-        ]),
-      ),
-    ]);
   }
 }
 
