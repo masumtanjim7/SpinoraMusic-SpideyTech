@@ -12,6 +12,7 @@ import '../../../features/player/application/player_controller.dart';
 import '../../../features/player/presentation/mini_player.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
+import '../../../features/profile/presentation/profile_screen.dart';
 import '../../../features/settings/presentation/settings_screen.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/smart_mixes_provider.dart';
@@ -41,7 +42,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
     if (index == 3) {
-      EditProfileSheet.show(context);
+      Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) => const ProfileScreen(),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        ),
+      );
       return;
     }
     if (index == 4) {
