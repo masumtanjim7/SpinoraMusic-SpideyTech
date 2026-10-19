@@ -413,107 +413,495 @@ class _DashboardBody extends ConsumerWidget {
 // Moonlit Cosmic Hero Painter
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CosmicHeroPainter extends CustomPainter {
-  const _CosmicHeroPainter({required this.hour, required this.animValue});
-  final int hour;
-  final double animValue; // 0.0 → 1.0 looping
+// ─────────────────────────────────────────────────────────────────────────────
+// Cinematic Time-of-Day Matrix & Models
+// ─────────────────────────────────────────────────────────────────────────────
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final isNight = hour >= 21 || hour < 6;
-    final isEvening = hour >= 18;
+enum _TimeSlot { morning, afternoon, evening, night }
 
-    // --- Aurora waves ---
-    final auroraColors = isNight
-        ? [const Color(0xFF8B5CF6), const Color(0xFF3B82F6), const Color(0xFF10B981)]
-        : [const Color(0xFFFF758F), const Color(0xFF8B5CF6), const Color(0xFFFF4D6D)];
+class _HeroSlotData {
+  const _HeroSlotData({
+    required this.slot,
+    required this.badge,
+    required this.subtitle,
+    required this.headlines,
+    required this.gradientColors,
+    required this.accentColor,
+    required this.orbColor,
+  });
 
-    for (var i = 0; i < 3; i++) {
-      final phase = animValue * 2 * math.pi + i * (2 * math.pi / 3);
-      final waveY = size.height * 0.55 + math.sin(phase) * 18;
-      final path = Path();
-      path.moveTo(0, waveY);
-      for (double x = 0; x <= size.width; x += 4) {
-        final y = waveY +
-            math.sin((x / size.width) * math.pi * 3 + phase) * 14 -
-            i * 20;
-        path.lineTo(x, y);
-      }
-      path.lineTo(size.width, size.height);
-      path.lineTo(0, size.height);
-      path.close();
+  final _TimeSlot slot;
+  final String badge;
+  final String subtitle;
+  final List<String> headlines;
+  final List<Color> gradientColors;
+  final Color accentColor;
+  final Color orbColor;
 
-      final paint = Paint()
-        ..shader = LinearGradient(
-          colors: [
-            auroraColors[i].withValues(alpha: 0.18),
-            auroraColors[(i + 1) % 3].withValues(alpha: 0.08),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-      canvas.drawPath(path, paint);
-    }
-
-    // --- Horizon silhouette ---
-    final horizonPaint = Paint()
-      ..color = (isNight
-              ? const Color(0xFF0D0A1A)
-              : const Color(0xFF1A0D2E))
-          .withValues(alpha: 0.6)
-      ..style = PaintingStyle.fill;
-    final horizonPath = Path();
-    horizonPath.moveTo(0, size.height * 0.72);
-    horizonPath.cubicTo(
-        size.width * 0.2, size.height * 0.65,
-        size.width * 0.5, size.height * 0.70,
-        size.width, size.height * 0.68);
-    horizonPath.lineTo(size.width, size.height);
-    horizonPath.lineTo(0, size.height);
-    horizonPath.close();
-    canvas.drawPath(horizonPath, horizonPaint);
-
-    // --- Moon (night) or Sun glow (day) ---
-    if (isEvening) {
-      final moonX = size.width * 0.78;
-      final moonY = size.height * 0.22;
-      final moonPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.9)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-      canvas.drawCircle(Offset(moonX, moonY), 14, moonPaint);
-
-      // Glow halo
-      final haloPaint = Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.3),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromCircle(center: Offset(moonX, moonY), radius: 36));
-      canvas.drawCircle(Offset(moonX, moonY), 36, haloPaint);
-    }
-
-    // --- Neon mesh glow nodes ---
-    final rng = math.Random(42);
-    final nodeCount = isNight ? 18 : 10;
-    for (var i = 0; i < nodeCount; i++) {
-      final nx = rng.nextDouble() * size.width;
-      final ny = rng.nextDouble() * size.height * 0.65;
-      final sparkle = (math.sin(animValue * 2 * math.pi + i) + 1) / 2;
-      final nodePaint = Paint()
-        ..color = auroraColors[i % auroraColors.length]
-            .withValues(alpha: 0.6 * sparkle + 0.1);
-      canvas.drawCircle(Offset(nx, ny), 1.5, nodePaint);
+  static _HeroSlotData resolve(DateTime now) {
+    final hour = now.hour;
+    if (hour >= 5 && hour < 12) {
+      // Morning (5:00 AM – 12:00 PM)
+      return const _HeroSlotData(
+        slot: _TimeSlot.morning,
+        badge: 'MORNING FLOW',
+        subtitle: 'Fresh and Energizing',
+        headlines: [
+          'Rise and shine with a soundtrack.',
+          'Brewing up your morning mix.',
+          'Start the day on the right note.',
+        ],
+        gradientColors: [Color(0xFFFF9E44), Color(0xFFFF5E7E)],
+        accentColor: Color(0xFFFF9E44),
+        orbColor: Color(0xFFFFD56B),
+      );
+    } else if (hour >= 12 && hour < 17) {
+      // Afternoon (12:00 PM – 5:00 PM)
+      return const _HeroSlotData(
+        slot: _TimeSlot.afternoon,
+        badge: 'MIDDAY GROOVE',
+        subtitle: 'Upbeat and Focused',
+        headlines: [
+          'Power through the afternoon.',
+          'Keep the momentum going.',
+          'Your midday rhythm is ready.',
+        ],
+        gradientColors: [Color(0xFF00D2FF), Color(0xFF7A5CFF)],
+        accentColor: Color(0xFF00D2FF),
+        orbColor: Color(0xFF70E1FF),
+      );
+    } else if (hour >= 17 && hour < 21) {
+      // Evening (5:00 PM – 9:00 PM)
+      return const _HeroSlotData(
+        slot: _TimeSlot.evening,
+        badge: 'GOLDEN HOUR',
+        subtitle: 'Warm and Mellow',
+        headlines: [
+          'Ease into the evening.',
+          'Chasing the sunset vibes.',
+          'Unwind from the day\'s noise.',
+        ],
+        gradientColors: [Color(0xFFFF4E88), Color(0xFF6A1B9A)],
+        accentColor: Color(0xFFFF4E88),
+        orbColor: Color(0xFFFF758F),
+      );
+    } else {
+      // Night (9:00 PM – 5:00 AM)
+      return const _HeroSlotData(
+        slot: _TimeSlot.night,
+        badge: 'LATE NIGHT VIBES',
+        subtitle: 'Cozy and Amazing',
+        headlines: [
+          'Stay a little after hours.',
+          'Lost in the midnight frequencies.',
+          'Soundtracks for the quiet hours.',
+        ],
+        gradientColors: [Color(0xFF9D50BB), Color(0xFFFF5E99)],
+        accentColor: Color(0xFF8B5CF6),
+        orbColor: Color(0xFFE0E7FF),
+      );
     }
   }
 
-  @override
-  bool shouldRepaint(covariant _CosmicHeroPainter oldDelegate) =>
-      oldDelegate.animValue != animValue;
+  String headlineFor(DateTime now) {
+    // Deterministically pick based on day of year & hour slot so it's stable throughout the hour/session
+    final index = (now.year * 366 + now.day + now.hour) % headlines.length;
+    return headlines[index];
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hero Card — Layered Lucid Glass Visual Hero Banner
+// Cinematic Time-of-Day Canvas Painter
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CinematicHeroPainter extends CustomPainter {
+  const _CinematicHeroPainter({
+    required this.slotData,
+    required this.animValue,
+    required this.isPlaying,
+    required this.tiltOffset,
+  });
+
+  final _HeroSlotData slotData;
+  final double animValue; // 0.0 -> 1.0 continuous ticker
+  final bool isPlaying;
+  final Offset tiltOffset; // -1.0 .. 1.0 parallax normalized
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final pulse = math.sin(animValue * 2 * math.pi);
+    final orbPulseScale = isPlaying ? 1.0 + (pulse * 0.14) : 1.0 + (pulse * 0.05);
+
+    // Parallax displacements
+    final midShiftX = tiltOffset.dx * 6.0;
+    final midShiftY = tiltOffset.dy * 4.0;
+
+    // ── 1. Sky Gradient Base
+    final skyGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        slotData.gradientColors.first.withValues(alpha: 0.35),
+        slotData.gradientColors.last.withValues(alpha: 0.20),
+        const Color(0xFF08070F).withValues(alpha: 0.90),
+      ],
+      stops: const [0.0, 0.45, 1.0],
+    );
+    canvas.drawRect(rect, Paint()..shader = skyGradient.createShader(rect));
+
+    // ── 2. Time-Slot Specific Celestial Sky & Dynamics
+    switch (slotData.slot) {
+      case _TimeSlot.morning:
+        _paintMorningSky(canvas, size, animValue, orbPulseScale);
+        break;
+      case _TimeSlot.afternoon:
+        _paintAfternoonSky(canvas, size, animValue, isPlaying);
+        break;
+      case _TimeSlot.evening:
+        _paintEveningSky(canvas, size, animValue, orbPulseScale);
+        break;
+      case _TimeSlot.night:
+        _paintNightSky(canvas, size, animValue, orbPulseScale);
+        break;
+    }
+
+    // ── 3. Middle Animated Hills (with parallax shift)
+    _paintMiddleHills(canvas, size, animValue, midShiftX, midShiftY);
+
+    // ── 4. Foreground Silhouette Hills
+    _paintForegroundSilhouettes(canvas, size);
+
+    // ── 5. Time-Slot Foreground Particle Accents
+    if (slotData.slot == _TimeSlot.morning) {
+      _paintMorningDewParticles(canvas, size, animValue);
+    } else if (slotData.slot == _TimeSlot.evening) {
+      _paintEveningFireflies(canvas, size, animValue);
+    }
+  }
+
+  void _paintMorningSky(Canvas canvas, Size size, double t, double pulseScale) {
+    // Rising sun ascending slightly in top-right
+    final sunCenter = Offset(size.width * 0.82, size.height * (0.24 - math.sin(t * math.pi) * 0.04));
+    final sunRadius = 20.0 * pulseScale;
+
+    // Sun outer halo
+    final haloPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          slotData.orbColor.withValues(alpha: 0.45),
+          const Color(0xFFFF9E44).withValues(alpha: 0.20),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: sunCenter, radius: sunRadius * 3.5));
+    canvas.drawCircle(sunCenter, sunRadius * 3.5, haloPaint);
+
+    // Sun core
+    final sunPaint = Paint()
+      ..color = slotData.orbColor.withValues(alpha: 0.95)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+    canvas.drawCircle(sunCenter, sunRadius, sunPaint);
+
+    // Horizontal drifting fog / mist layers
+    for (int i = 0; i < 3; i++) {
+      final layerShift = (t + i * 0.33) % 1.0;
+      final mistY = size.height * (0.50 + i * 0.08);
+      final mistPath = Path();
+      mistPath.moveTo(-size.width * 0.2, mistY);
+      for (double x = -size.width * 0.2; x <= size.width * 1.2; x += 12) {
+        final yOffset = math.sin((x / size.width) * 4 * math.pi + layerShift * 2 * math.pi) * 6;
+        mistPath.lineTo(x, mistY + yOffset);
+      }
+      mistPath.lineTo(size.width * 1.2, mistY + 22);
+      mistPath.lineTo(-size.width * 0.2, mistY + 22);
+      mistPath.close();
+
+      final mistPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.06 - (i * 0.015))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawPath(mistPath, mistPaint);
+    }
+  }
+
+  void _paintMorningDewParticles(Canvas canvas, Size size, double t) {
+    final rng = math.Random(101);
+    for (int i = 0; i < 18; i++) {
+      final baseX = rng.nextDouble() * size.width;
+      final speed = 0.3 + (rng.nextDouble() * 0.7);
+      final currentY = (size.height * 0.95) - (((t * speed + (i * 0.055)) % 1.0) * size.height * 0.65);
+      final driftX = baseX + math.sin(t * 2 * math.pi + i) * 12;
+      final particleAlpha = ((math.sin(t * 2 * math.pi + i) + 1) / 2) * 0.5 + 0.15;
+      final dewRadius = 1.2 + (rng.nextDouble() * 1.8);
+
+      final pPaint = Paint()
+        ..color = const Color(0xFFFFE082).withValues(alpha: particleAlpha.clamp(0.0, 1.0))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
+      canvas.drawCircle(Offset(driftX, currentY), dewRadius, pPaint);
+    }
+  }
+
+  void _paintAfternoonSky(Canvas canvas, Size size, double t, bool isPlaying) {
+    // Breeze wind lines sweeping across the upper sky
+    final breezePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.2;
+
+    for (int i = 0; i < 4; i++) {
+      final lineProgress = (t * (isPlaying ? 1.4 : 0.8) + i * 0.25) % 1.0;
+      final startX = -60.0 + lineProgress * (size.width + 120.0);
+      final y = size.height * (0.18 + i * 0.11);
+      final length = 45.0 + (i * 12.0);
+
+      breezePaint.color = const Color(0xFF00D2FF).withValues(alpha: (0.15 + (math.sin(lineProgress * math.pi) * 0.25)).clamp(0.0, 1.0));
+      final path = Path();
+      path.moveTo(startX, y);
+      path.quadraticBezierTo(startX + (length * 0.5), y - 4, startX + length, y + 2);
+      canvas.drawPath(path, breezePaint);
+    }
+  }
+
+  void _paintEveningSky(Canvas canvas, Size size, double t, double pulseScale) {
+    // Synthwave melting sun behind ridges
+    final sunCenter = Offset(size.width * 0.76, size.height * 0.52);
+    final sunRadius = 26.0 * pulseScale;
+
+    // Glowing sun rays / disc
+    final sunPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFFFD166),
+          const Color(0xFFFF4E88).withValues(alpha: 0.9),
+          Colors.transparent,
+        ],
+        stops: const [0.3, 0.7, 1.0],
+      ).createShader(Rect.fromCircle(center: sunCenter, radius: sunRadius * 2.2));
+    canvas.drawCircle(sunCenter, sunRadius * 2.2, sunPaint);
+
+    // Synthwave horizontal blinds cutouts on sun
+    final cutPaint = Paint()
+      ..color = const Color(0xFF08070F).withValues(alpha: 0.6)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    for (int i = 0; i < 4; i++) {
+      final y = sunCenter.dy + (i * 4.5);
+      canvas.drawLine(
+        Offset(sunCenter.dx - sunRadius, y),
+        Offset(sunCenter.dx + sunRadius, y),
+        cutPaint,
+      );
+    }
+
+    // Tiny flock of minimal vector birds gliding across upper sky
+    final birdSpeed = (t * 0.35) % 1.0;
+    final flockX = -40 + birdSpeed * (size.width + 80);
+    final birdPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 3; i++) {
+      final bx = flockX - (i * 14.0);
+      final by = size.height * 0.22 + (i * 6.0) + math.sin(t * 4 * math.pi + i) * 3;
+      final wingPath = Path();
+      wingPath.moveTo(bx - 4, by - 2);
+      wingPath.quadraticBezierTo(bx - 2, by, bx, by - 2);
+      wingPath.quadraticBezierTo(bx + 2, by, bx + 4, by - 2);
+      canvas.drawPath(wingPath, birdPaint);
+    }
+  }
+
+  void _paintEveningFireflies(Canvas canvas, Size size, double t) {
+    // Organic wandering firefly specks around the lower right (play button vicinity)
+    final rng = math.Random(77);
+    final targetArea = Offset(size.width * 0.82, size.height * 0.78);
+
+    for (int i = 0; i < 8; i++) {
+      final angle = rng.nextDouble() * 2 * math.pi + (t * 2 * math.pi * (i.isEven ? 1 : -1));
+      final radius = 12.0 + rng.nextDouble() * 38.0;
+      final fx = targetArea.dx + math.cos(angle) * radius;
+      final fy = targetArea.dy + math.sin(angle) * (radius * 0.65);
+      final twinkle = ((math.sin(t * 6 * math.pi + i * 2) + 1) / 2) * 0.8 + 0.2;
+
+      final fPaint = Paint()
+        ..color = const Color(0xFFFFF176).withValues(alpha: twinkle.clamp(0.0, 1.0))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+      canvas.drawCircle(Offset(fx, fy), 1.8, fPaint);
+    }
+  }
+
+  void _paintNightSky(Canvas canvas, Size size, double t, double pulseScale) {
+    // 1. Drifting aurora borealis ribbon
+    for (int i = 0; i < 3; i++) {
+      final phase = t * 2 * math.pi + i * (2 * math.pi / 3);
+      final waveY = size.height * 0.36 + math.sin(phase) * 12;
+      final path = Path();
+      path.moveTo(0, waveY);
+      for (double x = 0; x <= size.width; x += 6) {
+        final y = waveY + math.sin((x / size.width) * math.pi * 2.8 + phase) * 16 - (i * 12);
+        path.lineTo(x, y);
+      }
+      path.lineTo(size.width, size.height * 0.85);
+      path.lineTo(0, size.height * 0.85);
+      path.close();
+
+      final auroraColors = [
+        const Color(0xFF8B5CF6).withValues(alpha: 0.16),
+        const Color(0xFF00D2FF).withValues(alpha: 0.10),
+        const Color(0xFF10B981).withValues(alpha: 0.06),
+      ];
+
+      final aPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [auroraColors[i % auroraColors.length], Colors.transparent],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+      canvas.drawPath(path, aPaint);
+    }
+
+    // 2. Twinkling starfield dots
+    final rng = math.Random(54);
+    for (int i = 0; i < 22; i++) {
+      final sx = rng.nextDouble() * size.width;
+      final sy = rng.nextDouble() * (size.height * 0.58);
+      final twinkle = ((math.sin(t * 4 * math.pi + (i * 1.7)) + 1) / 2) * 0.7 + 0.15;
+      final sRadius = 0.8 + (rng.nextDouble() * 1.2);
+
+      final sPaint = Paint()
+        ..color = Colors.white.withValues(alpha: twinkle.clamp(0.0, 1.0));
+      canvas.drawCircle(Offset(sx, sy), sRadius, sPaint);
+    }
+
+    // 3. Diagonal shooting star every 8 seconds (derived from animValue looping over 8s)
+    final shootingProgress = (t * 2.5) % 1.0;
+    if (shootingProgress < 0.35) {
+      final prog = shootingProgress / 0.35;
+      final startX = size.width * 0.95 - (prog * size.width * 0.6);
+      final startY = size.height * 0.05 + (prog * size.height * 0.45);
+      final tailLength = 40.0 * (1.0 - prog);
+
+      final shootPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: (1.0 - prog).clamp(0.0, 1.0)),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromLTWH(startX, startY, tailLength, tailLength))
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(startX + tailLength * 0.8, startY - tailLength * 0.5),
+        shootPaint,
+      );
+    }
+
+    // 4. Breathing halo glowing moon in top-right
+    final moonCenter = Offset(size.width * 0.80, size.height * 0.22);
+    final moonRadius = 16.0 * pulseScale;
+
+    // Glowing halo
+    final haloPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFC4B5FD).withValues(alpha: 0.35),
+          const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: moonCenter, radius: moonRadius * 3.2));
+    canvas.drawCircle(moonCenter, moonRadius * 3.2, haloPaint);
+
+    // Moon body
+    final moonPaint = Paint()
+      ..color = const Color(0xFFF8FAFC).withValues(alpha: 0.95)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+    canvas.drawCircle(moonCenter, moonRadius, moonPaint);
+
+    // Subtle moon crater shadow
+    final craterPaint = Paint()
+      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.25);
+    canvas.drawCircle(Offset(moonCenter.dx + 4, moonCenter.dy - 3), 4, craterPaint);
+    canvas.drawCircle(Offset(moonCenter.dx - 3, moonCenter.dy + 4), 3, craterPaint);
+  }
+
+  void _paintMiddleHills(Canvas canvas, Size size, double t, double shiftX, double shiftY) {
+    final hillPath = Path();
+    final isAfternoon = slotData.slot == _TimeSlot.afternoon;
+
+    // If afternoon, audio-reactive / lively sine wave hill curves that speed up with playback
+    final speedMultiplier = (isAfternoon && isPlaying) ? 2.2 : 1.0;
+    final wavePhase = t * 2 * math.pi * speedMultiplier;
+
+    hillPath.moveTo(0, size.height * 0.65 + shiftY);
+    for (double x = 0; x <= size.width; x += 8) {
+      final normX = x / size.width;
+      final ripple = isAfternoon
+          ? math.sin(normX * 4 * math.pi + wavePhase) * 6
+          : math.sin(normX * 2 * math.pi + wavePhase * 0.5) * 3;
+      final y = (size.height * 0.60) +
+          (math.sin(normX * math.pi) * 14) +
+          ripple +
+          shiftY;
+      hillPath.lineTo(x + shiftX, y);
+    }
+    hillPath.lineTo(size.width + shiftX, size.height);
+    hillPath.lineTo(shiftX, size.height);
+    hillPath.close();
+
+    final hillColor = slotData.slot == _TimeSlot.night
+        ? const Color(0xFF130E26)
+        : (slotData.slot == _TimeSlot.morning
+            ? const Color(0xFF2E1530)
+            : const Color(0xFF1E1435));
+
+    final hillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          hillColor.withValues(alpha: 0.65),
+          const Color(0xFF08070F).withValues(alpha: 0.85),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, size.height * 0.5, size.width, size.height * 0.5));
+
+    canvas.drawPath(hillPath, hillPaint);
+  }
+
+  void _paintForegroundSilhouettes(Canvas canvas, Size size) {
+    // Signature card silhouette hill structure
+    final fgPath = Path();
+    fgPath.moveTo(0, size.height * 0.74);
+    fgPath.cubicTo(
+      size.width * 0.25, size.height * 0.66,
+      size.width * 0.55, size.height * 0.72,
+      size.width, size.height * 0.68,
+    );
+    fgPath.lineTo(size.width, size.height);
+    fgPath.lineTo(0, size.height);
+    fgPath.close();
+
+    final fgPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0xFF0D0A1A).withValues(alpha: 0.75),
+          const Color(0xFF08070F).withValues(alpha: 0.95),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, size.height * 0.6, size.width, size.height * 0.4));
+
+    canvas.drawPath(fgPath, fgPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CinematicHeroPainter oldDelegate) => true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero Card — Layered Lucid Glass Visual Hero Banner with 3D Tilt & Micro-Interactions
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _HeroCard extends ConsumerStatefulWidget {
@@ -532,39 +920,33 @@ class _HeroCard extends ConsumerStatefulWidget {
 
 class _HeroCardState extends ConsumerState<_HeroCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
+  late final AnimationController _tickerCtrl;
+  Offset _tilt = Offset.zero; // Parallax normalized (-1.0 to 1.0)
+  Offset _simulatedTilt = Offset.zero;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _tickerCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 8),
     )..repeat();
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _tickerCtrl.dispose();
     super.dispose();
   }
 
-  String _heroLabel() {
-    final h = DateTime.now().hour;
-    if (h < 6) return 'LATE NIGHT VIBES';
-    if (h < 12) return 'MORNING RITUALS';
-    if (h < 17) return 'AFTERNOON DRIVE';
-    if (h < 21) return 'EVENING FLOW';
-    return 'LATE NIGHT VIBES';
+  void _updatePointerTilt(Offset localPos, Size size) {
+    final dx = ((localPos.dx / size.width) * 2 - 1).clamp(-1.0, 1.0);
+    final dy = ((localPos.dy / size.height) * 2 - 1).clamp(-1.0, 1.0);
+    setState(() => _tilt = Offset(dx, dy));
   }
 
-  String _heroHeadline() {
-    final h = DateTime.now().hour;
-    if (h < 6) return 'Stay a little after hours.';
-    if (h < 12) return 'Set the tone for today.';
-    if (h < 17) return 'Keep the momentum going.';
-    if (h < 21) return 'Wind down with good sound.';
-    return 'Stay a little after hours.';
+  void _resetPointerTilt() {
+    setState(() => _tilt = Offset.zero);
   }
 
   @override
@@ -576,157 +958,324 @@ class _HeroCardState extends ConsumerState<_HeroCard>
       ...widget.allSongs.take(3),
     }.take(4).toList();
 
+    final now = DateTime.now();
+    final slotData = _HeroSlotData.resolve(now);
+    final headline = slotData.headlineFor(now);
+
+    final playerState = ref.watch(playerControllerProvider);
+    final isPlaying = playerState.isPlaying;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
-        onTap: () {
-          if (widget.allSongs.isNotEmpty) {
-            final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
-            ref
-                .read(playerControllerProvider.notifier)
-                .playTrack(tracks.first, queue: tracks);
-          } else {
-            context.push('/library');
-          }
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: SizedBox(
-            height: 200,
-            child: AnimatedBuilder(
-              animation: _ctrl,
-              builder: (_, _) {
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Layer 1: Cosmic background painter
-                    CustomPaint(
-                      painter: _CosmicHeroPainter(
-                        hour: DateTime.now().hour,
-                        animValue: _ctrl.value,
-                      ),
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth = constraints.maxWidth;
+          const cardHeight = 200.0;
 
-                    // Dark vignette
-                    Container(
+          return GestureDetector(
+            onTap: () {
+              if (widget.allSongs.isNotEmpty) {
+                final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
+                ref
+                    .read(playerControllerProvider.notifier)
+                    .playTrack(tracks.first, queue: tracks);
+              } else {
+                context.push('/library');
+              }
+            },
+            child: MouseRegion(
+              onHover: (event) => _updatePointerTilt(event.localPosition, Size(cardWidth, cardHeight)),
+              onExit: (_) => _resetPointerTilt(),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: SizedBox(
+                  height: cardHeight,
+                  child: AnimatedBuilder(
+                    animation: _tickerCtrl,
+                    builder: (context, child) {
+                      final t = _tickerCtrl.value;
+
+                      // Gentle idle gyroscope wobble if pointer isn't dragging
+                      _simulatedTilt = Offset(
+                        math.sin(t * 2 * math.pi) * 0.35,
+                        math.cos(t * 2 * math.pi) * 0.25,
+                      );
+                      final effectiveTilt = _tilt == Offset.zero ? _simulatedTilt : _tilt;
+
+                      // Foreground text/buttons shift opposite to middle hills for 3D depth
+                      final fgShiftX = -effectiveTilt.dx * 12.0;
+                      final fgShiftY = -effectiveTilt.dy * 8.0;
+
+                      // Glassmorphic pill metallic shimmer cycle (every 5 seconds)
+                      final shimmerCycle = (t * (8.0 / 5.0)) % 1.0;
+
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Layer 1: Time-of-Day Cinematic Animated Canvas
+                          CustomPaint(
+                            painter: _CinematicHeroPainter(
+                              slotData: slotData,
+                              animValue: t,
+                              isPlaying: isPlaying,
+                              tiltOffset: effectiveTilt,
+                            ),
+                          ),
+
+                          // Layer 2: Lucid Glass Vignette Overlay
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topRight,
+                                end: Alignment.bottomLeft,
+                                colors: [
+                                  const Color(0xFF1E0A3C).withValues(alpha: 0.35),
+                                  const Color(0xFF08070F).withValues(alpha: 0.78),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Layer 3: Glassmorphic Border Glow
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: slotData.accentColor.withValues(alpha: 0.35),
+                                width: 1.2,
+                              ),
+                            ),
+                          ),
+
+                          // Layer 4: Foreground Interactive Content (Parallax shifted)
+                          Transform.translate(
+                            offset: Offset(fgShiftX, fgShiftY),
+                            child: Padding(
+                              padding: const EdgeInsets.all(22),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Shimmering Badge Pill
+                                  _ShimmerBadgePill(
+                                    label: slotData.badge,
+                                    color: slotData.accentColor,
+                                    shimmerProgress: shimmerCycle,
+                                  ),
+
+                                  const Spacer(),
+
+                                  // Dynamic Headline (Deterministic per time slot)
+                                  Flexible(
+                                    child: Text(
+                                      headline,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.3,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 6),
+
+                                  // Subtitle & Interactive Play Button Row
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                songCount == 0
+                                                    ? 'Tap to scan your library • For $name'
+                                                    : '${slotData.subtitle} • $songCount songs • For $name',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.white.withValues(alpha: 0.65),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                            if (previewSongs.isNotEmpty) ...[
+                                              const SizedBox(height: 8),
+                                              _OverlappingAvatarRow(songs: previewSongs),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+
+                                      // Reactively Glowing / Rotating Play Button
+                                      _HeroPlayButton(
+                                        isPlaying: isPlaying,
+                                        accentColor: slotData.accentColor,
+                                        animValue: t,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Shimmering Badge Pill with a diagonal metallic sweep every 5 seconds
+class _ShimmerBadgePill extends StatelessWidget {
+  const _ShimmerBadgePill({
+    required this.label,
+    required this.color,
+    required this.shimmerProgress,
+  });
+
+  final String label;
+  final Color color;
+  final double shimmerProgress; // 0.0 -> 1.0
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: color.withValues(alpha: 0.16),
+              border: Border.all(
+                color: color.withValues(alpha: 0.45),
+                width: 1.0,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+          // Metallic diagonal sweep overlay
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final sweepX = -w + (shimmerProgress * (w * 2.5));
+                return Transform.translate(
+                  offset: Offset(sweepX, 0),
+                  child: Transform.rotate(
+                    angle: -0.4,
+                    child: Container(
+                      width: 24,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          begin: Alignment.topRight,
-                          end: Alignment.bottomLeft,
                           colors: [
-                            const Color(0xFF1E0A3C).withValues(alpha: 0.55),
-                            const Color(0xFF08070F).withValues(alpha: 0.82),
+                            Colors.white.withValues(alpha: 0.0),
+                            Colors.white.withValues(alpha: 0.45),
+                            Colors.white.withValues(alpha: 0.0),
                           ],
                         ),
                       ),
                     ),
-
-                    // Border glow
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ),
-
-                    // Foreground content
-                    Padding(
-                      padding: const EdgeInsets.all(22),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Badge pill
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              color:
-                                  const Color(0xFFFF758F).withValues(alpha: 0.15),
-                              border: Border.all(
-                                  color: const Color(0xFFFF758F)
-                                      .withValues(alpha: 0.4)),
-                            ),
-                            child: Text(_heroLabel(),
-                                style: const TextStyle(
-                                    color: Color(0xFFFF758F),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.5)),
-                          ),
-
-                          const Spacer(),
-
-                          // Headline
-                          Text(_heroHeadline(),
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.3,
-                                  height: 1.2)),
-
-                          const SizedBox(height: 6),
-
-                          // Subtitle + play button row
-                          Row(children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    songCount == 0
-                                        ? 'Tap to scan your library'
-                                        : '$songCount songs ready • For $name',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.55),
-                                        fontSize: 11),
-                                  ),
-                                  if (previewSongs.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    _OverlappingAvatarRow(songs: previewSongs),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Glowing neon play button
-                            Container(
-                              padding: const EdgeInsets.all(11),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                      color: const Color(0xFF8B5CF6)
-                                          .withValues(alpha: 0.6),
-                                      blurRadius: 20,
-                                      spreadRadius: 2),
-                                ],
-                              ),
-                              child: const Icon(Icons.play_arrow_rounded,
-                                  color: Colors.white, size: 26),
-                            ),
-                          ]),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+}
+
+/// Hero Play Button with Rotating Outer Glow Ring on playback
+class _HeroPlayButton extends StatelessWidget {
+  const _HeroPlayButton({
+    required this.isPlaying,
+    required this.accentColor,
+    required this.animValue,
+  });
+
+  final bool isPlaying;
+  final Color accentColor;
+  final double animValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final rotationAngle = animValue * 2 * math.pi;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Rotating outer glow ring when music is playing
+        if (isPlaying)
+          Transform.rotate(
+            angle: rotationAngle,
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    accentColor.withValues(alpha: 0.8),
+                    const Color(0xFFFF758F).withValues(alpha: 0.2),
+                    Colors.transparent,
+                    accentColor.withValues(alpha: 0.8),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        // Core Play Button
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [accentColor, const Color(0xFFFF758F)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: isPlaying ? 0.75 : 0.45),
+                blurRadius: isPlaying ? 22 : 14,
+                spreadRadius: isPlaying ? 3 : 1,
+              ),
+            ],
+          ),
+          child: Icon(
+            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
+        ),
+      ],
     );
   }
 }
