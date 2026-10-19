@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../player/application/player_controller.dart';
 import 'edit_song_dialog.dart';
 import 'song_artwork.dart';
@@ -37,18 +38,25 @@ class _SongOptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       decoration: BoxDecoration(
-        color: const Color(0xFF13111C).withValues(alpha: 0.95),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : const Color(0xFF13111C).withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: isLight
+              ? Colors.black.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.12),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.6),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -65,7 +73,9 @@ class _SongOptionsSheet extends ConsumerWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -91,7 +101,7 @@ class _SongOptionsSheet extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: isLight ? const Color(0xFF0F111A) : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -101,7 +111,9 @@ class _SongOptionsSheet extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: isLight
+                              ? const Color(0xFF5C6275)
+                              : Colors.white.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -111,7 +123,12 @@ class _SongOptionsSheet extends ConsumerWidget {
             ),
 
             const SizedBox(height: 18),
-            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            Divider(
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.08),
+              height: 1,
+            ),
             const SizedBox(height: 8),
 
             // Option 1: Play Next
@@ -120,13 +137,16 @@ class _SongOptionsSheet extends ConsumerWidget {
               iconColor: AppColors.cyanAccent,
               title: 'Play Next',
               subtitle: 'Add as the next track in the current queue',
+              isLight: isLight,
               onTap: () {
                 Navigator.of(context).pop();
                 ref.read(playerControllerProvider.notifier).playSongNext(song);
                 if (parentContext.mounted) {
                   ScaffoldMessenger.of(parentContext).showSnackBar(
                     SnackBar(
-                      backgroundColor: const Color(0xFF1E1A2E),
+                      backgroundColor: isLight
+                          ? Colors.white
+                          : const Color(0xFF1E1A2E),
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -136,7 +156,11 @@ class _SongOptionsSheet extends ConsumerWidget {
                       ),
                       content: Text(
                         'Playing next: "${song.title}"',
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF0F111A)
+                              : Colors.white,
+                        ),
                       ),
                       duration: const Duration(seconds: 2),
                     ),
@@ -151,6 +175,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               iconColor: AppColors.purpleAccent,
               title: 'Add to Playlist',
               subtitle: 'Select or create a custom playlist',
+              isLight: isLight,
               onTap: () {
                 Navigator.of(context).pop();
                 if (parentContext.mounted) {
@@ -171,6 +196,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               subtitle: song.isFavorite
                   ? 'Remove from your starred tracks'
                   : 'Save to your favorites collection',
+              isLight: isLight,
               onTap: () async {
                 Navigator.of(context).pop();
                 final db = ref.read(appDatabaseProvider);
@@ -187,6 +213,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               iconColor: AppColors.cyanAccent,
               title: 'Edit Tags',
               subtitle: 'Clean up song title, artist, or album',
+              isLight: isLight,
               onTap: () {
                 Navigator.of(context).pop();
                 if (parentContext.mounted) {
@@ -201,6 +228,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               iconColor: Colors.amberAccent,
               title: 'Hide from Library',
               subtitle: 'Hide ringtone, voice note or unwanted clip',
+              isLight: isLight,
               onTap: () async {
                 Navigator.of(context).pop();
                 final db = ref.read(appDatabaseProvider);
@@ -208,7 +236,9 @@ class _SongOptionsSheet extends ConsumerWidget {
                 if (parentContext.mounted) {
                   ScaffoldMessenger.of(parentContext).showSnackBar(
                     SnackBar(
-                      backgroundColor: const Color(0xFF1E1A2E),
+                      backgroundColor: isLight
+                          ? Colors.white
+                          : const Color(0xFF1E1A2E),
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -218,7 +248,11 @@ class _SongOptionsSheet extends ConsumerWidget {
                       ),
                       content: Text(
                         'Hidden "${song.title}" from library',
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: isLight
+                              ? const Color(0xFF0F111A)
+                              : Colors.white,
+                        ),
                       ),
                       action: SnackBarAction(
                         label: 'UNDO',
@@ -250,6 +284,7 @@ class _SheetActionTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.isLight = false,
   });
 
   final IconData icon;
@@ -257,6 +292,7 @@ class _SheetActionTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool isLight;
 
   @override
   Widget build(BuildContext context) {
@@ -279,8 +315,8 @@ class _SheetActionTile extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isLight ? const Color(0xFF0F111A) : Colors.white,
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
@@ -288,7 +324,9 @@ class _SheetActionTile extends StatelessWidget {
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: isLight
+                ? const Color(0xFF5C6275)
+                : Colors.white.withValues(alpha: 0.5),
             fontSize: 12,
           ),
         ),
@@ -328,6 +366,7 @@ class _AddToPlaylistModal extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playlistsAsync = ref.watch(allPlaylistsStreamProvider);
     final tt = Theme.of(context).textTheme;
+    final isLight = context.isLight;
 
     return Container(
       constraints: BoxConstraints(
@@ -335,14 +374,20 @@ class _AddToPlaylistModal extends ConsumerWidget {
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF13111C).withValues(alpha: 0.95),
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.96)
+            : const Color(0xFF13111C).withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: isLight
+              ? Colors.black.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.12),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.6),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -359,7 +404,9 @@ class _AddToPlaylistModal extends ConsumerWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -372,7 +419,7 @@ class _AddToPlaylistModal extends ConsumerWidget {
                 Text(
                   'Add to Playlist',
                   style: tt.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: isLight ? const Color(0xFF0F111A) : Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -410,13 +457,17 @@ class _AddToPlaylistModal extends ConsumerWidget {
                             Icon(
                               Icons.queue_music_rounded,
                               size: 44,
-                              color: Colors.white.withValues(alpha: 0.35),
+                              color: isLight
+                                  ? const Color(0xFF8E95A8)
+                                  : Colors.white.withValues(alpha: 0.35),
                             ),
                             const SizedBox(height: 12),
                             Text(
                               'No Playlists Found',
                               style: tt.titleSmall?.copyWith(
-                                color: Colors.white,
+                                color: isLight
+                                    ? const Color(0xFF0F111A)
+                                    : Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -424,7 +475,9 @@ class _AddToPlaylistModal extends ConsumerWidget {
                             Text(
                               'Tap "+ New Playlist" to create your first playlist.',
                               style: tt.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.55),
+                                color: isLight
+                                    ? const Color(0xFF5C6275)
+                                    : Colors.white.withValues(alpha: 0.55),
                               ),
                             ),
                           ],
@@ -436,8 +489,11 @@ class _AddToPlaylistModal extends ConsumerWidget {
                   return ListView.separated(
                     shrinkWrap: true,
                     itemCount: playlists.length,
-                    separatorBuilder: (context, index) =>
-                        Divider(color: Colors.white.withValues(alpha: 0.05)),
+                    separatorBuilder: (context, index) => Divider(
+                      color: isLight
+                          ? Colors.black.withValues(alpha: 0.05)
+                          : Colors.white.withValues(alpha: 0.05),
+                    ),
                     itemBuilder: (context, index) {
                       final playlist = playlists[index];
                       return ListTile(
@@ -459,14 +515,16 @@ class _AddToPlaylistModal extends ConsumerWidget {
                         ),
                         title: Text(
                           playlist.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isLight
+                                ? const Color(0xFF0F111A)
+                                : Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.arrow_forward_ios_rounded,
-                          color: Colors.white38,
+                          color: isLight ? Colors.black38 : Colors.white38,
                           size: 14,
                         ),
                         onTap: () async {

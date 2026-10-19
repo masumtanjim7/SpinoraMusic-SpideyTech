@@ -1094,13 +1094,13 @@ class _HeroCardState extends ConsumerState<_HeroCard>
                                               child: Text(
                                                 songCount == 0
                                                     ? 'Tap to scan your library • For $name'
-                                                    : '${slotData.subtitle} • $songCount songs • For $name',
+                                                    : '$songCount songs ready • For $name',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  color: Colors.white.withValues(alpha: 0.65),
+                                                  color: Colors.white.withValues(alpha: 0.75),
                                                   fontSize: 11,
-                                                  fontWeight: FontWeight.w500,
+                                                  fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ),
@@ -1158,22 +1158,35 @@ class _ShimmerBadgePill extends StatelessWidget {
       child: Stack(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              color: color.withValues(alpha: 0.16),
+              color: Colors.black.withValues(alpha: 0.35),
               border: Border.all(
-                color: color.withValues(alpha: 0.45),
-                width: 1.0,
+                color: color.withValues(alpha: 0.85),
+                width: 1.2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
             child: Text(
               label,
               style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.4,
+                color: Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
             ),
           ),

@@ -112,17 +112,35 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     final currentAvatarPath = _pendingAvatarPath ?? profile.avatarPath;
     final showAvatar = !_clearAvatar && currentAvatarPath != null;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? Colors.white : const Color(0xFF0F111A);
+    final secondaryTextColor =
+        isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF5C6275);
+    final sheetBg = isDark
+        ? const Color(0xFF0D0C18)
+        : Colors.white.withValues(alpha: 0.94);
+    final sheetBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF0D0C18),
+          color: sheetBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
-          ),
+          border: Border.all(color: sheetBorderColor),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.5)
+                  : Colors.black.withValues(alpha: 0.08),
+              blurRadius: 32,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -135,7 +153,9 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : Colors.black.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -148,6 +168,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
+                      color: primaryTextColor,
                     ),
               ),
               const SizedBox(height: 24),
@@ -198,33 +219,34 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextButton.icon(
-                        onPressed: _pickAvatar,
-                        icon: const Icon(Icons.photo_library_rounded, size: 16),
-                        label: const Text('Change photo'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF8B5CF6),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: EdgeInsets.zero,
-                        ),
-                      ),
-                      if (showAvatar)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         TextButton.icon(
-                          onPressed: _removeAvatar,
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              size: 16),
-                          label: const Text('Remove'),
+                          onPressed: _pickAvatar,
+                          icon: const Icon(Icons.photo_library_rounded, size: 16),
+                          label: const Text('Change photo'),
                           style: TextButton.styleFrom(
-                            foregroundColor:
-                                Colors.white.withValues(alpha: 0.45),
+                            foregroundColor: const Color(0xFF8B5CF6),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             padding: EdgeInsets.zero,
                           ),
                         ),
-                    ],
+                        if (showAvatar)
+                          TextButton.icon(
+                            onPressed: _removeAvatar,
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 16),
+                            label: const Text('Remove'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: secondaryTextColor,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -236,6 +258,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                 label: 'Display name',
                 hint: 'Music Lover',
                 icon: Icons.person_outline_rounded,
+                isDark: isDark,
               ),
               const SizedBox(height: 16),
 
@@ -245,6 +268,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                 label: 'Vibe tag',
                 hint: 'Finding my frequency',
                 icon: Icons.music_note_outlined,
+                isDark: isDark,
               ),
               const SizedBox(height: 32),
 
@@ -312,21 +336,40 @@ class _ProfileTextField extends StatelessWidget {
     required this.label,
     required this.hint,
     required this.icon,
+    required this.isDark,
   });
   final TextEditingController controller;
   final String label;
   final String hint;
   final IconData icon;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final labelColor = isDark
+        ? Colors.white.withValues(alpha: 0.55)
+        : const Color(0xFF5C6275);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F111A);
+    final hintColor = isDark
+        ? Colors.white.withValues(alpha: 0.3)
+        : const Color(0xFF8E95A8);
+    final iconColor = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : const Color(0xFF5C6275);
+    final fillColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.04);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.10);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.55),
+                color: labelColor,
                 letterSpacing: 0.8,
                 fontWeight: FontWeight.w600,
               ),
@@ -334,8 +377,8 @@ class _ProfileTextField extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: textColor,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),
@@ -344,18 +387,15 @@ class _ProfileTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: hintColor,
               fontSize: 14,
             ),
-            prefixIcon: Icon(icon,
-                size: 18, color: Colors.white.withValues(alpha: 0.45)),
+            prefixIcon: Icon(icon, size: 18, color: iconColor),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
+              borderSide: BorderSide(color: borderColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -365,7 +405,7 @@ class _ProfileTextField extends StatelessWidget {
               ),
             ),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
+            fillColor: fillColor,
           ),
         ),
       ],
