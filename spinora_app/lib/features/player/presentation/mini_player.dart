@@ -6,7 +6,6 @@ import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
 import 'now_playing_screen.dart';
-import 'widgets/audio_visualizer_widget.dart';
 
 /// Floating glassmorphic mini-player bar anchored to the bottom of the screen.
 ///
@@ -113,31 +112,16 @@ class MiniPlayer extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    track.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: tt.bodyMedium?.copyWith(
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF0F111A),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                if (playerState.isPlaying) ...[
-                                  const SizedBox(width: 8),
-                                  MiniAudioVisualizer(
-                                    isPlaying: true,
-                                    color: isDark
-                                        ? AppColors.cyanAccent
-                                        : const Color(0xFF7C3AED),
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tt.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F111A),
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(

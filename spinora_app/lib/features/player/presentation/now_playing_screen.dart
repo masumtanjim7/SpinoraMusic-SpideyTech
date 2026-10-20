@@ -10,7 +10,6 @@ import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
 import 'widgets/audio_tools_sheets.dart';
-import 'widgets/audio_visualizer_widget.dart';
 import 'widgets/lyrics_view.dart';
 import 'widgets/up_next_queue_sheet.dart';
 
@@ -191,21 +190,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         onClose: () =>
                                             setState(() => _showLyrics = false),
                                       )
-                                    : AudioVisualizerWidget(
-                                        key: const ValueKey('audio_visualizer_artwork'),
-                                        isPlaying: playerState.isPlaying,
-                                        size: artSize,
-                                        primaryColor: isLight
-                                            ? const Color(0xFF7C3AED)
-                                            : AppColors.cyanAccent,
-                                        secondaryColor: isLight
-                                            ? const Color(0xFF06B6D4)
-                                            : AppColors.purpleAccent,
-                                        child: GestureDetector(
-                                          key: const ValueKey('artwork_card'),
-                                          onTap: () =>
-                                              setState(() => _showLyrics = true),
-                                          child: AnimatedScale(
+                                    : GestureDetector(
+                                        key: const ValueKey('artwork_card'),
+                                        onTap: () =>
+                                            setState(() => _showLyrics = true),
+                                        child: AnimatedScale(
                                           scale: playerState.isPlaying ? 1.02 : 0.96,
                                           duration:
                                               const Duration(milliseconds: 400),
@@ -283,7 +272,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                             ),
                                           ),
                                         ),
-                                      ),
                                       ),
                               ),
                             ),

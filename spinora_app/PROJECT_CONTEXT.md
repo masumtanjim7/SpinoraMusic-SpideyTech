@@ -299,7 +299,14 @@ Task 2.7h DONE (Cloud Backup & Restore — Local JSON Export & Import):
     * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
     * All colors use `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
-    * All 111 tests passed (`flutter test` including `test/backup_service_test.dart`).
+  - UI Cleanups & Polish:
+    * Removed pulsing audio visualizer rings from around the Now Playing album art container, restoring a clean Lucid Glass card;
+    * Removed waveform equalizer icon from bottom floating mini-player title row (`mini_player.dart`), keeping title and artist clean and uncluttered;
+    * Restored and fixed round Play/Pause button on the HomeScreen animated Hero card (`home_screen.dart`): fixed 52x52 container preventing layout shifts, centered `Icons.play_arrow_rounded` when idle or paused/playing other sources, and `Icons.pause_rounded` when active playback is from this mix;
+    * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
+    * All colors use `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 111 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

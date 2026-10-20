@@ -972,7 +972,33 @@ class _HeroCardState extends ConsumerState<_HeroCard>
     final headline = slotData.headlineFor(now);
 
     final playerState = ref.watch(playerControllerProvider);
-    final isPlaying = playerState.isPlaying;
+    final currentTrack = playerState.currentTrack;
+    final isTrackFromMix = currentTrack != null &&
+        widget.allSongs.any(
+          (s) =>
+              currentTrack.id == 'local_${s.id}' ||
+              currentTrack.id == 'online_${s.id}' ||
+              currentTrack.uri == s.filePath ||
+              currentTrack.uri == Uri.file(s.filePath).toString(),
+        );
+    final isHeroActive = playerState.isPlaying && isTrackFromMix;
+
+    void handlePlayAction() {
+      if (widget.allSongs.isEmpty) {
+        context.push('/library');
+        return;
+      }
+      if (isHeroActive) {
+        ref.read(playerControllerProvider.notifier).togglePlayPause();
+      } else if (playerState.hasTrack && isTrackFromMix) {
+        ref.read(playerControllerProvider.notifier).togglePlayPause();
+      } else {
+        final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
+        ref
+            .read(playerControllerProvider.notifier)
+            .playTrack(tracks.first, queue: tracks);
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -982,16 +1008,7 @@ class _HeroCardState extends ConsumerState<_HeroCard>
           const cardHeight = 200.0;
 
           return GestureDetector(
-            onTap: () {
-              if (widget.allSongs.isNotEmpty) {
-                final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
-                ref
-                    .read(playerControllerProvider.notifier)
-                    .playTrack(tracks.first, queue: tracks);
-              } else {
-                context.push('/library');
-              }
-            },
+            onTap: handlePlayAction,
             child: MouseRegion(
               onHover: (event) => _updatePointerTilt(event.localPosition, Size(cardWidth, cardHeight)),
               onExit: (_) => _resetPointerTilt(),
@@ -1026,7 +1043,7 @@ class _HeroCardState extends ConsumerState<_HeroCard>
                             painter: _CinematicHeroPainter(
                               slotData: slotData,
                               animValue: t,
-                              isPlaying: isPlaying,
+                              isPlaying: isHeroActive,
                               tiltOffset: effectiveTilt,
                             ),
                           ),
@@ -1096,26 +1113,27 @@ class _HeroCardState extends ConsumerState<_HeroCard>
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Flexible(
-                                              child: Text(
-                                                songCount == 0
-                                                    ? 'Tap to scan your library • For $name'
-                                                    : '$songCount songs ready • For $name',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: Colors.white.withValues(alpha: 0.75),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                            Text(
+                                              songCount == 0
+                                                  ? 'Tap to scan your library • For $name'
+                                                  : '$songCount songs ready • For $name',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.75),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
                                               ),
                                             ),
                                             if (previewSongs.isNotEmpty) ...[
                                               const SizedBox(height: 8),
-                                              _OverlappingAvatarRow(songs: previewSongs),
+                                              _OverlappingAvatarRow(
+                                                  songs: previewSongs),
                                             ],
                                           ],
                                         ),
@@ -1124,9 +1142,10 @@ class _HeroCardState extends ConsumerState<_HeroCard>
 
                                       // Reactively Glowing / Rotating Play Button
                                       _HeroPlayButton(
-                                        isPlaying: isPlaying,
+                                        isPlaying: isHeroActive,
                                         accentColor: slotData.accentColor,
                                         animValue: t,
+                                        onTap: handlePlayAction,
                                       ),
                                     ],
                                   ),
@@ -1143,6 +1162,89 @@ class _HeroCardState extends ConsumerState<_HeroCard>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Hero Play Button with Rotating Outer Glow Ring on active playback
+class _HeroPlayButton extends StatelessWidget {
+  const _HeroPlayButton({
+    required this.isPlaying,
+    required this.accentColor,
+    required this.animValue,
+    this.onTap,
+  });
+
+  final bool isPlaying;
+  final Color accentColor;
+  final double animValue;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final rotationAngle = animValue * 2 * math.pi;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Rotating outer glow ring when music is actively playing from this mix
+            if (isPlaying)
+              Transform.rotate(
+                angle: rotationAngle,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: SweepGradient(
+                      colors: [
+                        accentColor.withValues(alpha: 0.8),
+                        const Color(0xFFFF758F).withValues(alpha: 0.2),
+                        Colors.transparent,
+                        accentColor.withValues(alpha: 0.8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // Core Round Play/Pause Button
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [accentColor, const Color(0xFFFF758F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor
+                        .withValues(alpha: isPlaying ? 0.75 : 0.45),
+                    blurRadius: isPlaying ? 20 : 12,
+                    spreadRadius: isPlaying ? 2 : 1,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1228,76 +1330,6 @@ class _ShimmerBadgePill extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Hero Play Button with Rotating Outer Glow Ring on playback
-class _HeroPlayButton extends StatelessWidget {
-  const _HeroPlayButton({
-    required this.isPlaying,
-    required this.accentColor,
-    required this.animValue,
-  });
-
-  final bool isPlaying;
-  final Color accentColor;
-  final double animValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final rotationAngle = animValue * 2 * math.pi;
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Rotating outer glow ring when music is playing
-        if (isPlaying)
-          Transform.rotate(
-            angle: rotationAngle,
-            child: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: SweepGradient(
-                  colors: [
-                    accentColor.withValues(alpha: 0.8),
-                    const Color(0xFFFF758F).withValues(alpha: 0.2),
-                    Colors.transparent,
-                    accentColor.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-        // Core Play Button
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [accentColor, const Color(0xFFFF758F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withValues(alpha: isPlaying ? 0.75 : 0.45),
-                blurRadius: isPlaying ? 22 : 14,
-                spreadRadius: isPlaying ? 3 : 1,
-              ),
-            ],
-          ),
-          child: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-      ],
     );
   }
 }
