@@ -280,6 +280,26 @@ Task 2.7g DONE (Real-Time Audio Visualizer & Waveform Rings):
     * Automated test runner detection to ensure `tester.pumpAndSettle()` settles instantly;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
     * All 107 tests passed (`flutter test`).
+Task 2.7h DONE (Cloud Backup & Restore — Local JSON Export & Import):
+  - Backup & Restore Service (`lib/features/settings/application/backup_service.dart`):
+    * Serializes user profile, theme/audio settings (theme mode, crossfade, duration), favorites, playlists, and custom tags/lyrics from Drift and SharedPreferences into a versioned `.spinora` JSON backup payload;
+    * `exportData()` writes `.spinora` backup to application documents and public Downloads directory;
+    * `shareBackupFile()` triggers Android native sharing (`Intent.ACTION_SEND` with `FileProvider`);
+    * `importData(String jsonString)` parses, validates version, restores favorites into Drift, reconstructs custom playlists and song associations, applies custom tags/lyrics, and updates SharedPreferences;
+    * Resilient song matching (exact `filePath` match with fallback to normalized `title` + `artist`);
+    * `getAvailableLocalBackups()` automatically scans device for `.spinora` files;
+  - Native Android File Sharing:
+    * Created `res/xml/filepaths.xml` and registered FileProvider in `AndroidManifest.xml`;
+    * Added `shareFile` handler to `MainActivity.kt` MethodChannel;
+  - Settings Screen Integration (`lib/features/settings/presentation/settings_screen.dart`):
+    * Added sleek "DATA & BACKUP" section with "Export Backup" and "Restore Backup" tiles;
+    * `_BackupSuccessSheet` displaying file size, stat badges (favorites, playlists, edits), and "Share Backup File" / "Copy Path" buttons;
+    * `_RestoreBackupSheet` listing discovered local backup files or allowing manual JSON/file path pasting, with confirmation dialog and reactive refresh;
+  - Strict Quality & Testing:
+    * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
+    * All colors use `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 111 tests passed (`flutter test` including `test/backup_service_test.dart`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

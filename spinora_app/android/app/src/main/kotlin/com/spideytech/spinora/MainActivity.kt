@@ -32,6 +32,43 @@ class MainActivity : AudioServiceActivity() {
                 } catch (e: Exception) {
                     result.success(null)
                 }
+            } else if (call.method == "shareFile") {
+                val filePath = call.argument<String>("filePath")
+                val title = call.argument<String>("title") ?: "Share Spinora Backup"
+                try {
+                    if (filePath != null) {
+                        val file = java.io.File(filePath)
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "${applicationContext.packageName}.fileprovider",
+                            file
+                        )
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/octet-stream"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        startActivity(android.content.Intent.createChooser(intent, title))
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_PATH", "File path was null", null)
+                    }
+                } catch (e: Exception) {
+                    try {
+                        val file = if (filePath != null) java.io.File(filePath) else null
+                        val text = if (file != null && file.exists()) file.readText() else ""
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, text)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+                        }
+                        startActivity(android.content.Intent.createChooser(intent, title))
+                        result.success(true)
+                    } catch (e2: Exception) {
+                        result.error("SHARE_ERROR", e2.localizedMessage, null)
+                    }
+                }
             } else {
                 result.notImplemented()
             }

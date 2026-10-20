@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -10,6 +11,7 @@ import '../../../features/player/application/player_controller.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
 import '../application/audio_settings_provider.dart';
+import '../application/backup_service.dart';
 import '../application/theme_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +141,13 @@ class SettingsScreen extends ConsumerWidget {
                         const _SectionLabel(label: 'LYRICS'),
                         const SizedBox(height: 12),
                         const _LyricsTile(),
+
+                        const SizedBox(height: 28),
+
+                        // ── Data & Backup
+                        const _SectionLabel(label: 'DATA & BACKUP'),
+                        const SizedBox(height: 12),
+                        const _BackupSection(),
 
                         const SizedBox(height: 28),
 
@@ -1139,3 +1148,1002 @@ class _VersionBadge extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Data & Backup Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BackupSection extends ConsumerStatefulWidget {
+  const _BackupSection();
+
+  @override
+  ConsumerState<_BackupSection> createState() => _BackupSectionState();
+}
+
+class _BackupSectionState extends ConsumerState<_BackupSection> {
+  bool _isExporting = false;
+
+  Future<void> _handleExport(BuildContext context) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    try {
+      final backupService = ref.read(backupServiceProvider);
+      final result = await backupService.exportData();
+      if (!mounted) return;
+      setState(() => _isExporting = false);
+
+      if (context.mounted) {
+        _BackupSuccessSheet.show(context, ref, result);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isExporting = false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export backup: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleRestore(BuildContext context) {
+    _RestoreBackupSheet.show(context, ref);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        _SettingsTile(
+          icon: Icons.cloud_upload_rounded,
+          iconColor: const Color(0xFF00E5FF),
+          title: 'Export Backup',
+          subtitle: 'Generate & share spinora_backup_<date>.spinora',
+          trailingWidget: _isExporting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF00E5FF),
+                  ),
+                )
+              : Icon(
+                  Icons.ios_share_rounded,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.35)
+                      : const Color(0xFF5C6275),
+                  size: 20,
+                ),
+          onTap: _isExporting ? null : () => _handleExport(context),
+        ),
+        const SizedBox(height: 10),
+        _SettingsTile(
+          icon: Icons.settings_backup_restore_rounded,
+          iconColor: const Color(0xFF8B5CF6),
+          title: 'Restore Backup',
+          subtitle: 'Pick a .spinora file to restore playlists & favorites',
+          trailingWidget: Icon(
+            Icons.chevron_right_rounded,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.35)
+                : const Color(0xFF5C6275),
+            size: 20,
+          ),
+          onTap: () => _handleRestore(context),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Backup Export Success Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BackupSuccessSheet extends StatelessWidget {
+  const _BackupSuccessSheet({required this.result, required this.ref});
+  final BackupExportResult result;
+  final WidgetRef ref;
+
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref,
+    BackupExportResult result,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BackupSuccessSheet(result: result, ref: ref),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        22,
+        14,
+        22,
+        MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF14141E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+            blurRadius: 30,
+            offset: const Offset(0, -10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : Colors.black.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Glowing Check Icon
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+              border: Border.all(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                  blurRadius: 18,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.cloud_done_rounded,
+              color: Color(0xFF00E5FF),
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            'Backup Created Successfully',
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F111A),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  result.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.6)
+                        : const Color(0xFF5C6275),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                ),
+                child: Text(
+                  result.formattedSize,
+                  style: const TextStyle(
+                    color: Color(0xFF00E5FF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Stats badges row
+          Row(
+            children: [
+              Expanded(
+                child: _BackupStatBadge(
+                  icon: Icons.favorite_rounded,
+                  iconColor: const Color(0xFFFF758F),
+                  label: '${result.favoritesCount}',
+                  subtitle: 'Favorites',
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _BackupStatBadge(
+                  icon: Icons.playlist_play_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  label: '${result.playlistsCount}',
+                  subtitle: 'Playlists',
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _BackupStatBadge(
+                  icon: Icons.tune_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  label: '${result.customMetadataCount}',
+                  subtitle: 'Edits',
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Informational note
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : const Color(0xFFF1F5F9),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.black.withValues(alpha: 0.04),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.folder_special_rounded,
+                  size: 18,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.5)
+                      : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Saved to App Documents and Downloads folder. You can export or send this file to any device.',
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.55)
+                          : const Color(0xFF475569),
+                      fontSize: 11.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: result.filePath));
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('File path copied to clipboard'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF1A1A2E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 16),
+                  label: const Text('Copy Path'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        isDark ? Colors.white : const Color(0xFF0F111A),
+                    side: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await ref
+                        .read(backupServiceProvider)
+                        .shareBackupFile(result.filePath);
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 17),
+                  label: const Text('Share Backup File'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E5FF),
+                    foregroundColor: const Color(0xFF0A0E21),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Restore Backup Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RestoreBackupSheet extends ConsumerStatefulWidget {
+  const _RestoreBackupSheet();
+
+  static Future<void> show(BuildContext context, WidgetRef ref) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _RestoreBackupSheet(),
+    );
+  }
+
+  @override
+  ConsumerState<_RestoreBackupSheet> createState() =>
+      _RestoreBackupSheetState();
+}
+
+class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
+  final _textController = TextEditingController();
+  bool _isLoading = true;
+  bool _isRestoring = false;
+  bool _isManualInput = false;
+  List<BackupFileInfo> _backups = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackups();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBackups() async {
+    setState(() => _isLoading = true);
+    try {
+      final list =
+          await ref.read(backupServiceProvider).getAvailableLocalBackups();
+      if (mounted) {
+        setState(() {
+          _backups = list;
+          _isLoading = false;
+          if (list.isEmpty) {
+            _isManualInput = true;
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isManualInput = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmAndRestore({
+    File? file,
+    String? rawJson,
+    String? title,
+  }) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+              ),
+              child: const Icon(
+                Icons.settings_backup_restore_rounded,
+                color: Color(0xFF8B5CF6),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Restore Backup?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'This will restore favorites, playlists, and settings from ${title ?? 'this backup'}.\n\nExisting library songs will not be deleted.',
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.7)
+                : const Color(0xFF475569),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.6)
+                    : const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8B5CF6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Confirm Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isRestoring = true);
+
+    try {
+      final jsonStr = file != null
+          ? await file.readAsString()
+          : (rawJson ?? _textController.text.trim());
+
+      if (jsonStr.isEmpty) {
+        throw const FormatException('Empty backup data provided.');
+      }
+
+      final summary =
+          await ref.read(backupServiceProvider).importData(jsonStr);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Restore complete: ${summary.restoredFavorites} favorites, ${summary.restoredPlaylists} playlists restored.',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isRestoring = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to restore backup: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.82,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        14,
+        22,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF14141E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.black.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                ),
+                child: const Icon(
+                  Icons.settings_backup_restore_rounded,
+                  color: Color(0xFF8B5CF6),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Restore Backup',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F111A),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      _isManualInput
+                          ? 'Paste raw JSON or enter file path'
+                          : 'Select a discovered .spinora backup file',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.5)
+                            : const Color(0xFF5C6275),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  setState(() => _isManualInput = !_isManualInput);
+                },
+                tooltip: _isManualInput ? 'Show local files' : 'Paste JSON/path',
+                icon: Icon(
+                  _isManualInput
+                      ? Icons.folder_open_rounded
+                      : Icons.text_snippet_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (_isRestoring)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 36),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Color(0xFF8B5CF6),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Restoring playlists & favorites…',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_isManualInput) ...[
+            Text(
+              'Paste Backup Payload or File Path',
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F111A),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _textController,
+              maxLines: 5,
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F111A),
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+              decoration: InputDecoration(
+                hintText:
+                    '{\n  "version": 1,\n  "appName": "Spinora Music",\n  ...\n} or /path/to/backup.spinora',
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white24 : Colors.black26,
+                  fontSize: 12,
+                ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF8B5CF6),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final data = await Clipboard.getData('text/plain');
+                    if (data?.text != null && mounted) {
+                      _textController.text = data!.text!;
+                    }
+                  },
+                  icon: const Icon(Icons.paste_rounded, size: 15),
+                  label: const Text('Paste Clipboard'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF8B5CF6),
+                    side: const BorderSide(color: Color(0xFF8B5CF6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: () {
+                    final text = _textController.text.trim();
+                    if (text.isEmpty) return;
+                    if (text.startsWith('/') || text.contains('.spinora')) {
+                      final f = File(text);
+                      if (f.existsSync()) {
+                        _confirmAndRestore(
+                            file: f, title: f.uri.pathSegments.last);
+                        return;
+                      }
+                    }
+                    _confirmAndRestore(rawJson: text, title: 'pasted JSON');
+                  },
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Restore Data'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (_isLoading) ...[
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+            ),
+          ] else if (_backups.isEmpty) ...[
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.folder_off_rounded,
+                      size: 40,
+                      color: isDark ? Colors.white30 : Colors.black26,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'No .spinora backups found in Downloads or Documents',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _isManualInput = true),
+                      icon: const Icon(Icons.text_snippet_rounded, size: 16),
+                      label: const Text('Paste JSON or File Path'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _backups.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final item = _backups[index];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.04)
+                          : Colors.white,
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.06),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                          ),
+                          child: const Icon(
+                            Icons.description_rounded,
+                            color: Color(0xFF8B5CF6),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F111A),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${item.formattedSize} • ${item.formattedDate}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.45)
+                                      : const Color(0xFF5C6275),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () => _confirmAndRestore(
+                            file: item.file,
+                            title: item.fileName,
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor:
+                                const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                            foregroundColor: const Color(0xFF8B5CF6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: const BorderSide(
+                                color: Color(0xFF8B5CF6),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: const Text(
+                            'Restore',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Backup Stat Badge
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BackupStatBadge extends StatelessWidget {
+  const _BackupStatBadge({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : const Color(0xFFF8FAFC),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 18),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F111A),
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : const Color(0xFF64748B),
+              fontSize: 10.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

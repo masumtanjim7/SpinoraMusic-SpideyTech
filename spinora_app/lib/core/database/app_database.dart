@@ -296,6 +296,43 @@ class AppDatabase extends _$AppDatabase {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Backup & Bulk Retrieval Helpers
+  // ---------------------------------------------------------------------------
+
+  /// Fetches all playlists currently stored in the database.
+  Future<List<Playlist>> getAllPlaylists() {
+    return select(playlists).get();
+  }
+
+  /// Fetches all songs currently stored in the database.
+  Future<List<Song>> getAllSongs() {
+    return select(songs).get();
+  }
+
+  /// Fetches all songs in a given playlist by its ID.
+  Future<List<Song>> getSongsInPlaylist(int playlistId) {
+    final query = select(songs).join([
+      innerJoin(
+        playlistSongs,
+        playlistSongs.songId.equalsExp(songs.id),
+      ),
+    ])
+      ..where(playlistSongs.playlistId.equals(playlistId))
+      ..orderBy([
+        OrderingTerm(expression: playlistSongs.addedAt, mode: OrderingMode.asc),
+      ]);
+
+    return query.map((row) => row.readTable(songs)).get();
+  }
+
+  /// Sets the favorite status of a song by ID.
+  Future<void> setSongFavorite(int songId, bool isFavorite) {
+    return (update(songs)..where((s) => s.id.equals(songId))).write(
+      SongsCompanion(isFavorite: Value(isFavorite)),
+    );
+  }
 }
 
 LazyDatabase _openConnection() {
