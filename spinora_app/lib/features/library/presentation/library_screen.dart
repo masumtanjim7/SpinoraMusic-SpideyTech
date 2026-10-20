@@ -163,7 +163,9 @@ final filteredSongsProvider = Provider<AsyncValue<List<Song>>>((ref) {
 /// Screen displaying local audio tracks with instant search, favorites filter,
 /// and embedded cover artwork.
 class LibraryScreen extends ConsumerStatefulWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({super.key, this.showMiniPlayer = true});
+
+  final bool showMiniPlayer;
 
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
@@ -206,7 +208,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         searchQuery.isNotEmpty || selectedFilter != LibraryFilter.all;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: widget.showMiniPlayer
+          ? Theme.of(context).scaffoldBackgroundColor
+          : Colors.transparent,
       body: Stack(
         children: [
           // Ambient background lighting orbs for glass refraction (soft glow, no solid clipping circles)
@@ -253,6 +257,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
           // Main content
           SafeArea(
+            bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -511,7 +516,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   20,
                                   showRecentlyPlayed ? 4 : 8,
                                   20,
-                                  playerState.hasTrack ? 110 : 80,
+                                  MediaQuery.of(context).padding.bottom +
+                                      (playerState.hasTrack ? 150.0 : 100.0),
                                 ),
                                 sliver: SliverList.separated(
                                   itemCount: filteredSongs.length,
@@ -554,15 +560,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
 
           // Floating Glass Mini-Player (bottom anchored)
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: MiniPlayer(bottomPadding: 16),
+          if (widget.showMiniPlayer)
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: MiniPlayer(bottomPadding: 16),
+              ),
             ),
-          ),
         ],
       ),
       floatingActionButton: playerState.hasTrack

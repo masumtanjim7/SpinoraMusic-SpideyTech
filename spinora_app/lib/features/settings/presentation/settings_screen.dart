@@ -19,7 +19,9 @@ import '../application/theme_provider.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.showMiniPlayer = true});
+
+  final bool showMiniPlayer;
 
   static const _appVersion = '1.0.0';
   static const _appName = 'Spinora Music • SpideyTech';
@@ -35,18 +37,27 @@ class SettingsScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: showMiniPlayer
+          ? Theme.of(context).scaffoldBackgroundColor
+          : Colors.transparent,
       body: Stack(
         children: [
           // Ambient blobs
           _buildAmbientBlobs(isDark),
           SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _buildHeader(context, profile, isDark),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      MediaQuery.of(context).padding.bottom +
+                          (playerState.hasTrack ? 150.0 : 100.0),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

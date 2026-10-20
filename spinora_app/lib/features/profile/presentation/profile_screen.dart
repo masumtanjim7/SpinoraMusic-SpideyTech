@@ -18,7 +18,9 @@ import '../application/user_profile_provider.dart';
 import 'edit_profile_sheet.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.showMiniPlayer = true});
+
+  final bool showMiniPlayer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,7 +31,9 @@ class ProfileScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: showMiniPlayer
+          ? Theme.of(context).scaffoldBackgroundColor
+          : Colors.transparent,
       body: Stack(
         children: [
           // Ambient Background Blobs
@@ -37,6 +41,7 @@ class ProfileScreen extends ConsumerWidget {
 
           // Main Scrollable Dashboard
           SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 // Top App Bar Header (Always rendered)
@@ -86,15 +91,16 @@ class ProfileScreen extends ConsumerWidget {
           ),
 
           // MiniPlayer
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: MiniPlayer(bottomPadding: 16),
+          if (showMiniPlayer)
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: MiniPlayer(bottomPadding: 16),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -130,7 +136,8 @@ class _ProfileContentBody extends StatelessWidget {
         20,
         12,
         20,
-        playerState.hasTrack ? 120 : 36,
+        MediaQuery.of(context).padding.bottom +
+            (playerState.hasTrack ? 150.0 : 100.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

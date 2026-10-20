@@ -10,98 +10,49 @@ import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
 import '../../../features/library/data/audio_scanner_service.dart';
 import '../../../features/player/application/player_controller.dart';
-import '../../../features/player/presentation/mini_player.dart';
 import '../../../features/profile/application/user_profile_provider.dart';
 import '../../../features/profile/presentation/edit_profile_sheet.dart';
-import '../../../features/profile/presentation/profile_screen.dart';
-import '../../../features/settings/presentation/settings_screen.dart';
+import '../../../shared/live_audio_waveform.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/smart_mixes_provider.dart';
+import 'main_scaffold.dart';
 import 'smart_mix_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Home Screen — Lucid Glass Personalized Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 
-class HomeScreen extends ConsumerStatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const MainScaffold();
+  }
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _selectedNav = 0;
-
-  void _onNavTap(int index) {
-    if (index == 1) {
-      context.push('/library');
-      return;
-    }
-    if (index == 2) {
-      context.push('/library');
-      return;
-    }
-    if (index == 3) {
-      Navigator.of(context).push(
-        PageRouteBuilder<void>(
-          pageBuilder: (_, _, _) => const ProfileScreen(),
-          transitionsBuilder: (_, animation, _, child) => FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
-        ),
-      );
-      return;
-    }
-    if (index == 4) {
-      Navigator.of(context).push(
-        PageRouteBuilder<void>(
-          pageBuilder: (_, _, _) => const SettingsScreen(),
-          transitionsBuilder: (_, animation, _, child) => FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
-        ),
-      );
-      return;
-    }
-    setState(() => _selectedNav = index);
-  }
+/// The main dashboard body view hosted within [MainScaffold]'s tab 0.
+class HomeDashboardView extends ConsumerWidget {
+  const HomeDashboardView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
     final profile = profileAsync.value;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          _buildAmbientBlobs(context),
-          SafeArea(
-            child: Column(
-              children: [
-                _TopHeader(profile: profile),
-                Expanded(child: _DashboardBody(profile: profile)),
-              ],
-            ),
+    return Stack(
+      children: [
+        _buildAmbientBlobs(context),
+        SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _TopHeader(profile: profile),
+              Expanded(child: _DashboardBody(profile: profile)),
+            ],
           ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: MiniPlayer(bottomPadding: 16),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _GlassBottomNav(
-        selectedIndex: _selectedNav,
-        onTap: _onNavTap,
-      ),
+        ),
+      ],
     );
   }
 
@@ -295,8 +246,11 @@ class _DashboardBody extends ConsumerWidget {
         ? Colors.white.withValues(alpha: 0.4)
         : const Color(0xFF5C6275);
 
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomPad = bottomInset + (hasMiniplayer ? 150.0 : 100.0);
+
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(0, 20, 0, hasMiniplayer ? 110 : 32),
+      padding: EdgeInsets.fromLTRB(0, 20, 0, bottomPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Vibe subtitle
         if (profile?.vibeSubtitle != null)
@@ -1318,10 +1272,13 @@ class _HeroPlayButton extends StatelessWidget {
                 ],
               ),
               child: Center(
-                child: Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                child: LiveAudioWaveform(
+                  isPlaying: isPlaying,
                   color: Colors.white,
-                  size: 26,
+                  size: 22,
+                  barCount: 4,
+                  pausedIcon: Icons.play_arrow_rounded,
+                  pausedIconSize: 26,
                 ),
               ),
             ),
@@ -1594,64 +1551,6 @@ bool _isSongActive(PlayerState playerState, Song song) {
       current.uri == Uri.file(song.filePath).toString();
 }
 
-/// Animated bouncing equalizer badge indicating active playback
-class _AnimatedEqualizerBadge extends StatefulWidget {
-  const _AnimatedEqualizerBadge({
-    required this.color,
-    this.size = 16,
-  });
-
-  final Color color;
-  final double size;
-
-  @override
-  State<_AnimatedEqualizerBadge> createState() => _AnimatedEqualizerBadgeState();
-}
-
-class _AnimatedEqualizerBadgeState extends State<_AnimatedEqualizerBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scaleAnim;
-
-  bool get _isTestEnvironment =>
-      WidgetsBinding.instance.runtimeType.toString().contains('Test');
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _scaleAnim = Tween<double>(begin: 0.85, end: 1.15).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
-    if (_isTestEnvironment) {
-      _controller.value = 1.0;
-    } else {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnim,
-      child: Icon(
-        Icons.equalizer_rounded,
-        color: widget.color,
-        size: widget.size,
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rotation Carousel — Tall Lucid Glass Portrait Cards
@@ -1794,16 +1693,16 @@ class _RotationCarousel extends ConsumerWidget {
                                 blurRadius: 8)
                           ],
                         ),
-                        child: isTrackActive
-                            ? const _AnimatedEqualizerBadge(
-                                color: Color(0xFF00E5FF),
-                                size: 16,
-                              )
-                            : const Icon(
-                                Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
+                        child: LiveAudioWaveform(
+                          isPlaying: isTrackActive,
+                          color: isTrackActive
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white,
+                          size: 16,
+                          barCount: 4,
+                          pausedIcon: Icons.play_arrow_rounded,
+                          pausedIconSize: 16,
+                        ),
                       ),
                     ),
 
@@ -1982,17 +1881,18 @@ class _RecentList extends ConsumerWidget {
                                     : const Color(0xFF5C6275))),
                       ]),
                 ),
-                if (isTrackActive)
-                  const _AnimatedEqualizerBadge(
-                    color: Color(0xFF8B5CF6),
-                    size: 20,
-                  )
-                else
-                  Icon(Icons.play_circle_outline_rounded,
-                      color: isDark
+                LiveAudioWaveform(
+                  isPlaying: isTrackActive,
+                  color: isTrackActive
+                      ? const Color(0xFF8B5CF6)
+                      : (isDark
                           ? Colors.white.withValues(alpha: 0.3)
-                          : const Color(0xFF5C6275).withValues(alpha: 0.6),
-                      size: 20),
+                          : const Color(0xFF5C6275).withValues(alpha: 0.6)),
+                  size: 20,
+                  barCount: 4,
+                  pausedIcon: Icons.play_circle_outline_rounded,
+                  pausedIconSize: 20,
+                ),
               ]),
             ),
           ),
@@ -2002,131 +1902,4 @@ class _RecentList extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Glass Bottom Nav Bar (5 tabs)
-// ─────────────────────────────────────────────────────────────────────────────
 
-class _GlassBottomNav extends StatelessWidget {
-  const _GlassBottomNav({
-    required this.selectedIndex,
-    required this.onTap,
-  });
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF0D0C18).withValues(alpha: 0.92)
-            : Colors.white.withValues(alpha: 0.92),
-        border: Border(
-          top: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : const Color(0xFF0F111A).withValues(alpha: 0.08),
-          ),
-        ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  isActive: selectedIndex == 0,
-                  onTap: () => onTap(0)),
-              _NavItem(
-                  icon: Icons.library_music_rounded,
-                  label: 'Library',
-                  isActive: selectedIndex == 1,
-                  onTap: () => onTap(1)),
-              _NavItem(
-                  icon: Icons.search_rounded,
-                  label: 'Search',
-                  isActive: selectedIndex == 2,
-                  onTap: () => onTap(2)),
-              _NavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profile',
-                  isActive: selectedIndex == 3,
-                  onTap: () => onTap(3)),
-              _NavItem(
-                  icon: Icons.settings_rounded,
-                  label: 'Settings',
-                  isActive: selectedIndex == 4,
-                  onTap: () => onTap(4)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeColor =
-        isDark ? const Color(0xFF8B5CF6) : const Color(0xFF7C3AED);
-    final inactiveColor =
-        isDark ? Colors.white.withValues(alpha: 0.4) : const Color(0xFF5C6275);
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: isActive
-                  ? activeColor.withValues(alpha: isDark ? 0.2 : 0.12)
-                  : Colors.transparent,
-            ),
-            child: Icon(icon,
-                size: 22,
-                color: isActive ? activeColor : inactiveColor),
-          ),
-          const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  color: isActive ? activeColor : inactiveColor)),
-        ]),
-      ),
-    );
-  }
-}

@@ -309,6 +309,22 @@ Task 2.7h DONE (Cloud Backup & Restore — Local JSON Export & Import):
     * All colors use `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
     * All 111 tests passed (`flutter test`).
+Task 2.7i DONE (macOS-Style Glass Tab Shifting Animation & Live Audio Waveforms):
+  - macOS-Style Glass Tab Shifting Navigation Shell (`lib/features/home/presentation/main_scaffold.dart`):
+    * Replaced abrupt tab switching with a fluid, liquid macOS-style glass transition when navigating bottom navigation items (Home, Library, Search, Profile, Settings);
+    * `MainScaffold` manages persistent floating `MiniPlayer` and frosted glass bottom navigation bar `GlassBottomNavBar`;
+    * Animated tab switcher with directional horizontal parallax slide (`Offset(±0.08, 0.0)` based on tab index direction), tactile scale factor (`0.97` -> `1.0`), and frosted glass opacity fade with `Curves.easeOutCubic`;
+    * `mainNavTabProvider` Riverpod notifier allowing deep-links and child views to switch tabs programmatically;
+    * `LibraryScreen` and `ProfileScreen` updated with optional `showMiniPlayer` parameter so embedded tabs don't duplicate the persistent mini-player;
+  - Live Audio Waveform Animation on Play Indicators (`lib/shared/live_audio_waveform.dart` & `home_screen.dart`):
+    * Replaced static play/equalizer icons on rotation cards, recently played list tiles, and Hero card with organic, multi-bar `LiveAudioWaveform` (`CustomPainter` with multi-harmonic sine calculations for realistic frequency flutter);
+    * When paused (`isPlaying == false`), gracefully animates back to a clean Play icon (`Icons.play_arrow_rounded` or `Icons.play_circle_outline_rounded`);
+    * Integrated into Hero Play button with rotating outer glow ring, Rotation carousel cards, and Recently Played list tiles;
+  - Strict Quality & Testing:
+    * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
+    * All colors use `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 111 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
