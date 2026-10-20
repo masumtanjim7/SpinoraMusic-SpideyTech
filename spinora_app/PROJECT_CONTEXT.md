@@ -303,6 +303,8 @@ Task 2.7h DONE (Cloud Backup & Restore — Local JSON Export & Import):
     * Removed pulsing audio visualizer rings from around the Now Playing album art container, restoring a clean Lucid Glass card;
     * Removed waveform equalizer icon from bottom floating mini-player title row (`mini_player.dart`), keeping title and artist clean and uncluttered;
     * Restored and fixed round Play/Pause button on the HomeScreen animated Hero card (`home_screen.dart`): fixed 52x52 container preventing layout shifts, centered `Icons.play_arrow_rounded` when idle or paused/playing other sources, and `Icons.pause_rounded` when active playback is from this mix;
+    * Added active track waveform indicator (`_isSongActive` and `_AnimatedEqualizerBadge`): transforms rotation card and recently played list tile play icons into an animated bouncing equalizer icon (`Icons.equalizer_rounded`) strictly when the song is actively playing;
+    * Hero card tap navigates to complete library playlist view (`SmartMixDetailScreen`) showing all library tracks via an Apple-inspired Lucid Glass Page Transition (smooth 0.95 to 1.0 scale, fade-in, and frosted glass backdrop blur overlay);
     * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
     * All colors use `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);

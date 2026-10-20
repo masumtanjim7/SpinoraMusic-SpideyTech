@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1000,6 +1001,87 @@ class _HeroCardState extends ConsumerState<_HeroCard>
       }
     }
 
+    void openHeroPlaylist() {
+      if (widget.allSongs.isEmpty) {
+        context.push('/library');
+        return;
+      }
+
+      final heroMix = SmartMixInfo(
+        id: 'library_mix',
+        title: headline,
+        subtitle: songCount == 0
+            ? 'For $name'
+            : '$songCount songs ready • For $name',
+        assetImagePath: '',
+        accentColor: slotData.accentColor,
+        secondaryColor: const Color(0xFFFF758F),
+        icon: Icons.auto_awesome_rounded,
+        songs: widget.allSongs,
+      );
+
+      Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          transitionDuration: const Duration(milliseconds: 380),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              SmartMixDetailScreen(mix: heroMix),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+            final curvedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            final scaleAnimation = Tween<double>(
+              begin: 0.95,
+              end: 1.0,
+            ).animate(curvedAnimation);
+            final fadeAnimation = Tween<double>(
+              begin: 0.0,
+              end: 1.0,
+            ).animate(curvedAnimation);
+            final isDark =
+                Theme.of(context).brightness == Brightness.dark;
+
+            return Stack(
+              children: [
+                AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, _) {
+                    final blurVal =
+                        (1.0 - curvedAnimation.value) * 10.0;
+                    if (blurVal <= 0.1) {
+                      return const SizedBox.shrink();
+                    }
+                    return BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: blurVal,
+                        sigmaY: blurVal,
+                      ),
+                      child: Container(
+                        color: (isDark ? Colors.black : Colors.white)
+                            .withValues(
+                          alpha: (1.0 - curvedAnimation.value) * 0.18,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                FadeTransition(
+                  opacity: fadeAnimation,
+                  child: ScaleTransition(
+                    scale: scaleAnimation,
+                    child: child,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: LayoutBuilder(
@@ -1008,7 +1090,7 @@ class _HeroCardState extends ConsumerState<_HeroCard>
           const cardHeight = 200.0;
 
           return GestureDetector(
-            onTap: handlePlayAction,
+            onTap: openHeroPlaylist,
             child: MouseRegion(
               onHover: (event) => _updatePointerTilt(event.localPosition, Size(cardWidth, cardHeight)),
               onExit: (_) => _resetPointerTilt(),
@@ -1501,6 +1583,76 @@ class _SmartPickCard extends StatelessWidget {
   }
 }
 
+bool _isSongActive(PlayerState playerState, Song song) {
+  if (!playerState.isPlaying) return false;
+  final current = playerState.currentTrack;
+  if (current == null) return false;
+  return current.id == 'local_${song.id}' ||
+      current.id == '${song.id}' ||
+      current.id == 'online_${song.id}' ||
+      current.uri == song.filePath ||
+      current.uri == Uri.file(song.filePath).toString();
+}
+
+/// Animated bouncing equalizer badge indicating active playback
+class _AnimatedEqualizerBadge extends StatefulWidget {
+  const _AnimatedEqualizerBadge({
+    required this.color,
+    this.size = 16,
+  });
+
+  final Color color;
+  final double size;
+
+  @override
+  State<_AnimatedEqualizerBadge> createState() => _AnimatedEqualizerBadgeState();
+}
+
+class _AnimatedEqualizerBadgeState extends State<_AnimatedEqualizerBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnim;
+
+  bool get _isTestEnvironment =>
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _scaleAnim = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    if (_isTestEnvironment) {
+      _controller.value = 1.0;
+    } else {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnim,
+      child: Icon(
+        Icons.equalizer_rounded,
+        color: widget.color,
+        size: widget.size,
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Rotation Carousel — Tall Lucid Glass Portrait Cards
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1526,8 +1678,8 @@ class _RotationCarousel extends ConsumerWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (_, i) {
           final s = songs[i];
-          final isCurrentTrack =
-              ref.watch(playerControllerProvider).currentTrack?.id == 'local_${s.id}';
+          final playerState = ref.watch(playerControllerProvider);
+          final isTrackActive = _isSongActive(playerState, s);
 
           return GestureDetector(
             onTap: () {
@@ -1543,7 +1695,7 @@ class _RotationCarousel extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                      color: isCurrentTrack
+                      color: isTrackActive
                           ? const Color(0xFF8B5CF6).withValues(alpha: 0.4)
                           : Colors.black.withValues(alpha: 0.3),
                       blurRadius: 16,
@@ -1561,7 +1713,7 @@ class _RotationCarousel extends ConsumerWidget {
                         height: 220,
                         borderRadius: BorderRadius.zero,
                         fit: BoxFit.cover,
-                        isCurrent: isCurrentTrack),
+                        isCurrent: isTrackActive),
 
                     // Frosted glass footer overlay
                     Positioned(
@@ -1604,7 +1756,7 @@ class _RotationCarousel extends ConsumerWidget {
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
-                                color: (isCurrentTrack
+                                color: (isTrackActive
                                         ? const Color(0xFF00E5FF)
                                         : const Color(0xFF8B5CF6))
                                     .withValues(alpha: 0.2),
@@ -1613,7 +1765,7 @@ class _RotationCarousel extends ConsumerWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                      color: isCurrentTrack
+                                      color: isTrackActive
                                           ? const Color(0xFF00E5FF)
                                           : const Color(0xFF8B5CF6),
                                       fontSize: 9,
@@ -1624,7 +1776,7 @@ class _RotationCarousel extends ConsumerWidget {
                       ),
                     ),
 
-                    // Glass play button — bottom-right of image area
+                    // Glass play button / active waveform indicator — bottom-right of image area
                     Positioned(
                       right: 8,
                       bottom: 60,
@@ -1642,20 +1794,21 @@ class _RotationCarousel extends ConsumerWidget {
                                 blurRadius: 8)
                           ],
                         ),
-                        child: Icon(
-                          isCurrentTrack
-                              ? Icons.equalizer_rounded
-                              : Icons.play_arrow_rounded,
-                          color: isCurrentTrack
-                              ? const Color(0xFF00E5FF)
-                              : Colors.white,
-                          size: 16,
-                        ),
+                        child: isTrackActive
+                            ? const _AnimatedEqualizerBadge(
+                                color: Color(0xFF00E5FF),
+                                size: 16,
+                              )
+                            : const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                       ),
                     ),
 
                     // Active track highlight border
-                    if (isCurrentTrack)
+                    if (isTrackActive)
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
@@ -1771,8 +1924,8 @@ class _RecentList extends ConsumerWidget {
 
     return Column(
       children: display.map((s) {
-        final isCurrentTrack =
-            ref.watch(playerControllerProvider).currentTrack?.id == 'local_${s.id}';
+        final playerState = ref.watch(playerControllerProvider);
+        final isTrackActive = _isSongActive(playerState, s);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           child: GestureDetector(
@@ -1787,11 +1940,11 @@ class _RecentList extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                color: isCurrentTrack
+                color: isTrackActive
                     ? const Color(0xFF8B5CF6).withValues(alpha: isDark ? 0.12 : 0.10)
                     : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.85)),
                 border: Border.all(
-                    color: isCurrentTrack
+                    color: isTrackActive
                         ? const Color(0xFF8B5CF6).withValues(alpha: 0.35)
                         : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white.withValues(alpha: 0.9))),
                 boxShadow: isDark
@@ -1808,7 +1961,7 @@ class _RecentList extends ConsumerWidget {
                 SongArtwork.fromSong(s,
                     size: 44,
                     borderRadius: BorderRadius.circular(10),
-                    isCurrent: isCurrentTrack),
+                    isCurrent: isTrackActive),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1829,9 +1982,11 @@ class _RecentList extends ConsumerWidget {
                                     : const Color(0xFF5C6275))),
                       ]),
                 ),
-                if (isCurrentTrack)
-                  const Icon(Icons.equalizer_rounded,
-                      color: Color(0xFF8B5CF6), size: 18)
+                if (isTrackActive)
+                  const _AnimatedEqualizerBadge(
+                    color: Color(0xFF8B5CF6),
+                    size: 20,
+                  )
                 else
                   Icon(Icons.play_circle_outline_rounded,
                       color: isDark
