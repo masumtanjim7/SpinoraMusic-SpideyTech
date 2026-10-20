@@ -9,6 +9,8 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private val CHANNEL = "com.spideytech.spinora/media_store"
+    private val WIDGET_CHANNEL = "com.spideytech.spinora/widget"
+    private var widgetMethodChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -34,6 +36,33 @@ class MainActivity : AudioServiceActivity() {
                 result.notImplemented()
             }
         }
+
+        widgetMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                if (call.method == "updateWidget") {
+                    val title = call.argument<String>("title")
+                    val artist = call.argument<String>("artist")
+                    val isPlaying = call.argument<Boolean>("isPlaying") ?: false
+                    SpinoraAppWidgetProvider.updateAllWidgets(this@MainActivity, title, artist, isPlaying)
+                    result.success(true)
+                } else {
+                    result.notImplemented()
+                }
+            }
+        }
+
+        // Bridge native widget button taps into Flutter PlayerController if running
+        SpinoraAppWidgetProvider.onWidgetActionListener = { action ->
+            runOnUiThread {
+                widgetMethodChannel?.invokeMethod("onWidgetAction", action)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        SpinoraAppWidgetProvider.onWidgetActionListener = null
+        widgetMethodChannel = null
+        super.onDestroy()
     }
 
     private fun getSongArtwork(songId: Long?, filePath: String?, uriStr: String?): ByteArray? {

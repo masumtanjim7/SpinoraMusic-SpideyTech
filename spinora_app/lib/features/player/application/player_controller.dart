@@ -10,6 +10,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../../core/audio/track.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/widgets/home_widget_service.dart';
 import '../../online/data/youtube_audio_service.dart';
 import '../../settings/application/audio_settings_provider.dart';
 import '../domain/equalizer_state.dart';
@@ -195,6 +196,12 @@ class PlayerController extends Notifier<PlayerState> {
     _listenToPlayerStreams();
     _restoreSavedSession();
     _initAudioEffects();
+
+    HomeWidgetService.initialize(
+      onPlayPause: togglePlayPause,
+      onNext: next,
+      onPrevious: previous,
+    );
 
     ref.listen<AudioSettingsState>(audioSettingsProvider, (prev, next) {
       if (!next.crossfadeEnabled && (prev?.crossfadeEnabled ?? false)) {
@@ -398,6 +405,7 @@ class PlayerController extends Notifier<PlayerState> {
           isPlaying: isPlaying,
           isBuffering: isBuffering,
         );
+        _syncWidgetState();
 
         if (isPlaying && !wasPlaying && state.currentTrack != null) {
           _recordPlayback(state.currentTrack!);
@@ -453,6 +461,7 @@ class PlayerController extends Notifier<PlayerState> {
             currentIndex: index,
             currentTrack: nextTrack,
           );
+          _syncWidgetState();
           if (state.isPlaying) {
             _recordPlayback(nextTrack);
           }
@@ -572,44 +581,73 @@ class PlayerController extends Notifier<PlayerState> {
         uriString.startsWith('http://') ||
         uriString.startsWith('https://');
 
+    final mediaItem = _createMediaItem(track);
+
     if (isOnline) {
       final parsed = (uriString.startsWith('/') && !uriString.startsWith('//'))
           ? Uri.file(uriString)
           : Uri.parse(uriString);
       return AudioSource.uri(
         parsed,
-        tag: MediaItem(
-          id: track.uri,
-          title: track.title,
-          artist: track.artist,
-          album: track.album,
-          duration: Duration(milliseconds: track.durationMs),
-          artUri: _parseArtUri(track.artworkUri),
-        ),
+        tag: mediaItem,
       );
     }
 
     final sourceUri = Uri.parse(uriString);
     return AudioSource.uri(
       sourceUri,
-      tag: MediaItem(
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        duration: Duration(milliseconds: track.durationMs),
-        artUri: _parseArtUri(track.artworkUri),
-      ),
+      tag: mediaItem,
     );
   }
 
-  static Uri? _parseArtUri(String? uriString) {
-    if (uriString == null || uriString.isEmpty) return null;
-    final parsed = Uri.tryParse(uriString);
-    if (parsed != null && (parsed.hasScheme || uriString.startsWith('content://'))) {
-      return parsed;
+  /// Builds a fully-specified [MediaItem] with guaranteed title, artist, album,
+  /// duration, display properties, and high-resolution artwork fallback for
+  /// Android Lock Screen, Bluetooth Car Dashboards (AVRCP/Media3), and AudioService.
+  static MediaItem _createMediaItem(Track track) {
+    final artUri = _resolveArtUri(track.artworkUri);
+    final albumTitle = (track.album != null && track.album!.trim().isNotEmpty)
+        ? track.album!.trim()
+        : 'Spinora Music';
+    final artistName = (track.artist.trim().isNotEmpty)
+        ? track.artist.trim()
+        : 'Unknown Artist';
+    final trackTitle = (track.title.trim().isNotEmpty)
+        ? track.title.trim()
+        : 'Unknown Track';
+
+    return MediaItem(
+      id: track.uri,
+      title: trackTitle,
+      artist: artistName,
+      album: albumTitle,
+      duration: Duration(milliseconds: track.durationMs),
+      artUri: artUri,
+      playable: true,
+      displayTitle: trackTitle,
+      displaySubtitle: artistName,
+      displayDescription: albumTitle,
+      extras: {
+        'id': track.id,
+        'source': track.source.name,
+        'isFavorite': track.isFavorite,
+      },
+    );
+  }
+
+  /// Resolves an artwork URI string (remote, content://, local file, or asset).
+  /// Falls back to the high-res app icon asset if no artwork is available.
+  static Uri _resolveArtUri(String? uriString) {
+    if (uriString != null && uriString.trim().isNotEmpty) {
+      final trimmed = uriString.trim();
+      final parsed = Uri.tryParse(trimmed);
+      if (parsed != null &&
+          (parsed.hasScheme || trimmed.startsWith('content://'))) {
+        return parsed;
+      }
+      return Uri.file(trimmed);
     }
-    return Uri.file(uriString);
+    // High-resolution fallback for Android Lock Screen, Bluetooth Car AVRCP & Media3
+    return Uri.parse('asset:///assets/icon/spinora_icon.png');
   }
 
   /// Plays a given [Track], optionally initializing a new track [queue].
@@ -635,6 +673,7 @@ class PlayerController extends Notifier<PlayerState> {
       isPlaying: false,
       clearError: true,
     );
+    _syncWidgetState();
 
     try {
       if (isOnline) {
@@ -643,14 +682,7 @@ class PlayerController extends Notifier<PlayerState> {
           await player.stop();
         } catch (_) {}
 
-        final mediaItem = MediaItem(
-          id: track.uri,
-          title: track.title,
-          artist: track.artist,
-          album: track.album,
-          duration: Duration(milliseconds: track.durationMs),
-          artUri: _parseArtUri(track.artworkUri),
-        );
+        final mediaItem = _createMediaItem(track);
 
         try {
           // 2) Extract videoId and await getAudioStreamUrl (first attempt)
@@ -1156,6 +1188,16 @@ class PlayerController extends Notifier<PlayerState> {
     player.setVolume(1.0);
     await player.stop();
     state = const PlayerState();
+    _syncWidgetState();
+  }
+
+  /// Synchronizes current playback state to native Android Home Screen App Widget.
+  void _syncWidgetState() {
+    HomeWidgetService.updateWidget(
+      title: state.currentTrack?.title ?? 'Spinora Music',
+      artist: state.currentTrack?.artist ?? 'Ready to play',
+      isPlaying: state.isPlaying,
+    );
   }
 
   // ---------------------------------------------------------------------------

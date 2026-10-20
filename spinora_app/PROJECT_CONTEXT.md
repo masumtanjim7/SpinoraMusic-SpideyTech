@@ -249,6 +249,23 @@ Task 2.7e DONE (Instant <2s Search & Playback, Parallel Stream Race, Non-Blockin
   - Tests & Analysis:
     * 0 analyzer issues (`flutter analyze` with 0 issues).
     * All 80 tests passed (`flutter test`).
+Task 2.7f DONE (Robust Android Lock Screen, Media3 Car Metadata & Native Home Screen App Widget Controls):
+  - Advanced Media3 & Background Audio Configuration (`lib/app/bootstrap.dart` & `lib/main.dart`):
+    * Configured `JustAudioBackground.init` with high notification priority, lock screen controls enabled (`androidStopForegroundOnPause: false`), description, notification badge, custom cyan color (`#00E5FF`), and launcher icon;
+    * Updated default entry point `lib/main.dart` to cleanly delegate to `bootstrap(AppFlavor.dev)` matching `main_dev.dart` and `main_prod.dart`;
+    * Fully populated `MediaItem` metadata (`title`, `artist`, `album`, `artUri`, `displayTitle`, `displaySubtitle`, `displayDescription`, `extras`) with guaranteed fallback high-res artwork (`asset:///assets/icon/spinora_icon.png`), ensuring Bluetooth car dashboards (AVRCP / Media3 / Android Auto) display full track metadata without blanks;
+  - Native Android Home Screen App Widget (`SpinoraAppWidgetProvider`):
+    * Implemented native `AppWidgetProvider` (`android/app/src/main/kotlin/com/spideytech/spinora/SpinoraAppWidgetProvider.kt`) in Kotlin;
+    * Built dark glassmorphic widget layout (`res/layout/widget_spinora.xml`) with rounded corners, artwork thumbnail, title, artist, and responsive Previous, Play/Pause, and Next buttons;
+    * Added vector drawables (`ic_widget_play`, `ic_widget_pause`, `ic_widget_next`, `ic_widget_prev`, `ic_widget_music`, `widget_background`, `widget_icon_bg`, `widget_play_btn_bg`) and widget provider info (`res/xml/spinora_widget_info.xml`);
+    * Configured widget receivers in `AndroidManifest.xml` with broadcast actions (`ACTION_PLAY_PAUSE`, `ACTION_NEXT`, `ACTION_PREV`);
+    * Dispatches playback control to `MediaButtonReceiver` for background audio and bridges to Flutter via `MethodChannel("com.spideytech.spinora/widget")`;
+    * Created `HomeWidgetService` (`lib/core/widgets/home_widget_service.dart`) wired into `PlayerController`, keeping the home screen widget in live sync with track changes and play/pause state;
+  - Strict Quality & Testing:
+    * All text widgets safely constrained/expanded with zero RenderFlex overflow;
+    * Clean color opacities using `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 102 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

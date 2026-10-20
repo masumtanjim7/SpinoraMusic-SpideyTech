@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Spinora Music player controls</string>
+    <string name="widget_default_title">Spinora Music</string>
+    <string name="widget_default_artist">Ready to play</string>
+</resources>

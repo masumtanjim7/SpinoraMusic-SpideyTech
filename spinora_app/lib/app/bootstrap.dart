@@ -18,11 +18,17 @@ import 'spidey_app.dart';
 Future<void> bootstrap(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Background Audio ───────────────────────────────────────────────────────
+  // ── Background Audio & Media3 ─────────────────────────────────────────────
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.spideytech.spinora.channel.audio',
     androidNotificationChannelName: 'Spinora Playback',
+    androidNotificationChannelDescription:
+        'Spinora Music background playback and lock screen controls',
     androidNotificationOngoing: true,
+    androidStopForegroundOnPause: false,
+    androidNotificationIcon: 'mipmap/ic_launcher',
+    androidShowNotificationBadge: true,
+    notificationColor: const Color(0xFF00E5FF),
   );
   // ──────────────────────────────────────────────────────────────────────────
 

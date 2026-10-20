@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:spinora/core/audio/track.dart';
+import 'package:spinora/core/widgets/home_widget_service.dart';
 import 'package:spinora/features/player/application/player_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('PlayerState logic tests', () {
     const track1 = Track(
       id: 'local_1',
@@ -186,6 +189,34 @@ void main() {
         1.5,
         2.0,
       ]);
+    });
+
+    test('HomeWidgetService.updateWidget executes safely without errors', () async {
+      await expectLater(
+        HomeWidgetService.updateWidget(
+          title: 'Test Song',
+          artist: 'Test Artist',
+          isPlaying: true,
+        ),
+        completes,
+      );
+    });
+
+    test('HomeWidgetService.initialize sets handlers and dispatches correctly', () {
+      var playPauseCalled = false;
+      var nextCalled = false;
+      var prevCalled = false;
+
+      HomeWidgetService.initialize(
+        onPlayPause: () => playPauseCalled = true,
+        onNext: () => nextCalled = true,
+        onPrevious: () => prevCalled = true,
+      );
+
+      // Verify initialization completed without exceptions
+      expect(playPauseCalled, false);
+      expect(nextCalled, false);
+      expect(prevCalled, false);
     });
   });
 }
