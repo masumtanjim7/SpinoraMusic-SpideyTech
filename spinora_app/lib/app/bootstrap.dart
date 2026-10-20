@@ -25,7 +25,7 @@ Future<void> bootstrap(AppFlavor flavor) async {
     androidNotificationChannelDescription:
         'Spinora Music background playback and lock screen controls',
     androidNotificationOngoing: true,
-    androidStopForegroundOnPause: false,
+    androidStopForegroundOnPause: true,
     androidNotificationIcon: 'mipmap/ic_launcher',
     androidShowNotificationBadge: true,
     notificationColor: const Color(0xFF00E5FF),
