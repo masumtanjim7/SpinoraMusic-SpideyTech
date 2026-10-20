@@ -266,6 +266,20 @@ Task 2.7f DONE (Robust Android Lock Screen, Media3 Car Metadata & Native Home Sc
     * Clean color opacities using `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
     * All 102 tests passed (`flutter test`).
+Task 2.7g DONE (Real-Time Audio Visualizer & Waveform Rings):
+  - Audio Visualizer Engine (`lib/features/player/presentation/widgets/audio_visualizer_widget.dart`):
+    * Created `AudioVisualizerWidget` CustomPainter with pulsing concentric neon cyan (`#00E5FF`) and electric purple (`#B026FF`) rings;
+    * 48-ray radial frequency spectrum bars with harmonic trigonometric modeling (`sin(3θ + t)`, `cos(5θ - 1.4t)`, `sin(7θ + 0.7t)`) and color gradient interpolation around perimeter;
+    * Smooth idle animation fade-out halting ticker on pause to preserve 100% CPU and battery;
+    * `MiniAudioVisualizer` with 4-bar dynamic animated jumping equalizer for compact components;
+  - UI Integrations:
+    * Wrapped centerpiece artwork card in `NowPlayingScreen` with `AudioVisualizerWidget`, pulsing and expanding to the playback state and hiding cleanly when lyrics view is flipped;
+    * Embedded `MiniAudioVisualizer` into `MiniPlayer` title row, wrapping title in `Expanded` to strictly guarantee zero `RenderFlex` overflow;
+  - Strict Quality & Testing:
+    * Uses `.withValues(alpha: ...)` exclusively for opacities;
+    * Automated test runner detection to ensure `tester.pumpAndSettle()` settles instantly;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 107 tests passed (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
