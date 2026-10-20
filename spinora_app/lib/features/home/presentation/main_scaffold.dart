@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -192,7 +193,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 // macOS/Apple Lucid Glass Bottom Navigation Bar
 // ─────────────────────────────────────────────────────────────────────────────
 
-class GlassBottomNavBar extends StatelessWidget {
+class GlassBottomNavBar extends StatefulWidget {
   const GlassBottomNavBar({
     super.key,
     required this.selectedIndex,
@@ -201,6 +202,39 @@ class GlassBottomNavBar extends StatelessWidget {
 
   final int selectedIndex;
   final ValueChanged<int> onTap;
+
+  @override
+  State<GlassBottomNavBar> createState() => _GlassBottomNavBarState();
+}
+
+class _GlassBottomNavBarState extends State<GlassBottomNavBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    // Initial entrance light sweep shimmer
+    _shimmerController.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant GlassBottomNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _shimmerController.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -250,42 +284,188 @@ class GlassBottomNavBar extends StatelessWidget {
             top: false,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _NavBarItem(
-                    icon: Icons.home_rounded,
-                    label: 'Home',
-                    isActive: selectedIndex == 0,
-                    onTap: () => onTap(0),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.library_music_rounded,
-                    label: 'Library',
-                    isActive: selectedIndex == 1,
-                    onTap: () => onTap(1),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.search_rounded,
-                    label: 'Search',
-                    isActive: selectedIndex == 2,
-                    onTap: () => onTap(2),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.person_rounded,
-                    label: 'Profile',
-                    isActive: selectedIndex == 3,
-                    onTap: () => onTap(3),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.settings_rounded,
-                    label: 'Settings',
-                    isActive: selectedIndex == 4,
-                    onTap: () => onTap(4),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final double totalWidth = constraints.maxWidth;
+                  final double tabWidth = totalWidth / 5.0;
+                  final double pillWidth = math.min(tabWidth - 4.0, 56.0);
+                  const double pillHeight = 32.0;
+                  final double pillLeft = (widget.selectedIndex * tabWidth) +
+                      ((tabWidth - pillWidth) / 2.0);
+                  const double pillTop = 4.0;
+
+                  return Stack(
+                    children: [
+                      // Sliding & Morphing Lucid Glass Active Tab Pill
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 380),
+                        curve: Curves.easeOutBack,
+                        left: pillLeft,
+                        top: pillTop,
+                        width: pillWidth,
+                        height: pillHeight,
+                        child: _ActiveGlassPill(
+                          isDark: isDark,
+                          shimmerAnimation: _shimmerController,
+                        ),
+                      ),
+
+                      // Interactive 5 Tabs
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _NavBarItem(
+                            icon: Icons.home_rounded,
+                            label: 'Home',
+                            isActive: widget.selectedIndex == 0,
+                            onTap: () => widget.onTap(0),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.library_music_rounded,
+                            label: 'Library',
+                            isActive: widget.selectedIndex == 1,
+                            onTap: () => widget.onTap(1),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.search_rounded,
+                            label: 'Search',
+                            isActive: widget.selectedIndex == 2,
+                            onTap: () => widget.onTap(2),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.person_rounded,
+                            label: 'Profile',
+                            isActive: widget.selectedIndex == 3,
+                            onTap: () => widget.onTap(3),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.settings_rounded,
+                            label: 'Settings',
+                            isActive: widget.selectedIndex == 4,
+                            onTap: () => widget.onTap(4),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tactile Lucid Glass selection capsule with BackdropFilter, specular borders,
+/// neon/lavender glow drop shadows, and a diagonal specular light sweep animation.
+class _ActiveGlassPill extends StatelessWidget {
+  const _ActiveGlassPill({
+    required this.isDark,
+    required this.shimmerAnimation,
+  });
+
+  final bool isDark;
+  final Animation<double> shimmerAnimation;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = isDark
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF9D50BB).withValues(alpha: 0.28),
+              const Color(0xFFFF5E99).withValues(alpha: 0.16),
+            ],
+          )
+        : LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.72),
+              const Color(0xFF8B5CF6).withValues(alpha: 0.18),
+            ],
+          );
+
+    final border = Border.all(
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.28)
+          : Colors.white.withValues(alpha: 0.95),
+      width: isDark ? 1.0 : 1.2,
+    );
+
+    final boxShadow = [
+      if (isDark)
+        BoxShadow(
+          color: const Color(0xFF9D50BB).withValues(alpha: 0.35),
+          blurRadius: 16,
+          spreadRadius: 1,
+          offset: const Offset(0, 2),
+        )
+      else
+        BoxShadow(
+          color: const Color(0xFF7A5CFF).withValues(alpha: 0.20),
+          blurRadius: 14,
+          spreadRadius: 1,
+          offset: const Offset(0, 2),
+        ),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: boxShadow,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Glass body capsule with gradient & specular border
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: gradient,
+                  border: border,
+                ),
+              ),
+
+              // Diagonal specular light sweep / glass shimmer on selection
+              AnimatedBuilder(
+                animation: shimmerAnimation,
+                builder: (context, child) {
+                  final progress = shimmerAnimation.value;
+                  if (progress <= 0.0 || progress >= 1.0) {
+                    return const SizedBox.shrink();
+                  }
+
+                  // Sweeps diagonally across from top-left to bottom-right
+                  final double sweepX = -1.8 + (3.6 * progress);
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment(sweepX - 0.7, -1.0),
+                        end: Alignment(sweepX + 0.7, 1.0),
+                        colors: [
+                          Colors.white.withValues(alpha: 0.0),
+                          Colors.white.withValues(
+                            alpha: isDark ? 0.38 : 0.50,
+                          ),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -310,48 +490,9 @@ class _NavBarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeColor =
-        isDark ? const Color(0xFFC084FC) : const Color(0xFF7C3AED);
+        isDark ? const Color(0xFFE9D5FF) : const Color(0xFF6D28D9);
     final inactiveColor =
         isDark ? Colors.white.withValues(alpha: 0.50) : const Color(0xFF64748B);
-
-    final pillDecoration = isActive
-        ? BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      const Color(0xFF8B5CF6).withValues(alpha: 0.32),
-                      const Color(0xFFFF758F).withValues(alpha: 0.18),
-                    ]
-                  : [
-                      Colors.white.withValues(alpha: 0.75),
-                      const Color(0xFF8B5CF6).withValues(alpha: 0.22),
-                    ],
-            ),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.24)
-                  : Colors.white.withValues(alpha: 0.90),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isDark
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF7C3AED))
-                    .withValues(alpha: isDark ? 0.30 : 0.16),
-                blurRadius: 12,
-                spreadRadius: 1,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          )
-        : BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.transparent,
-          );
 
     return Expanded(
       child: GestureDetector(
@@ -362,29 +503,46 @@ class _NavBarItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: pillDecoration,
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isActive ? activeColor : inactiveColor,
+              SizedBox(
+                height: 32,
+                child: Center(
+                  child: AnimatedScale(
+                    scale: isActive ? 1.15 : 1.0,
+                    curve: Curves.easeOutBack,
+                    duration: const Duration(milliseconds: 320),
+                    child: Icon(
+                      icon,
+                      size: 20,
+                      color: isActive ? activeColor : inactiveColor,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 3),
               Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     color: isActive ? activeColor : inactiveColor,
                     letterSpacing: -0.1,
+                    shadows: isActive
+                        ? [
+                            Shadow(
+                              color: activeColor.withValues(
+                                alpha: isDark ? 0.55 : 0.35,
+                              ),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
