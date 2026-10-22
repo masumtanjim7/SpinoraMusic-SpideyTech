@@ -69,15 +69,20 @@ void main() {
       // Trigger tab switch
       await tester.tap(find.text('Switch to Tab 1'));
       await tester.pump();
-      // Pump mid-animation (e.g. 200ms into the 450ms transition)
+      // Pump mid-animation (e.g. 200ms into the 480ms transition)
       await tester.pump(const Duration(milliseconds: 200));
 
-      // Mid-transition blur pulse should be present
+      // Both outgoing tab and incoming tab must be rendered simultaneously in the Stack
+      expect(find.text('Tab 0 Content'), findsOneWidget);
+      expect(find.text('Tab 1 Content'), findsOneWidget);
+
+      // Mid-transition blur pulse should be present on moving window
       expect(find.byType(BackdropFilter), findsOneWidget);
 
       // Settle animation completely
       await tester.pumpAndSettle();
 
+      expect(find.text('Tab 0 Content'), findsNothing);
       expect(find.text('Tab 1 Content'), findsOneWidget);
       // Once settled, BackdropFilter must be bypassed again
       expect(find.byType(BackdropFilter), findsNothing);
@@ -195,8 +200,8 @@ void main() {
         child: const Text('Route Page'),
       );
 
-      expect(page.transitionDuration, const Duration(milliseconds: 450));
-      expect(page.reverseTransitionDuration, const Duration(milliseconds: 400));
+      expect(page.transitionDuration, const Duration(milliseconds: 480));
+      expect(page.reverseTransitionDuration, const Duration(milliseconds: 420));
     });
   });
 }

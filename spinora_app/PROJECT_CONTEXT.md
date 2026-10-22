@@ -339,7 +339,18 @@ Task 2.7j DONE (Apple/macOS Lucid Glass Optical Transition Effect Across Tabs & 
   - Strict Quality & Testing:
     * All colors use `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
-    * Added 5 new widget/unit tests in `test/lucid_page_transition_test.dart` (116 tests total, all passing).
+Task 2.7k DONE (macOS Stage Manager 3D Dual-Window Lucid Glass Morph & Spring Twitch):
+  - Upgraded Lucid Glass Transition Engine (`lib/core/navigation/lucid_page_transition.dart`):
+    * Dual-Window Simultaneous 3D Rendering: Both outgoing and incoming tabs remain alive and render simultaneously in a `Stack` during the 480ms transition;
+    * Receding Outgoing Glass Window: Scales down (`1.0` -> `0.86`) with `Curves.easeInOutCubic`, slides away horizontally (`0.0` -> `±0.35`), applies 3D perspective Y-axis tilt (`±0.14`), and fades out (`1.0` -> `0.0`);
+    * Snapping Incoming Glass Window with "Twitch" Spring: Driven by `Cubic(0.18, 1.18, 0.32, 1.0)` with elastic overshoot gliding from `±0.45` -> `0.0`, scaling up `0.88` -> `1.0`, and un-tilting `∓0.16` -> `0.0` with signature macOS Stage Manager lock-in snap;
+    * Floating Lucid Glass Window Frame: Dynamically morphs into floating rounded window (`sin(t * pi) * 32.0`), 1.5px glowing specular border (white in Light Mode, neon lavender `#D8B4FE` in Dark Mode), deep floating window `BoxShadow` with purple bloom, optical blur pulse (`sin(t * pi) * 10.0`), and diagonal iridescent specular light sweep;
+    * Zero-Overhead Stationary Bypass: Stationary tabs/routes bypass `BackdropFilter`, `ClipRRect`, and `Transform` for zero GPU overhead;
+  - All 5 bottom nav tabs (`Home`, `Library`, `Search`, `Profile`, `Settings`) and routes seamlessly wired;
+  - Strict Quality & Testing:
+    * All colors use `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * All 116 tests passing (`flutter test`).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.
