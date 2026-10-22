@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import '../../../features/profile/presentation/edit_profile_sheet.dart';
 import '../../../shared/live_audio_waveform.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/smart_mixes_provider.dart';
+import '../../../core/navigation/lucid_page_transition.dart';
 import 'main_scaffold.dart';
 import 'smart_mix_detail_screen.dart';
 
@@ -294,13 +294,8 @@ class _DashboardBody extends ConsumerWidget {
                 mix: mix,
                 onTap: () {
                   Navigator.of(context).push(
-                    PageRouteBuilder<void>(
-                      pageBuilder: (_, _, _) => SmartMixDetailScreen(mix: mix),
-                      transitionsBuilder: (_, animation, _, child) =>
-                          FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
+                    LucidGlassPageRoute<void>(
+                      builder: (_) => SmartMixDetailScreen(mix: mix),
                     ),
                   );
                 },
@@ -975,63 +970,8 @@ class _HeroCardState extends ConsumerState<_HeroCard>
       );
 
       Navigator.of(context).push(
-        PageRouteBuilder<void>(
-          transitionDuration: const Duration(milliseconds: 380),
-          reverseTransitionDuration: const Duration(milliseconds: 300),
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              SmartMixDetailScreen(mix: heroMix),
-          transitionsBuilder:
-              (context, animation, secondaryAnimation, child) {
-            final curvedAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            final scaleAnimation = Tween<double>(
-              begin: 0.95,
-              end: 1.0,
-            ).animate(curvedAnimation);
-            final fadeAnimation = Tween<double>(
-              begin: 0.0,
-              end: 1.0,
-            ).animate(curvedAnimation);
-            final isDark =
-                Theme.of(context).brightness == Brightness.dark;
-
-            return Stack(
-              children: [
-                AnimatedBuilder(
-                  animation: animation,
-                  builder: (context, _) {
-                    final blurVal =
-                        (1.0 - curvedAnimation.value) * 10.0;
-                    if (blurVal <= 0.1) {
-                      return const SizedBox.shrink();
-                    }
-                    return BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: blurVal,
-                        sigmaY: blurVal,
-                      ),
-                      child: Container(
-                        color: (isDark ? Colors.black : Colors.white)
-                            .withValues(
-                          alpha: (1.0 - curvedAnimation.value) * 0.18,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                FadeTransition(
-                  opacity: fadeAnimation,
-                  child: ScaleTransition(
-                    scale: scaleAnimation,
-                    child: child,
-                  ),
-                ),
-              ],
-            );
-          },
+        LucidGlassPageRoute<void>(
+          builder: (_) => SmartMixDetailScreen(mix: heroMix),
         ),
       );
     }

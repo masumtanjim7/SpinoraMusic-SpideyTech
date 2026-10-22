@@ -12,6 +12,7 @@ import '../../../shared/glass_card.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
+import '../../../core/navigation/lucid_page_transition.dart';
 import 'playlist_detail_screen.dart';
 import 'widgets/library_group_views.dart';
 import 'widgets/online_search_view.dart';
@@ -1801,7 +1802,7 @@ class _PlaylistTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
+              LucidGlassPageRoute(
                 builder: (context) => PlaylistDetailScreen(playlist: playlist),
               ),
             );

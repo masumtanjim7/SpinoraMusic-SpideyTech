@@ -12,6 +12,7 @@ import '../../library/data/audio_scanner_service.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
+import '../../../core/navigation/lucid_page_transition.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../application/stats_provider.dart';
 import '../application/user_profile_provider.dart';
@@ -49,10 +50,8 @@ class ProfileScreen extends ConsumerWidget {
                   onEditProfile: () => EditProfileSheet.show(context),
                   onOpenSettings: () {
                     Navigator.of(context).push(
-                      PageRouteBuilder<void>(
-                        pageBuilder: (_, _, _) => const SettingsScreen(),
-                        transitionsBuilder: (_, animation, _, child) =>
-                            FadeTransition(opacity: animation, child: child),
+                      LucidGlassPageRoute<void>(
+                        builder: (_) => const SettingsScreen(),
                       ),
                     );
                   },

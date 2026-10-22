@@ -324,7 +324,22 @@ Task 2.7i DONE (macOS-Style Glass Tab Shifting Animation & Live Audio Waveforms)
     * Wrapped all row text elements in `Expanded`/`Flexible` with zero `RenderFlex` overflow;
     * All colors use `.withValues(alpha: ...)`;
     * 0 analyzer issues (`flutter analyze` with 0 issues);
-    * All 111 tests passed (`flutter test`).
+Task 2.7j DONE (Apple/macOS Lucid Glass Optical Transition Effect Across Tabs & Routes):
+  - Reusable Lucid Glass Transition Builder (`lib/core/navigation/lucid_page_transition.dart`):
+    * `LucidGlassPageTransition`, `LucidGlassTransitionPage`, `buildLucidGlassPageTransition`, `LucidGlassPageRoute`, and `LucidTabTransitionSwitcher` (450ms transition, 400ms reverse);
+    * Mid-Transition Optical Blur Pulse: Animated `BackdropFilter` with bell curve sigma (`sin(animation.value * pi) * 12.0`) and dynamic tint, strictly bypassed (`SizedBox.shrink`) when stationary (`animation.value == 0.0 || 1.0` or sigma <= 0.05) for zero GPU overhead;
+    * Directional Parallax & 3D Depth Scale: Direction-aware horizontal parallax (`Offset(isForward ? 0.08 : -0.08, 0.0)` -> `Offset.zero`), 3D depth scale (`0.95` -> `1.0`) with `Curves.easeOutCubic`, and smooth opacity crossfade;
+    * Moving Specular Glass Sheen: Transient diagonal specular light reflection (`LinearGradient`) sweeping across the screen as it settles, dynamically adapting to brightness (luminous white/lilac in Light Mode, neon violet/cyan in Dark Mode);
+    * Secondary animation support on page transitions: scales down (`1.0` -> `0.95`) and slides back (`Offset(-0.04, 0.0)`) when another route is pushed;
+    * Haptic feedback: triggers `HapticFeedback.selectionClick()` on transition start;
+  - Full App Integration:
+    * Wired `LucidTabTransitionSwitcher` into `MainScaffold` (`main_scaffold.dart`) for bottom nav tab switching (Home, Library, Search, Profile, Settings);
+    * Applied `LucidGlassTransitionPage` to all `GoRouter` routes in `router.dart` (`/`, `/library`, `/profile`, `/settings`, `/permission`, `/onboarding`);
+    * Applied `LucidGlassPageRoute` to all `Navigator.push` invocations (`SmartMixDetailScreen` in `home_screen.dart`, `SettingsScreen` in `profile_screen.dart`, `PlaylistDetailScreen` in `library_screen.dart`);
+  - Strict Quality & Testing:
+    * All colors use `.withValues(alpha: ...)`;
+    * 0 analyzer issues (`flutter analyze` with 0 issues);
+    * Added 5 new widget/unit tests in `test/lucid_page_transition_test.dart` (116 tests total, all passing).
 Next: Task 2.8 Crossfade / Gapless Playback or Full-Screen Immersive Lyrics Mode.
 Roadmap: 0 Setup ✓, 1 Core and UI ✓, 2 Streaming and audio (in progress), 3 AI, 4 Local badges and themes (optional sync),
 5 Friends APK release. Task IDs (for example 2.8 Crossfade) match the Spinora implementation guide.

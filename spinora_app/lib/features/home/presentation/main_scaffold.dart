@@ -8,6 +8,7 @@ import '../../library/presentation/library_screen.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../../core/navigation/lucid_page_transition.dart';
 import 'home_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,77 +100,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Fluid macOS-style glass tab shifting animated switcher
+          // Fluid Apple/macOS Lucid Glass tab shifting switcher
           Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 360),
-              reverseDuration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              layoutBuilder: (currentChild, previousChildren) {
-                return Stack(
-                  fit: StackFit.expand,
-                  alignment: Alignment.topLeft,
-                  children: <Widget>[
-                    ...previousChildren,
-                    ?currentChild,
-                  ],
-                );
-              },
-              transitionBuilder: (child, animation) {
-                final isEntering =
-                    (child.key as ValueKey<int>?)?.value == _selectedIndex;
-                final isForward = _selectedIndex >= _previousIndex;
-
-                // Horizontal parallax offset based on tab index direction
-                final double slideOffset = isForward ? 0.08 : -0.08;
-                final Offset beginOffset = isEntering
-                    ? Offset(slideOffset, 0.0)
-                    : Offset(-slideOffset, 0.0);
-
-                final curvedAnimation = CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                  reverseCurve: Curves.easeInCubic,
-                );
-
-                final slideAnimation = Tween<Offset>(
-                  begin: beginOffset,
-                  end: Offset.zero,
-                ).animate(curvedAnimation);
-
-                // Tactile scale factor (0.97 -> 1.0)
-                final scaleAnimation = Tween<double>(
-                  begin: isEntering ? 0.97 : 1.0,
-                  end: isEntering ? 1.0 : 0.97,
-                ).animate(curvedAnimation);
-
-                // Frosted glass opacity fade
-                final fadeAnimation = Tween<double>(
-                  begin: 0.0,
-                  end: 1.0,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.85, curve: Curves.easeOut),
-                  reverseCurve:
-                      const Interval(0.15, 1.0, curve: Curves.easeIn),
-                ));
-
-                return FadeTransition(
-                  opacity: fadeAnimation,
-                  child: SlideTransition(
-                    position: slideAnimation,
-                    child: ScaleTransition(
-                      scale: scaleAnimation,
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: KeyedSubtree(
-                key: ValueKey<int>(_selectedIndex),
-                child: _buildTab(_selectedIndex),
-              ),
+            child: LucidTabTransitionSwitcher(
+              currentIndex: _selectedIndex,
+              previousIndex: _previousIndex,
+              child: _buildTab(_selectedIndex),
             ),
           ),
         ],

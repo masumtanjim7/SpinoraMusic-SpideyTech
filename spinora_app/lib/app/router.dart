@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../core/navigation/lucid_page_transition.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/library/data/permission_service.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -47,27 +48,45 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const HomeScreen(),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const OnboardingScreen(),
+        ),
       ),
       GoRoute(
         path: '/permission',
-        builder: (context, state) => const PermissionScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const PermissionScreen(),
+        ),
       ),
       GoRoute(
         path: '/library',
-        builder: (context, state) => const LibraryScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const LibraryScreen(),
+        ),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const ProfileScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) => LucidGlassTransitionPage(
+          key: state.pageKey,
+          child: const SettingsScreen(),
+        ),
       ),
     ],
   );
