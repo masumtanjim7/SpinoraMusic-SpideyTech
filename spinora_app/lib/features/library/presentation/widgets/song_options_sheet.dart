@@ -11,26 +11,18 @@ import 'song_artwork.dart';
 
 /// Shows the glassmorphic song options sheet with options to "Play Next",
 /// "Add to Playlist", and "Toggle Favorite".
-void showSongOptionsSheet({
-  required BuildContext context,
-  required Song song,
-}) {
+void showSongOptionsSheet({required BuildContext context, required Song song}) {
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (sheetContext) => _SongOptionsSheet(
-      song: song,
-      parentContext: context,
-    ),
+    builder: (sheetContext) =>
+        _SongOptionsSheet(song: song, parentContext: context),
   );
 }
 
 class _SongOptionsSheet extends ConsumerWidget {
-  const _SongOptionsSheet({
-    required this.song,
-    required this.parentContext,
-  });
+  const _SongOptionsSheet({required this.song, required this.parentContext});
 
   final Song song;
   final BuildContext parentContext;
@@ -101,7 +93,9 @@ class _SongOptionsSheet extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tt.titleMedium?.copyWith(
-                          color: isLight ? const Color(0xFF0F111A) : Colors.white,
+                          color: isLight
+                              ? const Color(0xFF0F111A)
+                              : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -201,9 +195,7 @@ class _SongOptionsSheet extends ConsumerWidget {
                 Navigator.of(context).pop();
                 final db = ref.read(appDatabaseProvider);
                 await (db.update(db.songs)..where((s) => s.id.equals(song.id)))
-                    .write(
-                  SongsCompanion(isFavorite: Value(!song.isFavorite)),
-                );
+                    .write(SongsCompanion(isFavorite: Value(!song.isFavorite)));
               },
             ),
 
@@ -307,9 +299,7 @@ class _SheetActionTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: iconColor.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: iconColor.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: iconColor.withValues(alpha: 0.3)),
           ),
           child: Icon(icon, color: iconColor, size: 22),
         ),
@@ -346,18 +336,13 @@ void showAddToPlaylistSheet({
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (sheetContext) => _AddToPlaylistModal(
-      song: song,
-      parentContext: context,
-    ),
+    builder: (sheetContext) =>
+        _AddToPlaylistModal(song: song, parentContext: context),
   );
 }
 
 class _AddToPlaylistModal extends ConsumerWidget {
-  const _AddToPlaylistModal({
-    required this.song,
-    required this.parentContext,
-  });
+  const _AddToPlaylistModal({required this.song, required this.parentContext});
 
   final Song song;
   final BuildContext parentContext;
@@ -544,8 +529,9 @@ class _AddToPlaylistModal extends ConsumerWidget {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
-                                    color: AppColors.cyanAccent
-                                        .withValues(alpha: 0.4),
+                                    color: AppColors.cyanAccent.withValues(
+                                      alpha: 0.4,
+                                    ),
                                   ),
                                 ),
                                 content: Text(
@@ -621,9 +607,7 @@ class _CreatePlaylistDialogState extends State<CreatePlaylistDialog> {
       backgroundColor: const Color(0xFF181528),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: AppColors.purpleAccent.withValues(alpha: 0.4),
-        ),
+        side: BorderSide(color: AppColors.purpleAccent.withValues(alpha: 0.4)),
       ),
       title: Row(
         children: [
@@ -664,15 +648,11 @@ class _CreatePlaylistDialogState extends State<CreatePlaylistDialog> {
           fillColor: Colors.white.withValues(alpha: 0.06),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: AppColors.cyanAccent,
-            ),
+            borderSide: const BorderSide(color: AppColors.cyanAccent),
           ),
         ),
       ),
@@ -719,10 +699,7 @@ Future<int?> showCreatePlaylistDialog({
   final newId = await db.createPlaylist(name);
 
   if (songIdToInsert != null) {
-    await db.addSongToPlaylist(
-      playlistId: newId,
-      songId: songIdToInsert,
-    );
+    await db.addSongToPlaylist(playlistId: newId, songId: songIdToInsert);
   }
 
   if (context.mounted) {

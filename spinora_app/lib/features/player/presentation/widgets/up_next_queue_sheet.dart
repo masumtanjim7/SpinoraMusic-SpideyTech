@@ -93,8 +93,10 @@ class UpNextQueueSheet extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isLight
                         ? Colors.black.withValues(alpha: 0.05)
@@ -203,21 +205,29 @@ class UpNextQueueSheet extends ConsumerWidget {
                       child: Material(
                         color: isCurrent
                             ? (isLight
-                                ? AppColors.purpleAccent.withValues(alpha: 0.12)
-                                : AppColors.purpleAccent.withValues(alpha: 0.16))
+                                  ? AppColors.purpleAccent.withValues(
+                                      alpha: 0.12,
+                                    )
+                                  : AppColors.purpleAccent.withValues(
+                                      alpha: 0.16,
+                                    ))
                             : (isLight
-                                ? Colors.black.withValues(alpha: 0.02)
-                                : Colors.white.withValues(alpha: 0.04)),
+                                  ? Colors.black.withValues(alpha: 0.02)
+                                  : Colors.white.withValues(alpha: 0.04)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                           side: BorderSide(
                             color: isCurrent
                                 ? (isLight
-                                    ? AppColors.purpleAccent.withValues(alpha: 0.45)
-                                    : AppColors.cyanAccent.withValues(alpha: 0.5))
+                                      ? AppColors.purpleAccent.withValues(
+                                          alpha: 0.45,
+                                        )
+                                      : AppColors.cyanAccent.withValues(
+                                          alpha: 0.5,
+                                        ))
                                 : (isLight
-                                    ? Colors.black.withValues(alpha: 0.06)
-                                    : Colors.white.withValues(alpha: 0.06)),
+                                      ? Colors.black.withValues(alpha: 0.06)
+                                      : Colors.white.withValues(alpha: 0.06)),
                             width: isCurrent ? 1.4 : 1,
                           ),
                         ),
@@ -253,17 +263,21 @@ class UpNextQueueSheet extends ConsumerWidget {
                                           if (isCurrent) ...[
                                             Container(
                                               margin: const EdgeInsets.only(
-                                                  right: 6),
+                                                right: 6,
+                                              ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: (isLight
-                                                        ? AppColors.purpleAccent
-                                                        : AppColors.cyanAccent)
-                                                    .withValues(alpha: 0.2),
+                                                color:
+                                                    (isLight
+                                                            ? AppColors
+                                                                  .purpleAccent
+                                                            : AppColors
+                                                                  .cyanAccent)
+                                                        .withValues(alpha: 0.2),
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),
@@ -288,8 +302,10 @@ class UpNextQueueSheet extends ConsumerWidget {
                                               style: TextStyle(
                                                 color: isCurrent
                                                     ? (isLight
-                                                        ? AppColors.purpleAccent
-                                                        : AppColors.cyanAccent)
+                                                          ? AppColors
+                                                                .purpleAccent
+                                                          : AppColors
+                                                                .cyanAccent)
                                                     : context.primaryText,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 14,
@@ -317,8 +333,8 @@ class UpNextQueueSheet extends ConsumerWidget {
                                   style: TextStyle(
                                     color: isCurrent
                                         ? (isLight
-                                            ? AppColors.purpleAccent
-                                            : AppColors.cyanAccent)
+                                              ? AppColors.purpleAccent
+                                              : AppColors.cyanAccent)
                                         : context.secondaryText,
                                     fontSize: 12,
                                     fontWeight: isCurrent

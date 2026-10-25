@@ -60,8 +60,7 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile> {
   UserProfile _load() {
     return UserProfile(
       displayName: _prefs.getString(_kDisplayName) ?? 'Music Lover',
-      vibeSubtitle:
-          _prefs.getString(_kVibeSubtitle) ?? 'Finding my frequency',
+      vibeSubtitle: _prefs.getString(_kVibeSubtitle) ?? 'Finding my frequency',
       avatarPath: _prefs.getString(_kAvatarPath),
       hasCompletedOnboarding: _prefs.getBool(_kOnboardingDone) ?? false,
     );
@@ -117,5 +116,5 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile> {
 
 final userProfileProvider =
     AsyncNotifierProvider<UserProfileNotifier, UserProfile>(
-  UserProfileNotifier.new,
-);
+      UserProfileNotifier.new,
+    );

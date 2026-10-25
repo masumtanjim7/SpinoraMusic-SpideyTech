@@ -127,8 +127,8 @@ class AudioSettingsNotifier extends Notifier<AudioSettingsState> {
   }
 
   Future<void> setCrossfadeDuration(double durationSeconds) async {
-    final clamped = (math.max(1.0, math.min(8.0, durationSeconds)) * 10)
-            .roundToDouble() /
+    final clamped =
+        (math.max(1.0, math.min(8.0, durationSeconds)) * 10).roundToDouble() /
         10.0;
     state = state.copyWith(crossfadeDurationSeconds: clamped);
     try {
@@ -142,5 +142,5 @@ class AudioSettingsNotifier extends Notifier<AudioSettingsState> {
 
 final audioSettingsProvider =
     NotifierProvider<AudioSettingsNotifier, AudioSettingsState>(
-  AudioSettingsNotifier.new,
-);
+      AudioSettingsNotifier.new,
+    );

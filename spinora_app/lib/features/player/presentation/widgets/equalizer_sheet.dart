@@ -104,8 +104,8 @@ class EqualizerSheet extends ConsumerWidget {
                             color: isEqEnabled
                                 ? AppColors.cyanAccent.withValues(alpha: 0.6)
                                 : (isLight
-                                    ? Colors.black.withValues(alpha: 0.08)
-                                    : Colors.white.withValues(alpha: 0.1)),
+                                      ? Colors.black.withValues(alpha: 0.08)
+                                      : Colors.white.withValues(alpha: 0.1)),
                           ),
                         ),
                         child: Icon(
@@ -140,8 +140,8 @@ class EqualizerSheet extends ConsumerWidget {
                               style: tt.bodySmall?.copyWith(
                                 color: isEqEnabled
                                     ? (isLight
-                                        ? const Color(0xFF0D9488)
-                                        : AppColors.cyanAccent)
+                                          ? const Color(0xFF0D9488)
+                                          : AppColors.cyanAccent)
                                     : context.secondaryText,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -162,8 +162,9 @@ class EqualizerSheet extends ConsumerWidget {
                   value: isEqEnabled,
                   onChanged: (val) => controller.setEqualizerEnabled(val),
                   activeThumbColor: AppColors.cyanAccent,
-                  activeTrackColor:
-                      AppColors.cyanAccent.withValues(alpha: 0.35),
+                  activeTrackColor: AppColors.cyanAccent.withValues(
+                    alpha: 0.35,
+                  ),
                   inactiveThumbColor: isLight ? Colors.black38 : Colors.white38,
                   inactiveTrackColor: isLight
                       ? Colors.black.withValues(alpha: 0.08)
@@ -219,15 +220,15 @@ class EqualizerSheet extends ConsumerWidget {
                                   alpha: isLight ? 0.16 : 0.18,
                                 )
                               : (isLight
-                                  ? Colors.black.withValues(alpha: 0.03)
-                                  : Colors.white.withValues(alpha: 0.05)),
+                                    ? Colors.black.withValues(alpha: 0.03)
+                                    : Colors.white.withValues(alpha: 0.05)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.cyanAccent.withValues(alpha: 0.7)
                                 : (isLight
-                                    ? Colors.black.withValues(alpha: 0.06)
-                                    : Colors.white.withValues(alpha: 0.1)),
+                                      ? Colors.black.withValues(alpha: 0.06)
+                                      : Colors.white.withValues(alpha: 0.1)),
                             width: isSelected ? 1.4 : 1.0,
                           ),
                           boxShadow: isSelected
@@ -261,8 +262,8 @@ class EqualizerSheet extends ConsumerWidget {
                               style: TextStyle(
                                 color: isSelected
                                     ? (isLight
-                                        ? const Color(0xFF0D9488)
-                                        : AppColors.cyanAccent)
+                                          ? const Color(0xFF0D9488)
+                                          : AppColors.cyanAccent)
                                     : context.primaryText,
                                 fontWeight: isSelected
                                     ? FontWeight.w700
@@ -292,8 +293,8 @@ class EqualizerSheet extends ConsumerWidget {
                   color: isEqEnabled
                       ? AppColors.cyanAccent.withValues(alpha: 0.2)
                       : (isLight
-                          ? Colors.black.withValues(alpha: 0.06)
-                          : Colors.white.withValues(alpha: 0.08)),
+                            ? Colors.black.withValues(alpha: 0.06)
+                            : Colors.white.withValues(alpha: 0.08)),
                 ),
               ),
               child: Column(
@@ -363,10 +364,10 @@ class EqualizerSheet extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                                 color: isEqEnabled
                                     ? (isNonZero
-                                        ? (isLight
-                                            ? const Color(0xFF0D9488)
-                                            : AppColors.cyanAccent)
-                                        : context.primaryText)
+                                          ? (isLight
+                                                ? const Color(0xFF0D9488)
+                                                : AppColors.cyanAccent)
+                                          : context.primaryText)
                                     : context.secondaryText,
                               ),
                             ),
@@ -376,32 +377,35 @@ class EqualizerSheet extends ConsumerWidget {
                             SizedBox(
                               height: 140,
                               child: RotatedBox(
-                                quarterTurns: 3, // Rotate 270 deg: down=min, up=max
+                                quarterTurns:
+                                    3, // Rotate 270 deg: down=min, up=max
                                 child: SliderTheme(
                                   data: SliderTheme.of(context).copyWith(
                                     trackHeight: 3.5,
                                     activeTrackColor: isEqEnabled
                                         ? AppColors.cyanAccent
-                                        : (isLight ? Colors.black26 : Colors.white24),
+                                        : (isLight
+                                              ? Colors.black26
+                                              : Colors.white24),
                                     inactiveTrackColor: isLight
                                         ? Colors.black.withValues(alpha: 0.08)
                                         : Colors.white.withValues(alpha: 0.08),
                                     thumbColor: isEqEnabled
                                         ? (isNonZero
-                                            ? AppColors.cyanAccent
-                                            : (isLight
-                                                ? context.primaryText
-                                                : Colors.white))
-                                        : (isLight ? Colors.black26 : Colors.white38),
+                                              ? AppColors.cyanAccent
+                                              : (isLight
+                                                    ? context.primaryText
+                                                    : Colors.white))
+                                        : (isLight
+                                              ? Colors.black26
+                                              : Colors.white38),
                                     overlayColor: AppColors.cyanAccent
                                         .withValues(alpha: 0.15),
-                                    thumbShape:
-                                        const RoundSliderThumbShape(
+                                    thumbShape: const RoundSliderThumbShape(
                                       enabledThumbRadius: 6,
                                       elevation: 3,
                                     ),
-                                    overlayShape:
-                                        const RoundSliderOverlayShape(
+                                    overlayShape: const RoundSliderOverlayShape(
                                       overlayRadius: 14,
                                     ),
                                   ),
@@ -457,8 +461,8 @@ class EqualizerSheet extends ConsumerWidget {
                   color: playerState.loudnessGain > 0
                       ? AppColors.purpleAccent.withValues(alpha: 0.35)
                       : (isLight
-                          ? Colors.black.withValues(alpha: 0.06)
-                          : Colors.white.withValues(alpha: 0.08)),
+                            ? Colors.black.withValues(alpha: 0.06)
+                            : Colors.white.withValues(alpha: 0.08)),
                 ),
               ),
               child: Column(
@@ -535,15 +539,15 @@ class EqualizerSheet extends ConsumerWidget {
                                   alpha: isLight ? 0.14 : 0.2,
                                 )
                               : (isLight
-                                  ? Colors.black.withValues(alpha: 0.04)
-                                  : Colors.white.withValues(alpha: 0.06)),
+                                    ? Colors.black.withValues(alpha: 0.04)
+                                    : Colors.white.withValues(alpha: 0.06)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: playerState.loudnessGain > 0
                                 ? AppColors.purpleAccent.withValues(alpha: 0.6)
                                 : (isLight
-                                    ? Colors.black.withValues(alpha: 0.08)
-                                    : Colors.white.withValues(alpha: 0.1)),
+                                      ? Colors.black.withValues(alpha: 0.08)
+                                      : Colors.white.withValues(alpha: 0.1)),
                           ),
                         ),
                         child: Text(
@@ -572,8 +576,9 @@ class EqualizerSheet extends ConsumerWidget {
                           ? Colors.black.withValues(alpha: 0.08)
                           : Colors.white.withValues(alpha: 0.08),
                       thumbColor: AppColors.purpleAccent,
-                      overlayColor:
-                          AppColors.purpleAccent.withValues(alpha: 0.15),
+                      overlayColor: AppColors.purpleAccent.withValues(
+                        alpha: 0.15,
+                      ),
                       thumbShape: const RoundSliderThumbShape(
                         enabledThumbRadius: 7,
                         elevation: 3,

@@ -44,8 +44,7 @@ class LyricLine {
   int get hashCode => timestamp.hashCode ^ text.hashCode ^ isSynced.hashCode;
 
   @override
-  String toString() =>
-      isSynced ? '[${timestamp.inSeconds}s] $text' : text;
+  String toString() => isSynced ? '[${timestamp.inSeconds}s] $text' : text;
 }
 
 /// The result of parsing an LRC or plain text lyrics document.
@@ -103,8 +102,7 @@ class ParsedLyrics {
           offsetMs == other.offsetMs;
 
   @override
-  int get hashCode =>
-      Object.hash(Object.hashAll(lines), isSynced, offsetMs);
+  int get hashCode => Object.hash(Object.hashAll(lines), isSynced, offsetMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,13 +113,16 @@ class ParsedLyrics {
 class LrcParser {
   const LrcParser._();
 
-  static final _timestampRegex =
-      RegExp(r'\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]');
+  static final _timestampRegex = RegExp(
+    r'\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]',
+  );
   static final _metadataRegex = RegExp(r'^\[([a-zA-Z]+):(.*)\]$');
 
   /// Parses standard [mm:ss.xx] / [mm:ss] timestamped lines or falls back to plain lines.
   static ParsedLyrics parse(String rawContent) {
-    final cleanContent = rawContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final cleanContent = rawContent
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n');
     final rawLines = cleanContent.split('\n');
 
     final parsedSyncedLines = <LyricLine>[];
@@ -214,11 +215,8 @@ class LrcParser {
     // Fallback: Plain unsynced lyrics
     final unsyncedLines = plainLines
         .map(
-          (text) => LyricLine(
-            timestamp: Duration.zero,
-            text: text,
-            isSynced: false,
-          ),
+          (text) =>
+              LyricLine(timestamp: Duration.zero, text: text, isSynced: false),
         )
         .toList();
 
@@ -262,8 +260,9 @@ Future<String?> resolveSongLyrics({
     try {
       final filePath = song.filePath;
       final dotIndex = filePath.lastIndexOf('.');
-      final basePath =
-          dotIndex != -1 ? filePath.substring(0, dotIndex) : filePath;
+      final basePath = dotIndex != -1
+          ? filePath.substring(0, dotIndex)
+          : filePath;
 
       final lrcFile = File('$basePath.lrc');
       if (lrcFile.existsSync()) {
@@ -313,8 +312,10 @@ Future<String?> resolveSongLyrics({
 // ---------------------------------------------------------------------------
 
 /// Watches the lyrics for an active [Track] reactively.
-final trackLyricsProvider =
-    StreamProvider.family<ParsedLyrics, Track>((ref, track) {
+final trackLyricsProvider = StreamProvider.family<ParsedLyrics, Track>((
+  ref,
+  track,
+) {
   // If online track (e.g. YouTube stream)
   if (track.source == TrackSource.online || track.uri.startsWith('yt://')) {
     final cache = ref.watch(onlineLyricsCacheProvider);

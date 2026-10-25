@@ -13,6 +13,7 @@ import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
 import '../data/audio_scanner_service.dart';
 import '../../../core/navigation/lucid_page_transition.dart';
+import '../../../core/widgets/lucid_cascade_item.dart';
 import 'playlist_detail_screen.dart';
 import 'widgets/library_group_views.dart';
 import 'widgets/online_search_view.dart';
@@ -65,8 +66,8 @@ class LibraryFilterNotifier extends Notifier<LibraryFilter> {
 
 final libraryFilterProvider =
     NotifierProvider<LibraryFilterNotifier, LibraryFilter>(
-  LibraryFilterNotifier.new,
-);
+      LibraryFilterNotifier.new,
+    );
 
 class SongSortNotifier extends Notifier<SongSortOption> {
   @override
@@ -201,6 +202,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final selectedFilter = ref.watch(libraryFilterProvider);
     final searchQuery = ref.watch(librarySearchQueryProvider);
     final tt = Theme.of(context).textTheme;
+    final tick = ref.watch(tabEntryTicksProvider.select((t) => t[1] + t[2]));
 
     final allSongs = allSongsAsync.asData?.value ?? [];
     final filteredSongs = filteredSongsAsync.asData?.value ?? [];
@@ -263,85 +265,89 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Top App Bar / Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          }
-                        },
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: context.primaryText,
-                          size: 20,
+                LucidCascadeItem(
+                  index: 0,
+                  triggerKey: tick,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          icon: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: context.primaryText,
+                            size: 20,
+                          ),
+                          tooltip: 'Back',
                         ),
-                        tooltip: 'Back',
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Music Library',
-                              style: tt.titleLarge?.copyWith(
-                                color: context.primaryText,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Music Library',
+                                style: tt.titleLarge?.copyWith(
+                                  color: context.primaryText,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Text(
-                              allSongsAsync.when(
-                                data: (songs) =>
-                                    '${songs.length} tracks available',
-                                loading: () => 'Loading library...',
-                                error: (error, _) => 'Error loading library',
-                              ),
-                              style: tt.bodySmall?.copyWith(
-                                color: context.isDarkMode
-                                    ? AppColors.cyanAccent
-                                    : context.secondaryText,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Top Action button for scan
-                      IconButton.filledTonal(
-                        onPressed: scanState.isScanning
-                            ? null
-                            : () => ref
-                                .read(audioScannerStateProvider.notifier)
-                                .scan(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: context.isDarkMode
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.white.withValues(alpha: 0.90),
-                          foregroundColor: context.isDarkMode
-                              ? AppColors.cyanAccent
-                              : context.primaryAccent,
-                        ),
-                        icon: scanState.isScanning
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                              Text(
+                                allSongsAsync.when(
+                                  data: (songs) =>
+                                      '${songs.length} tracks available',
+                                  loading: () => 'Loading library...',
+                                  error: (error, _) => 'Error loading library',
+                                ),
+                                style: tt.bodySmall?.copyWith(
                                   color: context.isDarkMode
                                       ? AppColors.cyanAccent
-                                      : context.primaryAccent,
+                                      : context.secondaryText,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              )
-                            : const Icon(Icons.sync_rounded),
-                        tooltip: 'Scan Device Storage',
-                      ),
-                    ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Top Action button for scan
+                        IconButton.filledTonal(
+                          onPressed: scanState.isScanning
+                              ? null
+                              : () => ref
+                                    .read(audioScannerStateProvider.notifier)
+                                    .scan(),
+                          style: IconButton.styleFrom(
+                            backgroundColor: context.isDarkMode
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.white.withValues(alpha: 0.90),
+                            foregroundColor: context.isDarkMode
+                                ? AppColors.cyanAccent
+                                : context.primaryAccent,
+                          ),
+                          icon: scanState.isScanning
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: context.isDarkMode
+                                        ? AppColors.cyanAccent
+                                        : context.primaryAccent,
+                                  ),
+                                )
+                              : const Icon(Icons.sync_rounded),
+                          tooltip: 'Scan Device Storage',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -381,8 +387,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         Expanded(
                           child: Text(
                             'Scanning storage and indexing metadata...',
-                            style: tt.bodySmall
-                                ?.copyWith(color: context.primaryText),
+                            style: tt.bodySmall?.copyWith(
+                              color: context.primaryText,
+                            ),
                           ),
                         ),
                       ],
@@ -394,166 +401,176 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     isSearchingOrFiltering ||
                     selectedFilter == LibraryFilter.playlists ||
                     selectedFilter == LibraryFilter.onlineSearch) ...[
-                  _GlassSearchBar(
-                    controller: _searchController,
-                    hintText: selectedFilter == LibraryFilter.onlineSearch
-                        ? 'Search YouTube music & streams...'
-                        : 'Search songs, artists, albums...',
-                    onChanged: (val) {
-                      if (selectedFilter == LibraryFilter.onlineSearch) {
-                        _debounceTimer?.cancel();
-                        _debounceTimer =
-                            Timer(const Duration(milliseconds: 500), () {
+                  LucidCascadeItem(
+                    index: 1,
+                    triggerKey: tick,
+                    child: _GlassSearchBar(
+                      controller: _searchController,
+                      hintText: selectedFilter == LibraryFilter.onlineSearch
+                          ? 'Search YouTube music & streams...'
+                          : 'Search songs, artists, albums...',
+                      onChanged: (val) {
+                        if (selectedFilter == LibraryFilter.onlineSearch) {
+                          _debounceTimer?.cancel();
+                          _debounceTimer = Timer(
+                            const Duration(milliseconds: 500),
+                            () {
+                              ref
+                                  .read(librarySearchQueryProvider.notifier)
+                                  .setQuery(val);
+                            },
+                          );
+                        } else {
                           ref
                               .read(librarySearchQueryProvider.notifier)
                               .setQuery(val);
-                        });
-                      } else {
+                        }
+                      },
+                      onSubmitted: (val) {
+                        _debounceTimer?.cancel();
                         ref
                             .read(librarySearchQueryProvider.notifier)
                             .setQuery(val);
-                      }
-                    },
-                    onSubmitted: (val) {
-                      _debounceTimer?.cancel();
-                      ref
-                          .read(librarySearchQueryProvider.notifier)
-                          .setQuery(val);
-                    },
-                    onClear: () {
-                      _debounceTimer?.cancel();
-                      _searchController.clear();
-                      ref.read(librarySearchQueryProvider.notifier).clear();
-                    },
+                      },
+                      onClear: () {
+                        _debounceTimer?.cancel();
+                        _searchController.clear();
+                        ref.read(librarySearchQueryProvider.notifier).clear();
+                      },
+                    ),
                   ),
                 ],
 
                 // Filter Bar (always visible so user can freely switch tabs)
-                _LibraryFilterBar(
-                  selectedFilter: selectedFilter,
-                  onFilterSelected: (f) {
-                    setState(() {
-                      ref.read(libraryFilterProvider.notifier).setFilter(f);
-                    });
-                  },
-                  allSongs: allSongs,
-                  totalCount: allSongs.length,
-                  filteredCount: filteredSongs.length,
-                  isSearchingOrFiltering: isSearchingOrFiltering,
+                LucidCascadeItem(
+                  index: 2,
+                  triggerKey: tick,
+                  child: _LibraryFilterBar(
+                    selectedFilter: selectedFilter,
+                    onFilterSelected: (f) {
+                      setState(() {
+                        ref.read(libraryFilterProvider.notifier).setFilter(f);
+                      });
+                    },
+                    allSongs: allSongs,
+                    totalCount: allSongs.length,
+                    filteredCount: filteredSongs.length,
+                    isSearchingOrFiltering: isSearchingOrFiltering,
+                  ),
                 ),
 
                 // Songs List, Playlists, Artists, Albums, or State Placeholders
                 Expanded(
                   child: switch (selectedFilter) {
                     LibraryFilter.onlineSearch => OnlineSearchView(
-                        searchQuery: searchQuery,
-                        onSuggestionTap: (tag) {
-                          _searchController.text = tag;
-                          _debounceTimer?.cancel();
-                          ref
-                              .read(librarySearchQueryProvider.notifier)
-                              .setQuery(tag);
-                        },
-                      ),
+                      searchQuery: searchQuery,
+                      onSuggestionTap: (tag) {
+                        _searchController.text = tag;
+                        _debounceTimer?.cancel();
+                        ref
+                            .read(librarySearchQueryProvider.notifier)
+                            .setQuery(tag);
+                      },
+                    ),
                     LibraryFilter.playlists => const _PlaylistsView(),
                     LibraryFilter.artists => ArtistsGroupedView(
-                        songs: allSongs,
-                        searchQuery: searchQuery,
-                      ),
+                      songs: allSongs,
+                      searchQuery: searchQuery,
+                    ),
                     LibraryFilter.albums => AlbumsGroupedView(
-                        songs: allSongs,
-                        searchQuery: searchQuery,
-                      ),
+                      songs: allSongs,
+                      searchQuery: searchQuery,
+                    ),
                     _ => allSongsAsync.when(
-                        data: (songs) {
-                          if (songs.isEmpty &&
-                              selectedFilter == LibraryFilter.all) {
-                            return _EmptyLibraryView(
-                              isScanning: scanState.isScanning,
-                              onScanPressed: () => ref
-                                  .read(audioScannerStateProvider.notifier)
-                                  .scan(),
-                            );
-                          }
+                      data: (songs) {
+                        if (songs.isEmpty &&
+                            selectedFilter == LibraryFilter.all) {
+                          return _EmptyLibraryView(
+                            isScanning: scanState.isScanning,
+                            onScanPressed: () => ref
+                                .read(audioScannerStateProvider.notifier)
+                                .scan(),
+                          );
+                        }
 
-                          if (filteredSongs.isEmpty) {
-                            return _NoSearchResultsView(
-                              query: searchQuery,
-                              isFavoritesOnly:
-                                  selectedFilter == LibraryFilter.favorites,
-                              isMostPlayedOnly:
-                                  selectedFilter == LibraryFilter.mostPlayed,
-                              onReset: () {
-                                _searchController.clear();
+                        if (filteredSongs.isEmpty) {
+                          return _NoSearchResultsView(
+                            query: searchQuery,
+                            isFavoritesOnly:
+                                selectedFilter == LibraryFilter.favorites,
+                            isMostPlayedOnly:
+                                selectedFilter == LibraryFilter.mostPlayed,
+                            onReset: () {
+                              _searchController.clear();
+                              ref
+                                  .read(librarySearchQueryProvider.notifier)
+                                  .clear();
+                              setState(() {
                                 ref
-                                    .read(librarySearchQueryProvider.notifier)
-                                    .clear();
-                                setState(() {
-                                  ref
-                                      .read(libraryFilterProvider.notifier)
-                                      .setFilter(LibraryFilter.all);
-                                });
-                              },
-                            );
-                          }
+                                    .read(libraryFilterProvider.notifier)
+                                    .setFilter(LibraryFilter.all);
+                              });
+                            },
+                          );
+                        }
 
-                          final showRecentlyPlayed =
-                              selectedFilter == LibraryFilter.all &&
-                                  searchQuery.isEmpty &&
-                                  recentSongs.isNotEmpty;
+                        final showRecentlyPlayed =
+                            selectedFilter == LibraryFilter.all &&
+                            searchQuery.isEmpty &&
+                            recentSongs.isNotEmpty;
 
-                          return CustomScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            slivers: [
-                              if (showRecentlyPlayed) ...[
-                                SliverToBoxAdapter(
-                                  child: _RecentlyPlayedSection(
-                                    recentSongs: recentSongs,
-                                  ),
-                                ),
-                              ],
-                              SliverPadding(
-                                padding: EdgeInsets.fromLTRB(
-                                  20,
-                                  showRecentlyPlayed ? 4 : 8,
-                                  20,
-                                  MediaQuery.of(context).padding.bottom +
-                                      (playerState.hasTrack ? 150.0 : 100.0),
-                                ),
-                                sliver: SliverList.separated(
-                                  itemCount: filteredSongs.length,
-                                  separatorBuilder: (context, index) =>
-                                      const SizedBox(height: 8),
-                                  itemBuilder: (context, index) {
-                                    final song = filteredSongs[index];
-                                    return _SongListTile(
-                                      song: song,
-                                      songs: filteredSongs,
-                                    );
-                                  },
+                        return CustomScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          slivers: [
+                            if (showRecentlyPlayed) ...[
+                              SliverToBoxAdapter(
+                                child: _RecentlyPlayedSection(
+                                  recentSongs: recentSongs,
                                 ),
                               ),
                             ],
-                          );
-                        },
-                        loading: () => const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.purpleAccent,
-                          ),
-                        ),
-                        error: (error, _) => Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              'Failed to load songs: $error',
-                              style: tt.bodyMedium?.copyWith(
-                                color: Colors.redAccent,
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                20,
+                                showRecentlyPlayed ? 4 : 8,
+                                20,
+                                MediaQuery.of(context).padding.bottom +
+                                    (playerState.hasTrack ? 150.0 : 100.0),
                               ),
-                              textAlign: TextAlign.center,
+                              sliver: SliverList.separated(
+                                itemCount: filteredSongs.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final song = filteredSongs[index];
+                                  return _SongListTile(
+                                    song: song,
+                                    songs: filteredSongs,
+                                  );
+                                },
+                              ),
                             ),
+                          ],
+                        );
+                      },
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.purpleAccent,
+                        ),
+                      ),
+                      error: (error, _) => Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Failed to load songs: $error',
+                            style: tt.bodyMedium?.copyWith(
+                              color: Colors.redAccent,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
+                    ),
                   },
                 ),
               ],
@@ -566,10 +583,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: MiniPlayer(bottomPadding: 16),
-              ),
+              child: SafeArea(top: false, child: MiniPlayer(bottomPadding: 16)),
             ),
         ],
       ),
@@ -626,9 +640,7 @@ class _GlassSearchBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.searchBarBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.searchBarBorder,
-        ),
+        border: Border.all(color: context.searchBarBorder),
         boxShadow: context.isLight
             ? [
                 BoxShadow(
@@ -648,10 +660,7 @@ class _GlassSearchBar extends StatelessWidget {
         cursorColor: context.primaryAccent,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(
-            color: context.searchBarHint,
-            fontSize: 14,
-          ),
+          hintStyle: TextStyle(color: context.searchBarHint, fontSize: 14),
           prefixIcon: Icon(
             Icons.search_rounded,
             color: context.primaryAccent,
@@ -699,10 +708,12 @@ class _LibraryFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uniqueArtists = allSongs.map((s) => s.artist.trim()).toSet();
-    final uniqueAlbums =
-        allSongs.map((s) => s.album?.trim() ?? 'Unknown Album').toSet();
+    final uniqueAlbums = allSongs
+        .map((s) => s.album?.trim() ?? 'Unknown Album')
+        .toSet();
 
-    final showSortButton = selectedFilter == LibraryFilter.all ||
+    final showSortButton =
+        selectedFilter == LibraryFilter.all ||
         selectedFilter == LibraryFilter.favorites ||
         selectedFilter == LibraryFilter.mostPlayed;
 
@@ -754,7 +765,9 @@ class _LibraryFilterBar extends StatelessWidget {
               icon: Icons.person_rounded,
               isSelected: selectedFilter == LibraryFilter.artists,
               onTap: () => onFilterSelected(LibraryFilter.artists),
-              activeColor: isLight ? AppColors.lightAccent : AppColors.cyanAccent,
+              activeColor: isLight
+                  ? AppColors.lightAccent
+                  : AppColors.cyanAccent,
             ),
             const SizedBox(width: 8),
             _FilterChip(
@@ -815,14 +828,14 @@ class _LibraryFilterBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: (isLight ? AppColors.lightAccent : AppColors.cyanAccent)
-                      .withValues(alpha: isLight ? 0.10 : 0.12),
+                  color:
+                      (isLight ? AppColors.lightAccent : AppColors.cyanAccent)
+                          .withValues(alpha: isLight ? 0.10 : 0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (isLight
-                            ? AppColors.lightAccent
-                            : AppColors.cyanAccent)
-                        .withValues(alpha: isLight ? 0.25 : 0.3),
+                    color:
+                        (isLight ? AppColors.lightAccent : AppColors.cyanAccent)
+                            .withValues(alpha: isLight ? 0.25 : 0.3),
                   ),
                 ),
                 child: Text(
@@ -844,8 +857,9 @@ class _LibraryFilterBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: (isLight ? Colors.teal : Colors.tealAccent)
-                      .withValues(alpha: isLight ? 0.10 : 0.12),
+                  color: (isLight ? Colors.teal : Colors.tealAccent).withValues(
+                    alpha: isLight ? 0.10 : 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: (isLight ? Colors.teal : Colors.tealAccent)
@@ -913,9 +927,7 @@ class _LibraryFilterBar extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: context.glassTileBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: context.glassTileBorder,
-                          ),
+                          border: Border.all(color: context.glassTileBorder),
                           boxShadow: context.glassTileShadow,
                         ),
                         child: Row(
@@ -988,20 +1000,20 @@ class _FilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? (isLight
-                  ? effectiveColor.withValues(alpha: 0.12)
-                  : effectiveColor.withValues(alpha: 0.18))
+                    ? effectiveColor.withValues(alpha: 0.12)
+                    : effectiveColor.withValues(alpha: 0.18))
               : (isLight
-                  ? Colors.white.withValues(alpha: 0.85)
-                  : Colors.white.withValues(alpha: 0.05)),
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
                 ? (isLight
-                    ? effectiveColor.withValues(alpha: 0.8)
-                    : effectiveColor.withValues(alpha: 0.7))
+                      ? effectiveColor.withValues(alpha: 0.8)
+                      : effectiveColor.withValues(alpha: 0.7))
                 : (isLight
-                    ? Colors.black.withValues(alpha: 0.08)
-                    : Colors.white.withValues(alpha: 0.08)),
+                      ? Colors.black.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.08)),
             width: isSelected ? 1.4 : 1.0,
           ),
           boxShadow: isSelected
@@ -1015,14 +1027,14 @@ class _FilterChip extends StatelessWidget {
                   ),
                 ]
               : (isLight
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null),
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1033,8 +1045,8 @@ class _FilterChip extends StatelessWidget {
               color: isSelected
                   ? effectiveColor
                   : (isLight
-                      ? context.secondaryText
-                      : Colors.white.withValues(alpha: 0.6)),
+                        ? context.secondaryText
+                        : Colors.white.withValues(alpha: 0.6)),
             ),
             const SizedBox(width: 6),
             Text(
@@ -1045,8 +1057,8 @@ class _FilterChip extends StatelessWidget {
                 color: isSelected
                     ? (isLight ? effectiveColor : Colors.white)
                     : (isLight
-                        ? context.secondaryText
-                        : Colors.white.withValues(alpha: 0.7)),
+                          ? context.secondaryText
+                          : Colors.white.withValues(alpha: 0.7)),
               ),
             ),
           ],
@@ -1190,10 +1202,7 @@ class _RecentlyPlayedCard extends ConsumerWidget {
               .playSong(song, songsQueue: recentSongs);
         }
       },
-      onLongPress: () => showSongOptionsSheet(
-        context: context,
-        song: song,
-      ),
+      onLongPress: () => showSongOptionsSheet(context: context, song: song),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         width: 110,
@@ -1253,10 +1262,11 @@ class _RecentlyPlayedCard extends ConsumerWidget {
                             ),
                       boxShadow: [
                         BoxShadow(
-                          color: (isCurrent
-                                  ? AppColors.purpleAccent
-                                  : context.primaryAccent)
-                              .withValues(alpha: 0.6),
+                          color:
+                              (isCurrent
+                                      ? AppColors.purpleAccent
+                                      : context.primaryAccent)
+                                  .withValues(alpha: 0.6),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -1309,10 +1319,7 @@ class _RecentlyPlayedCard extends ConsumerWidget {
 
 /// Song item tile formatted with frosted glass styling, neon border glow, and animated equalizer.
 class _SongListTile extends ConsumerWidget {
-  const _SongListTile({
-    required this.song,
-    required this.songs,
-  });
+  const _SongListTile({required this.song, required this.songs});
 
   final Song song;
   final List<Song> songs;
@@ -1355,9 +1362,7 @@ class _SongListTile extends ConsumerWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
@@ -1369,10 +1374,7 @@ class _SongListTile extends ConsumerWidget {
                   .playSong(song, songsQueue: songs);
             }
           },
-          onLongPress: () => showSongOptionsSheet(
-            context: context,
-            song: song,
-          ),
+          onLongPress: () => showSongOptionsSheet(context: context, song: song),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
@@ -1429,22 +1431,24 @@ class _SongListTile extends ConsumerWidget {
                         color: song.isFavorite
                             ? Colors.pinkAccent
                             : (context.isLight
-                                ? Colors.black.withValues(alpha: 0.25)
-                                : Colors.white.withValues(alpha: 0.35)),
+                                  ? Colors.black.withValues(alpha: 0.25)
+                                  : Colors.white.withValues(alpha: 0.35)),
                         size: 18,
                       ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
                       tooltip: song.isFavorite
                           ? 'Remove from Favorites'
                           : 'Add to Favorites',
                       onPressed: () async {
                         final db = ref.read(appDatabaseProvider);
-                        await (db.update(db.songs)
-                              ..where((s) => s.id.equals(song.id)))
-                            .write(
+                        await (db.update(
+                          db.songs,
+                        )..where((s) => s.id.equals(song.id))).write(
                           SongsCompanion(isFavorite: Value(!song.isFavorite)),
                         );
                       },
@@ -1456,26 +1460,24 @@ class _SongListTile extends ConsumerWidget {
                         color: isCurrent
                             ? context.primaryAccent
                             : context.secondaryText,
-                        fontWeight:
-                            isCurrent ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isCurrent
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                     const SizedBox(width: 2),
                     IconButton(
-                      icon: const Icon(
-                        Icons.more_vert_rounded,
-                        size: 18,
-                      ),
+                      icon: const Icon(Icons.more_vert_rounded, size: 18),
                       color: context.secondaryText,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 26, minHeight: 28),
-                      tooltip: 'Song Options',
-                      onPressed: () => showSongOptionsSheet(
-                        context: context,
-                        song: song,
+                      constraints: const BoxConstraints(
+                        minWidth: 26,
+                        minHeight: 28,
                       ),
+                      tooltip: 'Song Options',
+                      onPressed: () =>
+                          showSongOptionsSheet(context: context, song: song),
                     ),
                   ],
                 ),
@@ -1542,16 +1544,22 @@ class _EqualizerIndicatorState extends State<_EqualizerIndicator>
             ? (5.0 + 8.0 * math.sin(t * math.pi)).clamp(4.0, 15.0)
             : 5.0;
         final h2 = widget.isPlaying
-            ? (4.0 + 11.0 * (math.sin((t + 0.3) * math.pi)).abs())
-                .clamp(4.0, 15.0)
+            ? (4.0 + 11.0 * (math.sin((t + 0.3) * math.pi)).abs()).clamp(
+                4.0,
+                15.0,
+              )
             : 11.0;
         final h3 = widget.isPlaying
-            ? (4.0 + 10.0 * (math.sin((t + 0.6) * math.pi)).abs())
-                .clamp(4.0, 15.0)
+            ? (4.0 + 10.0 * (math.sin((t + 0.6) * math.pi)).abs()).clamp(
+                4.0,
+                15.0,
+              )
             : 7.0;
         final h4 = widget.isPlaying
-            ? (4.0 + 8.0 * (math.sin((t + 0.85) * math.pi)).abs())
-                .clamp(4.0, 15.0)
+            ? (4.0 + 8.0 * (math.sin((t + 0.85) * math.pi)).abs()).clamp(
+                4.0,
+                15.0,
+              )
             : 4.0;
 
         return SizedBox(
@@ -1603,8 +1611,10 @@ class _PlaylistsView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playlistsAsync = ref.watch(allPlaylistsStreamProvider);
-    final searchQuery =
-        ref.watch(librarySearchQueryProvider).trim().toLowerCase();
+    final searchQuery = ref
+        .watch(librarySearchQueryProvider)
+        .trim()
+        .toLowerCase();
     final playerState = ref.watch(playerControllerProvider);
     final tt = Theme.of(context).textTheme;
 
@@ -1613,8 +1623,8 @@ class _PlaylistsView extends ConsumerWidget {
         final filteredPlaylists = searchQuery.isEmpty
             ? playlists
             : playlists
-                .where((p) => p.name.toLowerCase().contains(searchQuery))
-                .toList();
+                  .where((p) => p.name.toLowerCase().contains(searchQuery))
+                  .toList();
 
         return ListView(
           padding: EdgeInsets.fromLTRB(
@@ -1646,8 +1656,10 @@ class _PlaylistsView extends ConsumerWidget {
                   onTap: () =>
                       showCreatePlaylistDialog(context: context, ref: ref),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     child: Row(
                       children: [
                         Container(
@@ -1658,8 +1670,9 @@ class _PlaylistsView extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    AppColors.purpleAccent.withValues(alpha: 0.3),
+                                color: AppColors.purpleAccent.withValues(
+                                  alpha: 0.3,
+                                ),
                                 blurRadius: 10,
                                 spreadRadius: 1,
                               ),
@@ -1779,8 +1792,9 @@ class _PlaylistTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final songCountAsync =
-        ref.watch(playlistSongCountStreamProvider(playlist.id));
+    final songCountAsync = ref.watch(
+      playlistSongCountStreamProvider(playlist.id),
+    );
     final count = songCountAsync.asData?.value ?? 0;
     final tt = Theme.of(context).textTheme;
 
@@ -1788,16 +1802,12 @@ class _PlaylistTile extends ConsumerWidget {
       decoration: BoxDecoration(
         color: context.glassTileBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.glassTileBorder,
-        ),
+        border: Border.all(color: context.glassTileBorder),
         boxShadow: context.glassTileShadow,
       ),
       child: Material(
         color: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
@@ -1917,11 +1927,7 @@ class _NoSearchResultsView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 48,
-                color: context.secondaryText,
-              ),
+              Icon(icon, size: 48, color: context.secondaryText),
               const SizedBox(height: 14),
               Text(
                 title,
@@ -1933,9 +1939,7 @@ class _NoSearchResultsView extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 message,
-                style: tt.bodySmall?.copyWith(
-                  color: context.secondaryText,
-                ),
+                style: tt.bodySmall?.copyWith(color: context.secondaryText),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 18),
@@ -2008,9 +2012,7 @@ class _EmptyLibraryView extends StatelessWidget {
               Text(
                 'Scan your local storage to index MP3s and audio files into your Spinora library.',
                 textAlign: TextAlign.center,
-                style: tt.bodyMedium?.copyWith(
-                  color: context.secondaryText,
-                ),
+                style: tt.bodyMedium?.copyWith(color: context.secondaryText),
               ),
               const SizedBox(height: 24),
               FilledButton.icon(

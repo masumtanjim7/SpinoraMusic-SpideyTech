@@ -13,6 +13,7 @@ import '../../library/presentation/widgets/song_artwork.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../../core/navigation/lucid_page_transition.dart';
+import '../../../core/widgets/lucid_cascade_item.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../application/stats_provider.dart';
 import '../application/user_profile_provider.dart';
@@ -66,9 +67,8 @@ class ProfileScreen extends ConsumerWidget {
                       playerState: playerState,
                       ref: ref,
                     ),
-                    loading: () => _ProfileLoadingSkeleton(
-                      playerState: playerState,
-                    ),
+                    loading: () =>
+                        _ProfileLoadingSkeleton(playerState: playerState),
                     error: (error, stack) {
                       debugPrint(
                         '[ProfileScreen] Error loading stats: $error\n$stack',
@@ -95,10 +95,7 @@ class ProfileScreen extends ConsumerWidget {
               left: 0,
               right: 0,
               bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: MiniPlayer(bottomPadding: 16),
-              ),
+              child: SafeArea(top: false, child: MiniPlayer(bottomPadding: 16)),
             ),
         ],
       ),
@@ -128,6 +125,7 @@ class _ProfileContentBody extends StatelessWidget {
     final safeStats = stats ?? const UserListeningStats();
     final topArtists = safeStats.topArtists;
     final topSongs = safeStats.topSongs;
+    final tick = ref.watch(tabEntryTicksProvider.select((t) => t[3]));
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -142,77 +140,115 @@ class _ProfileContentBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Hero Card: "Your Music Universe"
-          _MusicUniverseHero(
-            profile: profile,
-            stats: safeStats,
-            onEdit: () => EditProfileSheet.show(context),
+          LucidCascadeItem(
+            index: 0,
+            triggerKey: tick,
+            child: _MusicUniverseHero(
+              profile: profile,
+              stats: safeStats,
+              onEdit: () => EditProfileSheet.show(context),
+            ),
           ),
           const SizedBox(height: 24),
 
           // 2. Stat Grid Cards (4 Metrics)
-          const _SectionHeader(
-            title: 'LISTENING METRICS',
-            icon: Icons.insights_rounded,
+          LucidCascadeItem(
+            index: 1,
+            triggerKey: tick,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(
+                  title: 'LISTENING METRICS',
+                  icon: Icons.insights_rounded,
+                ),
+                const SizedBox(height: 12),
+                _StatCardsGrid(stats: safeStats),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _StatCardsGrid(stats: safeStats),
           const SizedBox(height: 28),
 
           // 3. Listening Activity Breakdown (Futuristic Progress Bars)
-          const _SectionHeader(
-            title: 'LISTENING ACTIVITY & FLOW',
-            icon: Icons.graphic_eq_rounded,
+          LucidCascadeItem(
+            index: 2,
+            triggerKey: tick,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(
+                  title: 'LISTENING ACTIVITY & FLOW',
+                  icon: Icons.graphic_eq_rounded,
+                ),
+                const SizedBox(height: 12),
+                _ListeningActivityCard(stats: safeStats),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _ListeningActivityCard(stats: safeStats),
           const SizedBox(height: 28),
 
           // 4. Top Artists in Your Orbit
-          _SectionHeader(
-            title: 'TOP ARTISTS IN YOUR ORBIT',
-            icon: Icons.bubble_chart_rounded,
-            actionText: topArtists.isNotEmpty ? 'View Library' : null,
-            onActionTap: () => context.push('/library'),
-          ),
-          const SizedBox(height: 12),
-          if (topArtists.isNotEmpty)
-            _TopArtistsList(
-              artists: topArtists,
-              onArtistTap: (artist) => context.push('/library'),
-            )
-          else
-            const _EmptyInsightCard(
-              icon: Icons.bubble_chart_outlined,
-              title: 'No Artists in Orbit Yet',
-              message:
-                  'Start playing music to unlock insights! Your most streamed artists will orbit here.',
+          LucidCascadeItem(
+            index: 3,
+            triggerKey: tick,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionHeader(
+                  title: 'TOP ARTISTS IN YOUR ORBIT',
+                  icon: Icons.bubble_chart_rounded,
+                  actionText: topArtists.isNotEmpty ? 'View Library' : null,
+                  onActionTap: () => context.push('/library'),
+                ),
+                const SizedBox(height: 12),
+                if (topArtists.isNotEmpty)
+                  _TopArtistsList(
+                    artists: topArtists,
+                    onArtistTap: (artist) => context.push('/library'),
+                  )
+                else
+                  const _EmptyInsightCard(
+                    icon: Icons.bubble_chart_outlined,
+                    title: 'No Artists in Orbit Yet',
+                    message: 'Start playing music to unlock insights! Your most streamed artists will orbit here.',
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 28),
 
           // 5. Heavy Rotation (Top Tracks)
-          const _SectionHeader(
-            title: 'YOUR HEAVY ROTATION',
-            icon: Icons.local_fire_department_rounded,
-          ),
-          const SizedBox(height: 12),
-          if (topSongs.isNotEmpty)
-            _HeavyRotationList(
-              songs: topSongs,
-              onPlaySong: (song) {
-                final track = Track.fromSong(song);
-                final queue = topSongs.map(Track.fromSong).toList();
-                ref
-                    .read(playerControllerProvider.notifier)
-                    .playTrack(track, queue: queue);
-              },
-            )
-          else
-            const _EmptyInsightCard(
-              icon: Icons.local_fire_department_outlined,
-              title: 'No Heavy Rotation Yet',
-              message:
-                  'Start playing music to unlock insights! Songs you repeat will automatically appear here.',
+          LucidCascadeItem(
+            index: 4,
+            triggerKey: tick,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(
+                  title: 'YOUR HEAVY ROTATION',
+                  icon: Icons.local_fire_department_rounded,
+                ),
+                const SizedBox(height: 12),
+                if (topSongs.isNotEmpty)
+                  _HeavyRotationList(
+                    songs: topSongs,
+                    onPlaySong: (song) {
+                      final track = Track.fromSong(song);
+                      final queue = topSongs.map(Track.fromSong).toList();
+                      ref
+                          .read(playerControllerProvider.notifier)
+                          .playTrack(track, queue: queue);
+                    },
+                  )
+                else
+                  const _EmptyInsightCard(
+                    icon: Icons.local_fire_department_outlined,
+                    title: 'No Heavy Rotation Yet',
+                    message: 'Start playing music to unlock insights! Songs you repeat will automatically appear here.',
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -238,12 +274,7 @@ class _ProfileLoadingSkeleton extends StatelessWidget {
 
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        playerState.hasTrack ? 120 : 36,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, playerState.hasTrack ? 120 : 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -265,8 +296,9 @@ class _ProfileLoadingSkeleton extends StatelessWidget {
                   height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF8B5CF6),
+                    ),
                   ),
                 ),
                 SizedBox(width: 8),
@@ -397,12 +429,7 @@ class _ProfileErrorFallback extends StatelessWidget {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        playerState.hasTrack ? 120 : 36,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, playerState.hasTrack ? 120 : 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -441,8 +468,9 @@ class _ProfileErrorFallback extends StatelessWidget {
                       Text(
                         'Insights Inactive',
                         style: TextStyle(
-                          color:
-                              isLight ? const Color(0xFF881337) : Colors.white,
+                          color: isLight
+                              ? const Color(0xFF881337)
+                              : Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -466,10 +494,12 @@ class _ProfileErrorFallback extends StatelessWidget {
                 TextButton(
                   onPressed: onRetry,
                   style: TextButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFFFF4E88).withValues(alpha: 0.15),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    backgroundColor: const Color(0xFFFF4E88)
+                        .withValues(alpha: 0.15),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
@@ -524,8 +554,7 @@ class _ProfileErrorFallback extends StatelessWidget {
           const _EmptyInsightCard(
             icon: Icons.bubble_chart_outlined,
             title: 'No Artists in Orbit Yet',
-            message:
-                'Start playing music to unlock insights! Your top artists will orbit here.',
+            message: 'Start playing music to unlock insights! Your top artists will orbit here.',
           ),
           const SizedBox(height: 28),
 
@@ -537,8 +566,7 @@ class _ProfileErrorFallback extends StatelessWidget {
           const _EmptyInsightCard(
             icon: Icons.local_fire_department_outlined,
             title: 'No Heavy Rotation Yet',
-            message:
-                'Start playing music to unlock insights! Spin your favorite songs to see them featured here.',
+            message: 'Start playing music to unlock insights! Spin your favorite songs to see them featured here.',
           ),
           const SizedBox(height: 24),
         ],
@@ -757,8 +785,9 @@ class _MusicUniverseHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLight = context.isLight;
     final avatarPath = profile.avatarPath;
-    final name =
-        profile.displayName.isNotEmpty ? profile.displayName : 'Music Lover';
+    final name = profile.displayName.isNotEmpty
+        ? profile.displayName
+        : 'Music Lover';
     final vibe = profile.vibeSubtitle.isNotEmpty
         ? profile.vibeSubtitle
         : 'Cosmic Listener';
@@ -771,10 +800,7 @@ class _MusicUniverseHero extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isLight
-              ? [
-                  Colors.white.withValues(alpha: 0.95),
-                  const Color(0xFFF3F0FF),
-                ]
+              ? [Colors.white.withValues(alpha: 0.95), const Color(0xFFF3F0FF)]
               : [
                   const Color(0xFF1E1435).withValues(alpha: 0.85),
                   const Color(0xFF0F0B1A).withValues(alpha: 0.95),
@@ -897,8 +923,8 @@ class _MusicUniverseHero extends StatelessWidget {
                         color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color:
-                              const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                          color: const Color(0xFF8B5CF6)
+                              .withValues(alpha: 0.45),
                         ),
                       ),
                       child: Row(
@@ -1284,9 +1310,7 @@ class _ListeningActivityCard extends StatelessWidget {
                   final flex = (slot.percentage * 100).round().clamp(1, 100);
                   return Expanded(
                     flex: flex,
-                    child: Container(
-                      color: colors[index % colors.length],
-                    ),
+                    child: Container(color: colors[index % colors.length]),
                   );
                 }),
               ),
@@ -1361,10 +1385,7 @@ class _ListeningActivityCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _TopArtistsList extends StatelessWidget {
-  const _TopArtistsList({
-    required this.artists,
-    required this.onArtistTap,
-  });
+  const _TopArtistsList({required this.artists, required this.onArtistTap});
 
   final List<ArtistPlayStat> artists;
   final ValueChanged<String> onArtistTap;
@@ -1389,95 +1410,100 @@ class _TopArtistsList extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: artists.length,
-        separatorBuilder: (_, _) => Divider(
-          color: isLight
-              ? Colors.black.withValues(alpha: 0.05)
-              : Colors.white.withValues(alpha: 0.06),
-          height: 1,
-        ),
-        itemBuilder: (context, index) {
-          final item = artists[index];
-          final rank = index + 1;
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: artists.length,
+          separatorBuilder: (_, _) => Divider(
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.05)
+                : Colors.white.withValues(alpha: 0.06),
+            height: 1,
+          ),
+          itemBuilder: (context, index) {
+            final item = artists[index];
+            final rank = index + 1;
 
-          return ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            onTap: () => onArtistTap(item.artist),
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 20,
-                  child: Text(
-                    '#$rank',
-                    style: TextStyle(
-                      color: rank == 1
-                          ? const Color(0xFFFFD56B)
-                          : (isLight ? const Color(0xFF8E95A8) : Colors.white38),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              onTap: () => onArtistTap(item.artist),
+              leading: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    child: Text(
+                      '#$rank',
+                      style: TextStyle(
+                        color: rank == 1
+                            ? const Color(0xFFFFD56B)
+                            : (isLight
+                                  ? const Color(0xFF8E95A8)
+                                  : Colors.white38),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
-                        blurRadius: 8,
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF8B5CF6)
+                              .withValues(alpha: 0.25),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: item.representativeSong != null
+                          ? SongArtwork.fromSong(
+                              item.representativeSong!,
+                              size: 44,
+                              borderRadius: BorderRadius.zero,
+                            )
+                          : const Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                    ),
                   ),
-                  child: ClipOval(
-                    child: item.representativeSong != null
-                        ? SongArtwork.fromSong(
-                            item.representativeSong!,
-                            size: 44,
-                            borderRadius: BorderRadius.zero,
-                          )
-                        : const Icon(
-                            Icons.person_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                  ),
+                ],
+              ),
+              title: Text(
+                item.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isLight ? const Color(0xFF0F111A) : Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
                 ),
-              ],
-            ),
-            title: Text(
-              item.artist,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isLight ? const Color(0xFF0F111A) : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
               ),
-            ),
-            subtitle: Text(
-              '${item.songCount} songs • ${item.playCount} plays',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isLight ? const Color(0xFF5C6275) : Colors.white60,
-                fontSize: 11,
+              subtitle: Text(
+                '${item.songCount} songs • ${item.playCount} plays',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isLight ? const Color(0xFF5C6275) : Colors.white60,
+                  fontSize: 11,
+                ),
               ),
-            ),
-            trailing: const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Color(0xFF8B5CF6),
-            ),
-          );
-        },
-      ),
+              trailing: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Color(0xFF8B5CF6),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1488,10 +1514,7 @@ class _TopArtistsList extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _HeavyRotationList extends StatelessWidget {
-  const _HeavyRotationList({
-    required this.songs,
-    required this.onPlaySong,
-  });
+  const _HeavyRotationList({required this.songs, required this.onPlaySong});
 
   final List<Song> songs;
   final ValueChanged<Song> onPlaySong;
@@ -1516,68 +1539,70 @@ class _HeavyRotationList extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: songs.length,
-        separatorBuilder: (_, _) => Divider(
-          color: isLight
-              ? Colors.black.withValues(alpha: 0.05)
-              : Colors.white.withValues(alpha: 0.06),
-          height: 1,
-        ),
-        itemBuilder: (context, index) {
-          final song = songs[index];
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: songs.length,
+          separatorBuilder: (_, _) => Divider(
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.05)
+                : Colors.white.withValues(alpha: 0.06),
+            height: 1,
+          ),
+          itemBuilder: (context, index) {
+            final song = songs[index];
 
-          return ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            onTap: () => onPlaySong(song),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: SongArtwork.fromSong(
-                  song,
-                  size: 44,
-                  borderRadius: BorderRadius.zero,
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              onTap: () => onPlaySong(song),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: SongArtwork.fromSong(
+                    song,
+                    size: 44,
+                    borderRadius: BorderRadius.zero,
+                  ),
                 ),
               ),
-            ),
-            title: Text(
-              song.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isLight ? const Color(0xFF0F111A) : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+              title: Text(
+                song.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isLight ? const Color(0xFF0F111A) : Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
-            ),
-            subtitle: Text(
-              '${song.artist} • ${song.playCount} plays',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isLight ? const Color(0xFF5C6275) : Colors.white60,
-                fontSize: 11,
+              subtitle: Text(
+                '${song.artist} • ${song.playCount} plays',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isLight ? const Color(0xFF5C6275) : Colors.white60,
+                  fontSize: 11,
+                ),
               ),
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+              trailing: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Color(0xFF8B5CF6),
+                  size: 20,
+                ),
               ),
-              child: const Icon(
-                Icons.play_arrow_rounded,
-                color: Color(0xFF8B5CF6),
-                size: 20,
-              ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
       ),
     );
   }

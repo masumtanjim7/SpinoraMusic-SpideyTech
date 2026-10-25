@@ -92,8 +92,9 @@ class LyricsController extends Notifier<LyricsFetchState> {
     try {
       final audioPath = song.filePath;
       final dotIndex = audioPath.lastIndexOf('.');
-      final basePath =
-          dotIndex != -1 ? audioPath.substring(0, dotIndex) : audioPath;
+      final basePath = dotIndex != -1
+          ? audioPath.substring(0, dotIndex)
+          : audioPath;
       if (File('$basePath.lrc').existsSync() ||
           File('$basePath.txt').existsSync()) {
         return;
@@ -112,10 +113,7 @@ class LyricsController extends Notifier<LyricsFetchState> {
   /// Manually or automatically fetches lyrics from online providers and caches to Drift.
   ///
   /// Returns `true` if lyrics were found and cached, `false` otherwise.
-  Future<bool> refetchLyrics(
-    Song song, {
-    String? customQuery,
-  }) async {
+  Future<bool> refetchLyrics(Song song, {String? customQuery}) async {
     final songId = song.id;
     if (_inFlightSongIds.contains(songId)) return false;
 
@@ -167,10 +165,7 @@ class LyricsController extends Notifier<LyricsFetchState> {
   }
 
   /// Fetches lyrics for an online streaming [Track] and caches in memory.
-  Future<bool> refetchOnlineLyrics(
-    Track track, {
-    String? customQuery,
-  }) async {
+  Future<bool> refetchOnlineLyrics(Track track, {String? customQuery}) async {
     final cacheKey = track.id;
     final int syntheticId = track.id.hashCode;
     if (_inFlightSongIds.contains(syntheticId)) return false;
@@ -257,14 +252,12 @@ class OnlineLyricsCacheNotifier extends Notifier<Map<String, String>> {
 
 final onlineLyricsCacheProvider =
     NotifierProvider<OnlineLyricsCacheNotifier, Map<String, String>>(
-  OnlineLyricsCacheNotifier.new,
-);
+      OnlineLyricsCacheNotifier.new,
+    );
 
 /// Provider for managing online lyrics fetching lifecycle.
 final lyricsControllerProvider =
-    NotifierProvider<LyricsController, LyricsFetchState>(
-  LyricsController.new,
-);
+    NotifierProvider<LyricsController, LyricsFetchState>(LyricsController.new);
 
 /// Exposes whether any lyrics are actively being fetched online.
 final isFetchingLyricsProvider = Provider<bool>((ref) {

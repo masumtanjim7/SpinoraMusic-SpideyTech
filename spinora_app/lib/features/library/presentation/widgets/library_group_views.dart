@@ -253,8 +253,10 @@ class SortBottomSheet extends ConsumerWidget {
               borderRadius: BorderRadius.circular(16),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: currentSort == option
@@ -271,7 +273,9 @@ class SortBottomSheet extends ConsumerWidget {
                         : context.glassTileBorder,
                     width: currentSort == option ? 1.4 : 1.0,
                   ),
-                  boxShadow: currentSort == option ? null : context.glassTileShadow,
+                  boxShadow: currentSort == option
+                      ? null
+                      : context.glassTileShadow,
                 ),
                 child: Row(
                   children: [
@@ -284,8 +288,8 @@ class SortBottomSheet extends ConsumerWidget {
                                 alpha: isLight ? 0.15 : 0.2,
                               )
                             : (isLight
-                                ? Colors.black.withValues(alpha: 0.05)
-                                : Colors.white.withValues(alpha: 0.08)),
+                                  ? Colors.black.withValues(alpha: 0.05)
+                                  : Colors.white.withValues(alpha: 0.08)),
                       ),
                       child: Icon(
                         option.icon,
@@ -348,7 +352,9 @@ class ArtistsGroupedView extends ConsumerWidget {
     // Group songs by artist name
     final Map<String, List<Song>> artistMap = {};
     for (final song in songs) {
-      final artistName = song.artist.trim().isEmpty ? 'Unknown Artist' : song.artist.trim();
+      final artistName = song.artist.trim().isEmpty
+          ? 'Unknown Artist'
+          : song.artist.trim();
       artistMap.putIfAbsent(artistName, () => []).add(song);
     }
 
@@ -388,9 +394,7 @@ class ArtistsGroupedView extends ConsumerWidget {
                     ? 'No artists match "$searchQuery"'
                     : 'Scan your storage to populate your artist catalog.',
                 textAlign: TextAlign.center,
-                style: tt.bodySmall?.copyWith(
-                  color: context.secondaryText,
-                ),
+                style: tt.bodySmall?.copyWith(color: context.secondaryText),
               ),
             ],
           ),
@@ -400,12 +404,7 @@ class ArtistsGroupedView extends ConsumerWidget {
 
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        playerState.hasTrack ? 110 : 80,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, playerState.hasTrack ? 110 : 80),
       itemCount: filteredArtists.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
@@ -423,9 +422,7 @@ class ArtistsGroupedView extends ConsumerWidget {
             decoration: BoxDecoration(
               color: context.glassTileBg,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: context.glassTileBorder,
-              ),
+              border: Border.all(color: context.glassTileBorder),
               boxShadow: context.glassTileShadow,
             ),
             child: Row(
@@ -500,10 +497,7 @@ void showArtistDetailSheet(
 }
 
 class _ArtistDetailSheet extends ConsumerWidget {
-  const _ArtistDetailSheet({
-    required this.artist,
-    required this.songs,
-  });
+  const _ArtistDetailSheet({required this.artist, required this.songs});
 
   final String artist;
   final List<Song> songs;
@@ -611,7 +605,10 @@ class _ArtistDetailSheet extends ConsumerWidget {
                     playerController.playPlaylist(songs);
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                  icon: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                  ),
                   label: const Text(
                     'Play All',
                     style: TextStyle(
@@ -661,10 +658,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Divider(
-            height: 1,
-            color: isLight ? Colors.black12 : Colors.white10,
-          ),
+          Divider(height: 1, color: isLight ? Colors.black12 : Colors.white10),
           const SizedBox(height: 8),
 
           // Tracks List
@@ -801,7 +795,9 @@ class AlbumsGroupedView extends ConsumerWidget {
     final filteredAlbums = searchQuery.isEmpty
         ? sortedAlbums
         : sortedAlbums.where((album) {
-            final matchesAlbum = album.toLowerCase().contains(searchQuery.toLowerCase());
+            final matchesAlbum = album.toLowerCase().contains(
+              searchQuery.toLowerCase(),
+            );
             final matchesArtist = (albumMap[album]?.first.artist ?? '')
                 .toLowerCase()
                 .contains(searchQuery.toLowerCase());
@@ -834,9 +830,7 @@ class AlbumsGroupedView extends ConsumerWidget {
                     ? 'No albums match "$searchQuery"'
                     : 'Scan your storage to populate your album library.',
                 textAlign: TextAlign.center,
-                style: tt.bodySmall?.copyWith(
-                  color: context.secondaryText,
-                ),
+                style: tt.bodySmall?.copyWith(color: context.secondaryText),
               ),
             ],
           ),
@@ -846,12 +840,7 @@ class AlbumsGroupedView extends ConsumerWidget {
 
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        playerState.hasTrack ? 110 : 80,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, playerState.hasTrack ? 110 : 80),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 14,
@@ -874,9 +863,7 @@ class AlbumsGroupedView extends ConsumerWidget {
             decoration: BoxDecoration(
               color: context.glassTileBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: context.glassTileBorder,
-              ),
+              border: Border.all(color: context.glassTileBorder),
               boxShadow: context.glassTileShadow,
             ),
             child: Column(
@@ -970,10 +957,7 @@ void showAlbumDetailSheet(
 }
 
 class _AlbumDetailSheet extends ConsumerWidget {
-  const _AlbumDetailSheet({
-    required this.album,
-    required this.songs,
-  });
+  const _AlbumDetailSheet({required this.album, required this.songs});
 
   final String album;
   final List<Song> songs;
@@ -1084,7 +1068,10 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     playerController.playPlaylist(songs);
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                  icon: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                  ),
                   label: const Text(
                     'Play All',
                     style: TextStyle(
@@ -1135,10 +1122,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Divider(
-            height: 1,
-            color: isLight ? Colors.black12 : Colors.white10,
-          ),
+          Divider(height: 1, color: isLight ? Colors.black12 : Colors.white10),
           const SizedBox(height: 8),
 
           // Tracks List

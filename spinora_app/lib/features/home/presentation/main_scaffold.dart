@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../player/presentation/mini_player.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../../core/navigation/lucid_page_transition.dart';
+import '../../../core/widgets/lucid_cascade_item.dart';
 import 'home_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,8 +26,9 @@ class MainNavTabNotifier extends Notifier<int> {
 }
 
 /// Global riverpod provider to allow any child view to switch navigation tabs.
-final mainNavTabProvider =
-    NotifierProvider<MainNavTabNotifier, int>(MainNavTabNotifier.new);
+final mainNavTabProvider = NotifierProvider<MainNavTabNotifier, int>(
+  MainNavTabNotifier.new,
+);
 
 /// Main application scaffold hosting the 5 primary tabs with a tactile,
 /// macOS-style fluid glass tab shifting animation and persistent mini-player.
@@ -63,6 +66,16 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     });
 
     ref.read(mainNavTabProvider.notifier).setTab(index);
+    ref.read(tabEntryTicksProvider.notifier).bump(index);
+  }
+
+  /// Horizontal thumb-swipe: left swipe -> next tab, right swipe -> previous.
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final double v = details.primaryVelocity ?? 0.0;
+    if (v.abs() <= 380.0) return;
+    final int next = v < 0 ? _selectedIndex + 1 : _selectedIndex - 1;
+    if (next < 0 || next > 4) return;
+    _onTabTapped(next);
   }
 
   Widget _buildTab(BuildContext context, int index) {
@@ -99,9 +112,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         children: [
           // Fluid Apple/macOS Lucid Glass tab shifting switcher
           Positioned.fill(
-            child: LucidTabTransitionSwitcher(
-              currentIndex: _selectedIndex,
-              tabBuilder: _buildTab,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: _onHorizontalDragEnd,
+              child: LucidTabTransitionSwitcher(
+                currentIndex: _selectedIndex,
+                tabBuilder: _buildTab,
+              ),
             ),
           ),
         ],
@@ -111,10 +128,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         children: [
           // Persistent Floating Glass Mini-Player (sits floating right above the bottom bar)
           const MiniPlayer(bottomPadding: 8),
-          GlassBottomNavBar(
-            selectedIndex: _selectedIndex,
-            onTap: _onTabTapped,
-          ),
+          GlassBottomNavBar(selectedIndex: _selectedIndex, onTap: _onTabTapped),
         ],
       ),
     );
@@ -227,7 +241,8 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
                   const double pillHeight = 32.0;
                   final double inset = (tabWidth - pillWidth) / 2.0;
                   final double fromLeft = (_fromIndex * tabWidth) + inset;
-                  final double toLeft = (widget.selectedIndex * tabWidth) + inset;
+                  final double toLeft =
+                      (widget.selectedIndex * tabWidth) + inset;
                   final bool forward = widget.selectedIndex >= _fromIndex;
                   const double pillTop = 4.0;
 
@@ -240,13 +255,12 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
                         animation: _pillController,
                         builder: (context, _) {
                           final double t = _pillController.value;
-                          final double lead =
-                              kMacOSSpringTwitchCurve.transform(t);
-                          final double trail = const Interval(
-                            0.14,
-                            1.0,
-                            curve: Curves.easeOutCubic,
-                          ).transform(t);
+                          // Leading edge rockets ahead; trailing edge follows
+                          // with an elastic back-ease, stretching the glass.
+                          final double lead = Curves.easeOutExpo.transform(t);
+                          final double trail = Curves.easeInOutBack.transform(
+                            t,
+                          );
 
                           final double fromRight = fromLeft + pillWidth;
                           final double toRight = toLeft + pillWidth;
@@ -260,7 +274,10 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
                           return Positioned(
                             left: leftEdge,
                             top: pillTop,
-                            width: math.max(pillWidth * 0.8, rightEdge - leftEdge),
+                            width: math.max(
+                              pillWidth * 0.8,
+                              rightEdge - leftEdge,
+                            ),
                             height: pillHeight,
                             child: _ActiveGlassPill(
                               isDark: isDark,
@@ -322,10 +339,7 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
 /// the page whip), neon/lavender glow, and a diagonal specular light sweep.
 /// No BackdropFilter: the nav bar already provides the frosted backdrop.
 class _ActiveGlassPill extends StatelessWidget {
-  const _ActiveGlassPill({
-    required this.isDark,
-    required this.progress,
-  });
+  const _ActiveGlassPill({required this.isDark, required this.progress});
 
   final bool isDark;
 
@@ -366,14 +380,16 @@ class _ActiveGlassPill extends StatelessWidget {
     final boxShadow = [
       if (isDark)
         BoxShadow(
-          color: const Color(0xFF9D50BB).withValues(alpha: 0.35 + (0.30 * pulse)),
+          color: const Color(0xFF9D50BB)
+              .withValues(alpha: 0.35 + (0.30 * pulse)),
           blurRadius: 16 + (10 * pulse),
           spreadRadius: 1,
           offset: const Offset(0, 2),
         )
       else
         BoxShadow(
-          color: const Color(0xFF7A5CFF).withValues(alpha: 0.20 + (0.22 * pulse)),
+          color: const Color(0xFF7A5CFF)
+              .withValues(alpha: 0.20 + (0.22 * pulse)),
           blurRadius: 14 + (10 * pulse),
           spreadRadius: 1,
           offset: const Offset(0, 2),
@@ -439,10 +455,12 @@ class _NavBarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeColor =
-        isDark ? const Color(0xFFE9D5FF) : const Color(0xFF6D28D9);
-    final inactiveColor =
-        isDark ? Colors.white.withValues(alpha: 0.50) : const Color(0xFF64748B);
+    final activeColor = isDark
+        ? const Color(0xFFE9D5FF)
+        : const Color(0xFF6D28D9);
+    final inactiveColor = isDark
+        ? Colors.white.withValues(alpha: 0.50)
+        : const Color(0xFF64748B);
 
     return Expanded(
       child: GestureDetector(

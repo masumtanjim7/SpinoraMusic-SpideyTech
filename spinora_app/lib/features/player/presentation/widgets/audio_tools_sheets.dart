@@ -168,7 +168,9 @@ class SleepTimerSheet extends ConsumerWidget {
                         ],
                 ),
                 border: Border.all(
-                  color: AppColors.cyanAccent.withValues(alpha: isLight ? 0.4 : 0.5),
+                  color: AppColors.cyanAccent.withValues(
+                    alpha: isLight ? 0.4 : 0.5,
+                  ),
                 ),
               ),
               child: Row(
@@ -217,7 +219,9 @@ class SleepTimerSheet extends ConsumerWidget {
                     },
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.pinkAccent,
-                      backgroundColor: Colors.pinkAccent.withValues(alpha: 0.12),
+                      backgroundColor: Colors.pinkAccent.withValues(
+                        alpha: 0.12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -237,7 +241,8 @@ class SleepTimerSheet extends ConsumerWidget {
               title: preset.label,
               subtitle: 'Pauses audio after ${preset.duration.inMinutes} mins',
               icon: Icons.timer_outlined,
-              isSelected: !playerState.stopAtEndOfTrack &&
+              isSelected:
+                  !playerState.stopAtEndOfTrack &&
                   playerState.remainingSleepDuration != null &&
                   (playerState.remainingSleepDuration!.inMinutes -
                               preset.duration.inMinutes)
@@ -304,15 +309,15 @@ class _TimerOptionTile extends StatelessWidget {
           color: isSelected
               ? AppColors.cyanAccent.withValues(alpha: isLight ? 0.16 : 0.14)
               : (isLight
-                  ? Colors.black.withValues(alpha: 0.03)
-                  : Colors.white.withValues(alpha: 0.05)),
+                    ? Colors.black.withValues(alpha: 0.03)
+                    : Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? AppColors.cyanAccent.withValues(alpha: 0.6)
                 : (isLight
-                    ? Colors.black.withValues(alpha: 0.06)
-                    : Colors.white.withValues(alpha: 0.08)),
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white.withValues(alpha: 0.08)),
             width: isSelected ? 1.4 : 1.0,
           ),
         ),
@@ -325,13 +330,15 @@ class _TimerOptionTile extends StatelessWidget {
                 color: isSelected
                     ? AppColors.cyanAccent.withValues(alpha: 0.2)
                     : (isLight
-                        ? Colors.black.withValues(alpha: 0.05)
-                        : Colors.white.withValues(alpha: 0.08)),
+                          ? Colors.black.withValues(alpha: 0.05)
+                          : Colors.white.withValues(alpha: 0.08)),
               ),
               child: Icon(
                 icon,
                 size: 20,
-                color: isSelected ? AppColors.cyanAccent : context.secondaryText,
+                color: isSelected
+                    ? AppColors.cyanAccent
+                    : context.secondaryText,
               ),
             ),
             const SizedBox(width: 14),
@@ -345,14 +352,14 @@ class _TimerOptionTile extends StatelessWidget {
                       color: isSelected
                           ? (isLight ? const Color(0xFF0D9488) : Colors.white)
                           : context.primaryText,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: tt.bodySmall?.copyWith(
-                      color: context.secondaryText,
-                    ),
+                    style: tt.bodySmall?.copyWith(color: context.secondaryText),
                   ),
                 ],
               ),
@@ -482,7 +489,8 @@ class PlaybackSpeedSheet extends ConsumerWidget {
           for (final (speed, label, desc) in speeds) ...[
             Builder(
               builder: (context) {
-                final isSelected = (playerState.playbackSpeed - speed).abs() < 0.01;
+                final isSelected =
+                    (playerState.playbackSpeed - speed).abs() < 0.01;
                 return InkWell(
                   onTap: () {
                     controller.setPlaybackSpeed(speed);
@@ -491,21 +499,26 @@ class PlaybackSpeedSheet extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.purpleAccent.withValues(alpha: isLight ? 0.16 : 0.16)
+                          ? AppColors.purpleAccent.withValues(
+                              alpha: isLight ? 0.16 : 0.16,
+                            )
                           : (isLight
-                              ? Colors.black.withValues(alpha: 0.03)
-                              : Colors.white.withValues(alpha: 0.05)),
+                                ? Colors.black.withValues(alpha: 0.03)
+                                : Colors.white.withValues(alpha: 0.05)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected
                             ? AppColors.purpleAccent.withValues(alpha: 0.7)
                             : (isLight
-                                ? Colors.black.withValues(alpha: 0.06)
-                                : Colors.white.withValues(alpha: 0.08)),
+                                  ? Colors.black.withValues(alpha: 0.06)
+                                  : Colors.white.withValues(alpha: 0.08)),
                         width: isSelected ? 1.4 : 1.0,
                       ),
                     ),
@@ -518,8 +531,10 @@ class PlaybackSpeedSheet extends ConsumerWidget {
                           decoration: BoxDecoration(
                             color: isLight
                                 ? (isSelected
-                                    ? AppColors.purpleAccent.withValues(alpha: 0.15)
-                                    : Colors.black.withValues(alpha: 0.05))
+                                      ? AppColors.purpleAccent.withValues(
+                                          alpha: 0.15,
+                                        )
+                                      : Colors.black.withValues(alpha: 0.05))
                                 : Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -527,7 +542,9 @@ class PlaybackSpeedSheet extends ConsumerWidget {
                             label,
                             style: tt.labelMedium?.copyWith(
                               color: isSelected
-                                  ? (isLight ? AppColors.purpleAccent : AppColors.cyanAccent)
+                                  ? (isLight
+                                        ? AppColors.purpleAccent
+                                        : AppColors.cyanAccent)
                                   : context.primaryText,
                               fontWeight: FontWeight.bold,
                             ),
@@ -575,11 +592,14 @@ class TrackInfoSheet extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
     final isLight = context.isLight;
 
-    final songId = (track.source == TrackSource.local && track.id.startsWith('local_'))
+    final songId =
+        (track.source == TrackSource.local && track.id.startsWith('local_'))
         ? int.tryParse(track.id.replaceFirst('local_', ''))
         : null;
 
-    final songAsync = songId != null ? ref.watch(songByIdProvider(songId)) : null;
+    final songAsync = songId != null
+        ? ref.watch(songByIdProvider(songId))
+        : null;
     final song = songAsync?.asData?.value;
 
     return Container(
@@ -692,7 +712,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'Artist',
@@ -701,7 +723,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'Album',
@@ -710,7 +734,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'Duration',
@@ -746,7 +772,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'Last Played',
@@ -758,7 +786,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'Source',
@@ -771,7 +801,9 @@ class TrackInfoSheet extends ConsumerWidget {
                 ),
                 Divider(
                   height: 18,
-                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white10,
+                  color: isLight
+                      ? Colors.black.withValues(alpha: 0.06)
+                      : Colors.white10,
                 ),
                 _InfoRow(
                   label: 'File Path',
@@ -844,11 +876,7 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: accentColor ?? context.secondaryText,
-        ),
+        Icon(icon, size: 18, color: accentColor ?? context.secondaryText),
         const SizedBox(width: 12),
         SizedBox(
           width: 86,
@@ -932,11 +960,13 @@ class AudioToolsActionRow extends ConsumerWidget {
           children: [
             // 1. Sleep Timer Quick Button
             _ToolButton(
-              icon: isTimerActive ? Icons.bedtime_rounded : Icons.bedtime_outlined,
+              icon: isTimerActive
+                  ? Icons.bedtime_rounded
+                  : Icons.bedtime_outlined,
               label: isTimerActive
                   ? (playerState.stopAtEndOfTrack
-                      ? 'End Track'
-                      : formatCountdown(remainingTimer ?? Duration.zero))
+                        ? 'End Track'
+                        : formatCountdown(remainingTimer ?? Duration.zero))
                   : 'Timer',
               isActive: isTimerActive,
               activeColor: AppColors.cyanAccent,
@@ -1040,15 +1070,15 @@ class _ToolButton extends StatelessWidget {
             color: isActive
                 ? activeColor.withValues(alpha: isLight ? 0.18 : 0.18)
                 : (isLight
-                    ? Colors.black.withValues(alpha: 0.04)
-                    : Colors.white.withValues(alpha: 0.05)),
+                      ? Colors.black.withValues(alpha: 0.04)
+                      : Colors.white.withValues(alpha: 0.05)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isActive
                   ? activeColor.withValues(alpha: 0.5)
                   : (isLight
-                      ? Colors.black.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.1)),
+                        ? Colors.black.withValues(alpha: 0.08)
+                        : Colors.white.withValues(alpha: 0.1)),
             ),
           ),
           child: Row(
@@ -1059,7 +1089,9 @@ class _ToolButton extends StatelessWidget {
                 size: 15,
                 color: isActive
                     ? activeColor
-                    : (isLight ? context.secondaryText : Colors.white.withValues(alpha: 0.7)),
+                    : (isLight
+                          ? context.secondaryText
+                          : Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(width: 5),
               Text(

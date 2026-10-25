@@ -139,8 +139,8 @@ class PlayerController extends Notifier<PlayerState> {
     this.playerInstance,
     AndroidEqualizer? equalizerInstance,
     AndroidLoudnessEnhancer? loudnessEnhancerInstance,
-  })  : _equalizer = equalizerInstance,
-        _loudnessEnhancer = loudnessEnhancerInstance;
+  }) : _equalizer = equalizerInstance,
+       _loudnessEnhancer = loudnessEnhancerInstance;
 
   final AudioPlayer? playerInstance;
   AudioPlayer? _player;
@@ -158,10 +158,7 @@ class PlayerController extends Notifier<PlayerState> {
     _loudnessEnhancer ??= AndroidLoudnessEnhancer();
     _player = AudioPlayer(
       audioPipeline: AudioPipeline(
-        androidAudioEffects: [
-          _equalizer!,
-          _loudnessEnhancer!,
-        ],
+        androidAudioEffects: [_equalizer!, _loudnessEnhancer!],
       ),
     );
     return _player!;
@@ -250,14 +247,11 @@ class PlayerController extends Notifier<PlayerState> {
       final trackDuration = Duration(milliseconds: track.durationMs);
       final safePosition =
           (savedPosition > trackDuration || savedPosition < Duration.zero)
-              ? Duration.zero
-              : savedPosition;
+          ? Duration.zero
+          : savedPosition;
 
       final audioSource = _buildAudioSource(track);
-      await player.setAudioSource(
-        audioSource,
-        initialPosition: safePosition,
-      );
+      await player.setAudioSource(audioSource, initialPosition: safePosition);
 
       state = state.copyWith(
         currentTrack: track,
@@ -310,7 +304,9 @@ class PlayerController extends Notifier<PlayerState> {
       }
       // Auto-fetch lyrics online in background if not already cached
       try {
-        ref.read(lyricsControllerProvider.notifier).triggerAutoFetchForTrack(track);
+        ref
+            .read(lyricsControllerProvider.notifier)
+            .triggerAutoFetchForTrack(track);
       } catch (e) {
         debugPrint('[PlayerController] Error triggering auto lyrics fetch: $e');
       }
@@ -350,7 +346,8 @@ class PlayerController extends Notifier<PlayerState> {
     }
     _lastPersistedTime = now;
 
-    final songId = (currentTrack.source == TrackSource.local &&
+    final songId =
+        (currentTrack.source == TrackSource.local &&
             currentTrack.id.startsWith('local_') &&
             !currentTrack.uri.startsWith('yt://'))
         ? int.tryParse(currentTrack.id.replaceFirst('local_', ''))
@@ -397,14 +394,11 @@ class PlayerController extends Notifier<PlayerState> {
         final isPlaying = playerState.playing;
         final isBuffering =
             playerState.processingState == ProcessingState.buffering ||
-                playerState.processingState == ProcessingState.loading;
+            playerState.processingState == ProcessingState.loading;
 
         final wasPlaying = state.isPlaying;
 
-        state = state.copyWith(
-          isPlaying: isPlaying,
-          isBuffering: isBuffering,
-        );
+        state = state.copyWith(isPlaying: isPlaying, isBuffering: isBuffering);
         _syncWidgetState();
 
         if (isPlaying && !wasPlaying && state.currentTrack != null) {
@@ -457,10 +451,7 @@ class PlayerController extends Notifier<PlayerState> {
             index < state.queue.length &&
             index != state.currentIndex) {
           final nextTrack = state.queue[index];
-          state = state.copyWith(
-            currentIndex: index,
-            currentTrack: nextTrack,
-          );
+          state = state.copyWith(currentIndex: index, currentTrack: nextTrack);
           _syncWidgetState();
           if (state.isPlaying) {
             _recordPlayback(nextTrack);
@@ -577,7 +568,8 @@ class PlayerController extends Notifier<PlayerState> {
 
   AudioSource _buildAudioSource(Track track) {
     final uriString = _resolvedStreamUrls[track.uri] ?? track.uri;
-    final isOnline = track.uri.startsWith('yt://') ||
+    final isOnline =
+        track.uri.startsWith('yt://') ||
         uriString.startsWith('http://') ||
         uriString.startsWith('https://');
 
@@ -587,17 +579,11 @@ class PlayerController extends Notifier<PlayerState> {
       final parsed = (uriString.startsWith('/') && !uriString.startsWith('//'))
           ? Uri.file(uriString)
           : Uri.parse(uriString);
-      return AudioSource.uri(
-        parsed,
-        tag: mediaItem,
-      );
+      return AudioSource.uri(parsed, tag: mediaItem);
     }
 
     final sourceUri = Uri.parse(uriString);
-    return AudioSource.uri(
-      sourceUri,
-      tag: mediaItem,
-    );
+    return AudioSource.uri(sourceUri, tag: mediaItem);
   }
 
   /// Builds a fully-specified [MediaItem] with guaranteed title, artist, album,
@@ -688,19 +674,19 @@ class PlayerController extends Notifier<PlayerState> {
           // 2) Extract videoId and await getAudioStreamUrl (first attempt)
           final streamUrl = await _resolveTrackStreamUrl(track);
           if (requestId != _playbackRequestId) {
-            debugPrint('[PlayerController] Discarding outdated playback request #$requestId for ${track.title}');
+            debugPrint(
+              '[PlayerController] Discarding outdated playback request #$requestId for ${track.title}',
+            );
             return;
           }
 
-          final streamUri = (streamUrl.startsWith('/') && !streamUrl.startsWith('//'))
+          final streamUri =
+              (streamUrl.startsWith('/') && !streamUrl.startsWith('//'))
               ? Uri.file(streamUrl)
               : Uri.parse(streamUrl);
 
           // 3) Load resolved URL without custom headers so ExoPlayer connects directly over HTTP/HTTPS/file
-          final audioSource = AudioSource.uri(
-            streamUri,
-            tag: mediaItem,
-          );
+          final audioSource = AudioSource.uri(streamUri, tag: mediaItem);
 
           await player.setAudioSource(audioSource);
           if (requestId != _playbackRequestId) return;
@@ -726,7 +712,9 @@ class PlayerController extends Notifier<PlayerState> {
           );
           if (requestId != _playbackRequestId) return;
 
-          final fallbackUri = (fallbackStreamUrl.startsWith('/') && !fallbackStreamUrl.startsWith('//'))
+          final fallbackUri =
+              (fallbackStreamUrl.startsWith('/') &&
+                  !fallbackStreamUrl.startsWith('//'))
               ? Uri.file(fallbackStreamUrl)
               : Uri.parse(fallbackStreamUrl);
           final fallbackAudioSource = AudioSource.uri(
@@ -752,7 +740,9 @@ class PlayerController extends Notifier<PlayerState> {
       }
 
       // Local playback branch
-      final hasOnlineInQueue = activeQueue.any((t) => t.uri.startsWith('yt://'));
+      final hasOnlineInQueue = activeQueue.any(
+        (t) => t.uri.startsWith('yt://'),
+      );
       if (activeQueue.length > 1 && !hasOnlineInQueue) {
         final sources = activeQueue.map(_buildAudioSource).toList();
         await player.setAudioSources(sources, initialIndex: index);
@@ -843,7 +833,9 @@ class PlayerController extends Notifier<PlayerState> {
           initialPosition: state.position,
         );
       } catch (e, st) {
-        debugPrint('[PlayerController] Error updating audio sources on playNext: $e');
+        debugPrint(
+          '[PlayerController] Error updating audio sources on playNext: $e',
+        );
         FirebaseCrashlytics.instance.recordError(
           e,
           st,
@@ -868,10 +860,7 @@ class PlayerController extends Notifier<PlayerState> {
     final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
 
     if (!hasOnline && (player.hasPrevious || player.hasNext)) {
-      state = state.copyWith(
-        currentIndex: index,
-        currentTrack: targetTrack,
-      );
+      state = state.copyWith(currentIndex: index, currentTrack: targetTrack);
       try {
         await player.seek(Duration.zero, index: index);
         if (!state.isPlaying) {
@@ -948,7 +937,9 @@ class PlayerController extends Notifier<PlayerState> {
           initialPosition: state.position,
         );
       } catch (e, st) {
-        debugPrint('[PlayerController] Error updating queue sources on remove: $e');
+        debugPrint(
+          '[PlayerController] Error updating queue sources on remove: $e',
+        );
         FirebaseCrashlytics.instance.recordError(
           e,
           st,
@@ -1117,11 +1108,7 @@ class PlayerController extends Notifier<PlayerState> {
     final trackId = 'local_$songId';
     final updatedQueue = state.queue.map((t) {
       if (t.id == trackId) {
-        return t.copyWith(
-          title: title,
-          artist: artist,
-          album: album,
-        );
+        return t.copyWith(title: title, artist: artist, album: album);
       }
       return t;
     }).toList();
@@ -1243,20 +1230,14 @@ class PlayerController extends Notifier<PlayerState> {
   void setSleepTimerEndOfTrack() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
-    state = state.copyWith(
-      clearSleepTimer: true,
-      stopAtEndOfTrack: true,
-    );
+    state = state.copyWith(clearSleepTimer: true, stopAtEndOfTrack: true);
   }
 
   /// Cancels any active sleep timer or end-of-track pause rule.
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
     _sleepTimer = null;
-    state = state.copyWith(
-      clearSleepTimer: true,
-      stopAtEndOfTrack: false,
-    );
+    state = state.copyWith(clearSleepTimer: true, stopAtEndOfTrack: false);
   }
 
   // ---------------------------------------------------------------------------
@@ -1309,23 +1290,29 @@ class PlayerController extends Notifier<PlayerState> {
       final eq = equalizer;
       final le = loudnessEnhancer;
 
-      _subscriptions.add(eq.enabledStream.listen((enabled) {
-        if (state.equalizerEnabled != enabled) {
-          state = state.copyWith(equalizerEnabled: enabled);
-        }
-      }));
+      _subscriptions.add(
+        eq.enabledStream.listen((enabled) {
+          if (state.equalizerEnabled != enabled) {
+            state = state.copyWith(equalizerEnabled: enabled);
+          }
+        }),
+      );
 
-      _subscriptions.add(le.enabledStream.listen((enabled) {
-        if (state.loudnessEnhancerEnabled != enabled) {
-          state = state.copyWith(loudnessEnhancerEnabled: enabled);
-        }
-      }));
+      _subscriptions.add(
+        le.enabledStream.listen((enabled) {
+          if (state.loudnessEnhancerEnabled != enabled) {
+            state = state.copyWith(loudnessEnhancerEnabled: enabled);
+          }
+        }),
+      );
 
-      _subscriptions.add(le.targetGainStream.listen((gain) {
-        if ((state.loudnessGain - gain).abs() > 0.01) {
-          state = state.copyWith(loudnessGain: gain);
-        }
-      }));
+      _subscriptions.add(
+        le.targetGainStream.listen((gain) {
+          if ((state.loudnessGain - gain).abs() > 0.01) {
+            state = state.copyWith(loudnessGain: gain);
+          }
+        }),
+      );
 
       final params = await eq.parameters;
       _equalizerParameters = params;
@@ -1337,21 +1324,24 @@ class PlayerController extends Notifier<PlayerState> {
       final List<EqualizerBandState> initialBands = [];
       for (final band in params.bands) {
         final gain = band.gain;
-        initialBands.add(EqualizerBandState(
-          index: band.index,
-          centerFrequency: band.centerFrequency,
-          gain: gain,
-          minDecibels: params.minDecibels,
-          maxDecibels: params.maxDecibels,
-        ));
+        initialBands.add(
+          EqualizerBandState(
+            index: band.index,
+            centerFrequency: band.centerFrequency,
+            gain: gain,
+            minDecibels: params.minDecibels,
+            maxDecibels: params.maxDecibels,
+          ),
+        );
       }
 
       state = state.copyWith(
         equalizerEnabled: eqEnabled,
         loudnessEnhancerEnabled: leEnabled,
         loudnessGain: targetGain,
-        equalizerBands:
-            initialBands.isNotEmpty ? initialBands : defaultEqualizerBands,
+        equalizerBands: initialBands.isNotEmpty
+            ? initialBands
+            : defaultEqualizerBands,
       );
     } catch (e) {
       debugPrint('[PlayerController] Audio effects init fallback: $e');
@@ -1385,7 +1375,9 @@ class PlayerController extends Notifier<PlayerState> {
     try {
       await loudnessEnhancer.setEnabled(enabled);
     } catch (e, st) {
-      debugPrint('[PlayerController] Error setting loudness enhancer enabled: $e');
+      debugPrint(
+        '[PlayerController] Error setting loudness enhancer enabled: $e',
+      );
       FirebaseCrashlytics.instance.recordError(
         e,
         st,
@@ -1428,8 +1420,10 @@ class PlayerController extends Notifier<PlayerState> {
     if (bandIndex < 0 || bandIndex >= currentBands.length) return;
 
     final targetBand = currentBands[bandIndex];
-    final clampedGain =
-        gain.clamp(targetBand.minDecibels, targetBand.maxDecibels);
+    final clampedGain = gain.clamp(
+      targetBand.minDecibels,
+      targetBand.maxDecibels,
+    );
     currentBands[bandIndex] = targetBand.copyWith(gain: clampedGain);
 
     state = state.copyWith(
@@ -1462,8 +1456,7 @@ class PlayerController extends Notifier<PlayerState> {
     final updatedBands = <EqualizerBandState>[];
     for (int i = 0; i < currentBands.length; i++) {
       final band = currentBands[i];
-      final newGain =
-          presetGains[i].clamp(band.minDecibels, band.maxDecibels);
+      final newGain = presetGains[i].clamp(band.minDecibels, band.maxDecibels);
       updatedBands.add(band.copyWith(gain: newGain));
     }
 
@@ -1495,6 +1488,4 @@ class PlayerController extends Notifier<PlayerState> {
 // ---------------------------------------------------------------------------
 
 final playerControllerProvider =
-    NotifierProvider<PlayerController, PlayerState>(
-  PlayerController.new,
-);
+    NotifierProvider<PlayerController, PlayerState>(PlayerController.new);

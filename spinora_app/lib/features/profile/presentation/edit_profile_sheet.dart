@@ -89,7 +89,9 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     if (_isSaving) return;
     setState(() => _isSaving = true);
 
-    await ref.read(userProfileProvider.notifier).updateProfile(
+    await ref
+        .read(userProfileProvider.notifier)
+        .updateProfile(
           displayName: _nameCtrl.text.trim().isEmpty
               ? null
               : _nameCtrl.text.trim(),
@@ -114,8 +116,9 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = isDark ? Colors.white : const Color(0xFF0F111A);
-    final secondaryTextColor =
-        isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF5C6275);
+    final secondaryTextColor = isDark
+        ? Colors.white.withValues(alpha: 0.55)
+        : const Color(0xFF5C6275);
     final sheetBg = isDark
         ? const Color(0xFF0D0C18)
         : Colors.white.withValues(alpha: 0.94);
@@ -124,9 +127,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
         : Colors.black.withValues(alpha: 0.06);
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         decoration: BoxDecoration(
           color: sheetBg,
@@ -166,10 +167,10 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
               Text(
                 'Edit Profile',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                      color: primaryTextColor,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  color: primaryTextColor,
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -186,10 +187,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                         gradient: showAvatar
                             ? null
                             : const LinearGradient(
-                                colors: [
-                                  Color(0xFF8B5CF6),
-                                  Color(0xFFFF758F),
-                                ],
+                                colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -201,8 +199,8 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                             : null,
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                            color: const Color(0xFF8B5CF6)
+                                .withValues(alpha: 0.4),
                             blurRadius: 18,
                           ),
                         ],
@@ -225,7 +223,10 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                       children: [
                         TextButton.icon(
                           onPressed: _pickAvatar,
-                          icon: const Icon(Icons.photo_library_rounded, size: 16),
+                          icon: const Icon(
+                            Icons.photo_library_rounded,
+                            size: 16,
+                          ),
                           label: const Text('Change photo'),
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFF8B5CF6),
@@ -236,8 +237,10 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                         if (showAvatar)
                           TextButton.icon(
                             onPressed: _removeAvatar,
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                size: 16),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              size: 16,
+                            ),
                             label: const Text('Remove'),
                             style: TextButton.styleFrom(
                               foregroundColor: secondaryTextColor,
@@ -284,8 +287,7 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
                         blurRadius: 20,
                         offset: const Offset(0, 6),
                       ),
@@ -369,10 +371,10 @@ class _ProfileTextField extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: labelColor,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w600,
-              ),
+            color: labelColor,
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -386,13 +388,12 @@ class _ProfileTextField extends StatelessWidget {
           textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(
-              color: hintColor,
-              fontSize: 14,
-            ),
+            hintStyle: TextStyle(color: hintColor, fontSize: 14),
             prefixIcon: Icon(icon, size: 18, color: iconColor),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: borderColor),

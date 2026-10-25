@@ -14,16 +14,14 @@ import '../../../../core/database/app_database.dart';
 
 @immutable
 class CleanedTrackMetadata {
-  const CleanedTrackMetadata({
-    required this.title,
-    required this.artist,
-  });
+  const CleanedTrackMetadata({required this.title, required this.artist});
 
   final String title;
   final String artist;
 
   @override
-  String toString() => 'CleanedTrackMetadata(artist: "$artist", title: "$title")';
+  String toString() =>
+      'CleanedTrackMetadata(artist: "$artist", title: "$title")';
 }
 
 // ---------------------------------------------------------------------------
@@ -44,15 +42,15 @@ String cleanQueryTextHelper(String input) {
 
   // 2. Remove bracketed / isolated bitrates (e.g. [320kbps], (128 kbps), _320kbps, 320kbps)
   text = text.replaceAll(
-    RegExp(r'[\(\[\{]?\s*(320|256|192|128)\s*(kbps|kb/s|k)?\s*[\)\]\}]?', caseSensitive: false),
+    RegExp(
+      r'[\(\[\{]?\s*(320|256|192|128)\s*(kbps|kb/s|k)?\s*[\)\]\}]?',
+      caseSensitive: false,
+    ),
     '',
   );
 
   // 3. Remove common website watermarks, domains, and audio source tags
-  text = text.replaceAll(
-    RegExp(r'www\.[^\s]+', caseSensitive: false),
-    '',
-  );
+  text = text.replaceAll(RegExp(r'www\.[^\s]+', caseSensitive: false), '');
   text = text.replaceAll(
     RegExp(
       r'\[?\b[a-zA-Z0-9_\-]+\.(com|net|org|in|co|pk|me|io|info|biz|site|cc|xyz|club|mp3)\b\]?',
@@ -82,7 +80,10 @@ String cleanQueryTextHelper(String input) {
 
   // 5. Remove bracketed featuring tags: (feat. Artist), [ft. Artist]
   text = text.replaceAll(
-    RegExp(r'[\(\[]\s*(feat|ft|featuring)\.?\s+[^)\]]+[\)\]]', caseSensitive: false),
+    RegExp(
+      r'[\(\[]\s*(feat|ft|featuring)\.?\s+[^)\]]+[\)\]]',
+      caseSensitive: false,
+    ),
     '',
   );
 
@@ -117,7 +118,8 @@ CleanedTrackMetadata cleanSongMetadataHelper({
   var artist = cleanQueryTextHelper(rawArtist);
   var title = cleanQueryTextHelper(rawTitle);
 
-  final isUnknownArtist = artist.isEmpty ||
+  final isUnknownArtist =
+      artist.isEmpty ||
       artist.toLowerCase() == '<unknown>' ||
       artist.toLowerCase() == 'unknown artist' ||
       artist.toLowerCase() == 'unknown' ||
@@ -144,8 +146,7 @@ CleanedTrackMetadata cleanSongMetadataHelper({
 CleanedTrackMetadata cleanSongMetadata({
   required String rawTitle,
   required String rawArtist,
-}) =>
-    cleanSongMetadataHelper(rawTitle: rawTitle, rawArtist: rawArtist);
+}) => cleanSongMetadataHelper(rawTitle: rawTitle, rawArtist: rawArtist);
 
 // ---------------------------------------------------------------------------
 // Online Lyrics Service
@@ -154,33 +155,30 @@ CleanedTrackMetadata cleanSongMetadata({
 /// Service responsible for querying online lyrics providers (LRCLIB primary,
 /// secondary fallback) with smart query sanitization and timeout protection.
 class OnlineLyricsService {
-  OnlineLyricsService({http.Client? client}) : _client = client ?? http.Client();
+  OnlineLyricsService({http.Client? client})
+    : _client = client ?? http.Client();
 
   final http.Client _client;
 
   static const String _lrclibHost = 'lrclib.net';
-  static const String _userAgent = 'SpinoraMusic/1.0.0 (https://github.com/masumtanjim7)';
+  static const String _userAgent =
+      'SpinoraMusic/1.0.0 (https://github.com/masumtanjim7)';
   static const Duration _requestTimeout = Duration(seconds: 6);
 
   /// Strips bracketed tags, extensions, bitrates, and watermarks from [input].
-  static String cleanQueryText(String input) =>
-      cleanQueryTextHelper(input);
+  static String cleanQueryText(String input) => cleanQueryTextHelper(input);
 
   /// Sanitizes raw song titles and artists, splitting "Artist - Title" if artist is unknown.
   static CleanedTrackMetadata cleanSongMetadata({
     required String rawTitle,
     required String rawArtist,
-  }) =>
-      cleanSongMetadataHelper(rawTitle: rawTitle, rawArtist: rawArtist);
+  }) => cleanSongMetadataHelper(rawTitle: rawTitle, rawArtist: rawArtist);
 
   /// Fetches lyrics for a given Drift [Song] record.
   ///
   /// Returns raw synced `.lrc` lyrics if available, fallback plain text lyrics,
   /// or `null` if no match is found or if offline.
-  Future<String?> fetchLyricsForSong(
-    Song song, {
-    String? customQuery,
-  }) async {
+  Future<String?> fetchLyricsForSong(Song song, {String? customQuery}) async {
     final cleaned = cleanSongMetadata(
       rawTitle: song.title,
       rawArtist: song.artist,
@@ -241,14 +239,13 @@ class OnlineLyricsService {
   }) async {
     List<dynamic> items = [];
 
-    final headers = {
-      'User-Agent': _userAgent,
-      'Accept': 'application/json',
-    };
+    final headers = {'User-Agent': _userAgent, 'Accept': 'application/json'};
 
     if (customQuery != null && customQuery.trim().isNotEmpty) {
       // Direct query via custom user input
-      final uri = Uri.https(_lrclibHost, '/api/search', {'q': customQuery.trim()});
+      final uri = Uri.https(_lrclibHost, '/api/search', {
+        'q': customQuery.trim(),
+      });
       items = await _executeLrclibRequest(uri, headers);
     } else {
       // 1. Precise track_name & artist_name query
@@ -279,7 +276,9 @@ class OnlineLyricsService {
     Map<String, String> headers,
   ) async {
     try {
-      final response = await _client.get(uri, headers: headers).timeout(_requestTimeout);
+      final response = await _client
+          .get(uri, headers: headers)
+          .timeout(_requestTimeout);
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -329,7 +328,9 @@ class OnlineLyricsService {
 
       // Duration penalty if duration delta is significant
       final itemDuration = (raw['duration'] as num?)?.toDouble();
-      if (targetDurationSec != null && itemDuration != null && itemDuration > 0) {
+      if (targetDurationSec != null &&
+          itemDuration != null &&
+          itemDuration > 0) {
         final delta = (itemDuration - targetDurationSec).abs();
         score -= delta * 2.0;
       }
@@ -368,13 +369,12 @@ class OnlineLyricsService {
         '/v1/${Uri.encodeComponent(artist)}/${Uri.encodeComponent(title)}',
       );
 
-      final response = await _client.get(
-        uri,
-        headers: {
-          'User-Agent': _userAgent,
-          'Accept': 'application/json',
-        },
-      ).timeout(_requestTimeout);
+      final response = await _client
+          .get(
+            uri,
+            headers: {'User-Agent': _userAgent, 'Accept': 'application/json'},
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);

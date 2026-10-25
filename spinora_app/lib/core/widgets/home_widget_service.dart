@@ -6,8 +6,9 @@ import 'package:flutter/services.dart';
 class HomeWidgetService {
   HomeWidgetService._();
 
-  static const MethodChannel _channel =
-      MethodChannel('com.spideytech.spinora/widget');
+  static const MethodChannel _channel = MethodChannel(
+    'com.spideytech.spinora/widget',
+  );
 
   static bool _initialized = false;
   static VoidCallback? _onPlayPause;

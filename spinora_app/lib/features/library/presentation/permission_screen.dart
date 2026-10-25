@@ -128,9 +128,9 @@ class _PermissionScreenState extends ConsumerState<PermissionScreen> {
                         Text(
                           _permanentlyDenied
                               ? 'Access was denied. Open Settings to enable '
-                                  '"Music & Audio" permission for Spinora.'
+                                    '"Music & Audio" permission for Spinora.'
                               : 'Spinora needs access to your local audio files '
-                                  'to scan and play your music library.',
+                                    'to scan and play your music library.',
                           style: tt.bodyMedium?.copyWith(
                             color: Colors.white.withValues(alpha: 0.7),
                           ),
@@ -142,8 +142,11 @@ class _PermissionScreenState extends ConsumerState<PermissionScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed:
-                                _requesting ? null : (_permanentlyDenied ? _openSettings : _request),
+                            onPressed: _requesting
+                                ? null
+                                : (_permanentlyDenied
+                                      ? _openSettings
+                                      : _request),
                             icon: _requesting
                                 ? const SizedBox(
                                     width: 18,
@@ -162,8 +165,8 @@ class _PermissionScreenState extends ConsumerState<PermissionScreen> {
                               _requesting
                                   ? 'Requesting…'
                                   : (_permanentlyDenied
-                                      ? 'Open Settings'
-                                      : 'Allow Access'),
+                                        ? 'Open Settings'
+                                        : 'Allow Access'),
                             ),
                           ),
                         ),

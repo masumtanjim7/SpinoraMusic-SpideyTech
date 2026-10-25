@@ -42,5 +42,6 @@ Future<void> openPermissionSettings() => openAppSettings();
 ///
 /// After calling [requestAudioPermission] invalidate this with
 /// `ref.invalidate(audioPermissionStatusProvider)` to re-read the status.
-final audioPermissionStatusProvider =
-    FutureProvider<PermissionStatus>((ref) => checkAudioPermission());
+final audioPermissionStatusProvider = FutureProvider<PermissionStatus>(
+  (ref) => checkAudioPermission(),
+);

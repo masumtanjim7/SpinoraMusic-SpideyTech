@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -139,8 +140,9 @@ class SongArtwork extends StatefulWidget {
   // ── Global In-Memory Artwork Cache ──────────────────────────────────────────
   static final Map<String, Uint8List?> _artworkBytesCache = {};
   static final Map<String, Future<Uint8List?>> _activeRequests = {};
-  static const MethodChannel _channel =
-      MethodChannel('com.spideytech.spinora/media_store');
+  static const MethodChannel _channel = MethodChannel(
+    'com.spideytech.spinora/media_store',
+  );
 
   @override
   State<SongArtwork> createState() => _SongArtworkState();
@@ -319,18 +321,11 @@ class _SongArtworkState extends State<SongArtwork> {
 
     final clipped = ClipRRect(
       borderRadius: radius,
-      child: SizedBox(
-        width: w,
-        height: h,
-        child: content,
-      ),
+      child: SizedBox(width: w, height: h, child: content),
     );
 
     if (widget.heroTag != null && widget.heroTag!.isNotEmpty) {
-      return Hero(
-        tag: widget.heroTag!,
-        child: clipped,
-      );
+      return Hero(tag: widget.heroTag!, child: clipped);
     }
 
     return clipped;

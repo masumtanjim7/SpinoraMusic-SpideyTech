@@ -14,10 +14,7 @@ import 'song_artwork.dart';
 // ---------------------------------------------------------------------------
 
 /// Opens the dark glassmorphic song metadata editor dialog.
-void showEditSongDialog({
-  required BuildContext context,
-  required Song song,
-}) {
+void showEditSongDialog({required BuildContext context, required Song song}) {
   showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.75),
@@ -94,9 +91,7 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: AppColors.cyanAccent.withValues(alpha: 0.4),
-          ),
+          side: BorderSide(color: AppColors.cyanAccent.withValues(alpha: 0.4)),
         ),
         content: const Text(
           'Tags cleaned from filename clutter',
@@ -139,7 +134,9 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
       );
 
       // 2. Refresh active queue and current track in PlayerController
-      ref.read(playerControllerProvider.notifier).updateTrackMetadata(
+      ref
+          .read(playerControllerProvider.notifier)
+          .updateTrackMetadata(
             songId: widget.song.id,
             title: title,
             artist: finalArtist,
@@ -236,8 +233,9 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
                             shape: BoxShape.circle,
                             color: AppColors.cyanAccent.withValues(alpha: 0.15),
                             border: Border.all(
-                              color:
-                                  AppColors.cyanAccent.withValues(alpha: 0.4),
+                              color: AppColors.cyanAccent.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                           ),
                           child: const Icon(
@@ -264,8 +262,10 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon:
-                        const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                    ),
                     tooltip: 'Close',
                   ),
                 ],
@@ -387,8 +387,9 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed:
-                        _isSaving ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isSaving
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: Text(
                       'Cancel',
                       style: TextStyle(
@@ -409,8 +410,11 @@ class _EditSongDialogState extends ConsumerState<EditSongDialog> {
                               color: Colors.black,
                             ),
                           )
-                        : const Icon(Icons.check_rounded,
-                            size: 18, color: Colors.black),
+                        : const Icon(
+                            Icons.check_rounded,
+                            size: 18,
+                            color: Colors.black,
+                          ),
                     label: Text(
                       _isSaving ? 'Saving...' : 'Save Changes',
                       style: const TextStyle(

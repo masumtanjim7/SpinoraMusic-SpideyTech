@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
@@ -236,11 +237,7 @@ class _WaveformRingPainter extends CustomPainter {
       barPaint.color = barColor.withValues(alpha: barAlpha.clamp(0.0, 1.0));
       barPaint.strokeWidth = (2.2 * (0.8 + 0.4 * combined)).clamp(1.5, 3.0);
 
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        barPaint,
-      );
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), barPaint);
     }
   }
 
@@ -343,7 +340,10 @@ class _MiniAudioVisualizerState extends State<MiniAudioVisualizer>
   Widget build(BuildContext context) {
     final barSpacing = 2.0;
     final totalSpacing = (widget.barCount - 1) * barSpacing;
-    final barWidth = ((widget.width - totalSpacing) / widget.barCount).clamp(1.5, 4.0);
+    final barWidth = ((widget.width - totalSpacing) / widget.barCount).clamp(
+      1.5,
+      4.0,
+    );
 
     return SizedBox(
       width: widget.width,
@@ -361,7 +361,10 @@ class _MiniAudioVisualizerState extends State<MiniAudioVisualizer>
               final wave = (math.sin(t) + 1.0) / 2.0;
 
               final barHeight = widget.isPlaying
-                  ? (widget.height * (0.25 + 0.75 * wave)).clamp(3.0, widget.height)
+                  ? (widget.height * (0.25 + 0.75 * wave)).clamp(
+                      3.0,
+                      widget.height,
+                    )
                   : 3.0;
 
               return Container(

@@ -249,8 +249,9 @@ UserListeningStats calculateListeningStats(List<Song> allSongs) {
     });
 
   // Streak: at least 1 day base streak, scaled moderately by plays
-  final streakDays =
-      totalPlayCount > 0 ? (1 + (totalPlayCount ~/ 5)).clamp(1, 45) : 1;
+  final streakDays = totalPlayCount > 0
+      ? (1 + (totalPlayCount ~/ 5)).clamp(1, 45)
+      : 1;
 
   return UserListeningStats(
     totalDurationSeconds: totalDurationSeconds,
@@ -281,7 +282,9 @@ final statsProvider = Provider<AsyncValue<UserListeningStats>>((ref) {
         final stats = calculateListeningStats(songs);
         return AsyncValue.data(stats);
       } catch (e, st) {
-        debugPrint('[StatsProvider] Error calculating listening stats: $e\n$st');
+        debugPrint(
+          '[StatsProvider] Error calculating listening stats: $e\n$st',
+        );
         return const AsyncValue.data(UserListeningStats());
       }
     },

@@ -47,10 +47,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
 
-    _pulseAnim = Tween<double>(begin: 0.92, end: 1.0)
-        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
-    _floatAnim = Tween<double>(begin: -8, end: 8)
-        .animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
+    _pulseAnim = Tween<double>(
+      begin: 0.92,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _floatAnim = Tween<double>(
+      begin: -8,
+      end: 8,
+    ).animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -88,7 +92,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     final name = _nameCtrl.text.trim();
     final vibe = _vibeCtrl.text.trim();
 
-    await ref.read(userProfileProvider.notifier).updateProfile(
+    await ref
+        .read(userProfileProvider.notifier)
+        .updateProfile(
           displayName: name.isEmpty ? null : name,
           vibeSubtitle: vibe.isEmpty ? null : vibe,
           avatarPath: _avatarPath,
@@ -209,10 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                         shape: BoxShape.circle,
                         gradient: _avatarPath == null
                             ? const LinearGradient(
-                                colors: [
-                                  Color(0xFF8B5CF6),
-                                  Color(0xFFFF758F),
-                                ],
+                                colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               )
@@ -225,7 +228,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                             : null,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                            color: const Color(0xFF8B5CF6)
+                                .withValues(alpha: 0.45),
                             blurRadius: 24,
                             spreadRadius: 2,
                           ),
@@ -263,10 +267,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   const SizedBox(height: 32),
 
                   // — Glass input card —
-                  _GlassInputCard(
-                    nameCtrl: _nameCtrl,
-                    vibeCtrl: _vibeCtrl,
-                  ),
+                  _GlassInputCard(nameCtrl: _nameCtrl, vibeCtrl: _vibeCtrl),
 
                   const SizedBox(height: 32),
 
@@ -287,7 +288,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                            color: const Color(0xFF8B5CF6)
+                                .withValues(alpha: 0.45),
                             blurRadius: 24,
                             offset: const Offset(0, 8),
                           ),
@@ -366,10 +368,7 @@ class _GlowBlob extends StatelessWidget {
 }
 
 class _GlassInputCard extends StatelessWidget {
-  const _GlassInputCard({
-    required this.nameCtrl,
-    required this.vibeCtrl,
-  });
+  const _GlassInputCard({required this.nameCtrl, required this.vibeCtrl});
   final TextEditingController nameCtrl;
   final TextEditingController vibeCtrl;
 
@@ -380,9 +379,7 @@ class _GlassInputCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         color: Colors.white.withValues(alpha: 0.06),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
@@ -433,10 +430,10 @@ class _GlassTextField extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.6),
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w600,
-              ),
+            color: Colors.white.withValues(alpha: 0.6),
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -454,10 +451,15 @@ class _GlassTextField extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.3),
               fontSize: 14,
             ),
-            prefixIcon: Icon(icon,
-                size: 18, color: Colors.white.withValues(alpha: 0.5)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            prefixIcon: Icon(
+              icon,
+              size: 18,
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
@@ -504,9 +506,9 @@ class _GlassPermissionNote extends StatelessWidget {
             child: Text(
               'Spinora needs audio library access to scan your local music collection.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    height: 1.45,
-                  ),
+                color: Colors.white.withValues(alpha: 0.65),
+                height: 1.45,
+              ),
             ),
           ),
         ],
@@ -542,8 +544,7 @@ class _SpiderwebFrequencyPainter extends CustomPainter {
     for (int ring = 1; ring <= 5; ring++) {
       final r = maxR * (ring / 5.5);
       final ringPaint = Paint()
-        ..color = const Color(0xFF8B5CF6)
-            .withValues(alpha: 0.15 + 0.04 * ring)
+        ..color = const Color(0xFF8B5CF6).withValues(alpha: 0.15 + 0.04 * ring)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.7;
       canvas.drawCircle(center, r, ringPaint);

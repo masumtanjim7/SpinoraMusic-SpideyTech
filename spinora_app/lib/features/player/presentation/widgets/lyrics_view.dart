@@ -104,7 +104,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     if (songId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Lyrics auto-fetch is only supported for local library tracks.'),
+          content: Text(
+            'Lyrics auto-fetch is only supported for local library tracks.',
+          ),
           backgroundColor: AppColors.surface,
         ),
       );
@@ -170,7 +172,8 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     final songId = widget.track.id.startsWith('local_')
         ? int.tryParse(widget.track.id.replaceFirst('local_', ''))
         : null;
-    final isFetchingThis = lyricsFetchState.isFetching &&
+    final isFetchingThis =
+        lyricsFetchState.isFetching &&
         (lyricsFetchState.activeSongId == null ||
             lyricsFetchState.activeSongId == songId);
     final isLight = context.isLight;
@@ -250,10 +253,14 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.cyanAccent.withValues(alpha: 0.18),
+                              color: AppColors.cyanAccent.withValues(
+                                alpha: 0.18,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                                color: AppColors.cyanAccent.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
                             ),
                             child: const Row(
@@ -299,12 +306,16 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSynced
-                                      ? AppColors.cyanAccent.withValues(alpha: 0.18)
+                                      ? AppColors.cyanAccent.withValues(
+                                          alpha: 0.18,
+                                        )
                                       : Colors.white.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: isSynced
-                                        ? AppColors.cyanAccent.withValues(alpha: 0.5)
+                                        ? AppColors.cyanAccent.withValues(
+                                            alpha: 0.5,
+                                          )
                                         : Colors.white.withValues(alpha: 0.15),
                                   ),
                                 ),
@@ -334,7 +345,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
 
                 // Auto-Fetch / Refresh Button
                 IconButton(
-                  onPressed: isFetchingThis ? null : () => _triggerRefresh(context),
+                  onPressed: isFetchingThis
+                      ? null
+                      : () => _triggerRefresh(context),
                   icon: Icon(
                     Icons.refresh_rounded,
                     color: isFetchingThis
@@ -343,7 +356,10 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   ),
                   tooltip: 'Auto-Fetch / Refresh',
                   iconSize: 18,
-                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -357,7 +373,10 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   ),
                   tooltip: 'Search Online (LRCLIB)',
                   iconSize: 18,
-                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -371,7 +390,10 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                   ),
                   tooltip: 'Edit / Paste Lyrics',
                   iconSize: 18,
-                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -379,13 +401,13 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                 // Return to Artwork Card Button
                 IconButton(
                   onPressed: widget.onClose,
-                  icon: Icon(
-                    Icons.photo_rounded,
-                    color: context.secondaryText,
-                  ),
+                  icon: Icon(Icons.photo_rounded, color: context.secondaryText),
                   tooltip: 'Show Artwork',
                   iconSize: 18,
-                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -418,7 +440,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                         }
 
                         final activeIndex = lyrics.isSynced
-                            ? lyrics.activeIndexForPosition(playerState.position)
+                            ? lyrics.activeIndexForPosition(
+                                playerState.position,
+                              )
                             : -1;
 
                         // Trigger auto-scroll smoothly to dead-center on active line advance
@@ -447,8 +471,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children:
-                                  List.generate(lyrics.lines.length, (index) {
+                              children: List.generate(lyrics.lines.length, (
+                                index,
+                              ) {
                                 final line = lyrics.lines[index];
                                 final isActive = index == activeIndex;
                                 final lineKey = _lineKeys.putIfAbsent(
@@ -464,15 +489,16 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                           _userIsScrolling = false;
                                           ref
                                               .read(
-                                                  playerControllerProvider.notifier)
+                                                playerControllerProvider
+                                                    .notifier,
+                                              )
                                               .seek(line.timestamp);
                                           _scrollToActiveLine(index);
                                         }
                                       : null,
                                   borderRadius: BorderRadius.circular(16),
                                   child: AnimatedContainer(
-                                    duration:
-                                        const Duration(milliseconds: 300),
+                                    duration: const Duration(milliseconds: 300),
                                     curve: Curves.easeOutCubic,
                                     margin: const EdgeInsets.symmetric(
                                       vertical: 5,
@@ -484,14 +510,16 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: isActive
-                                          ? AppColors.cyanAccent
-                                              .withValues(alpha: 0.14)
+                                          ? AppColors.cyanAccent.withValues(
+                                              alpha: 0.14,
+                                            )
                                           : Colors.transparent,
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: isActive
-                                            ? AppColors.cyanAccent
-                                                .withValues(alpha: 0.35)
+                                            ? AppColors.cyanAccent.withValues(
+                                                alpha: 0.35,
+                                              )
                                             : Colors.transparent,
                                         width: 1.0,
                                       ),
@@ -507,22 +535,27 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                           : null,
                                     ),
                                     child: AnimatedDefaultTextStyle(
-                                      duration:
-                                          const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       curve: Curves.easeOutCubic,
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: isActive
                                             ? (isLight
-                                                ? const Color(0xFF0D9488)
-                                                : AppColors.cyanAccent)
+                                                  ? const Color(0xFF0D9488)
+                                                  : AppColors.cyanAccent)
                                             : (lyrics.isSynced
-                                                ? (isLight
-                                                    ? Colors.black
-                                                        .withValues(alpha: 0.35)
-                                                    : Colors.white
-                                                        .withValues(alpha: 0.35))
-                                                : context.primaryText),
+                                                  ? (isLight
+                                                        ? Colors.black
+                                                              .withValues(
+                                                                alpha: 0.35,
+                                                              )
+                                                        : Colors.white
+                                                              .withValues(
+                                                                alpha: 0.35,
+                                                              ))
+                                                  : context.primaryText),
                                         fontSize: isActive ? 18.5 : 14.5,
                                         fontWeight: isActive
                                             ? FontWeight.w800
@@ -552,9 +585,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: AppColors.cyanAccent
                                                     .withValues(alpha: 0.2),
@@ -584,31 +617,31 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
                           ),
                         );
                       },
-                loading: () => const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: AppColors.cyanAccent,
-                      value: 0.75,
-                    ),
-                  ),
-                ),
-                error: (error, _) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Failed to load lyrics: $error',
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
+                      loading: () => const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppColors.cyanAccent,
+                            value: 0.75,
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
+                      error: (error, _) => Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Failed to load lyrics: $error',
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -720,7 +753,9 @@ class _LiveLyricsCardState extends ConsumerState<LiveLyricsCard> {
     if (songId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Lyrics editing is only supported for local library tracks.'),
+          content: Text(
+            'Lyrics editing is only supported for local library tracks.',
+          ),
           backgroundColor: AppColors.surface,
         ),
       );
@@ -895,11 +930,14 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          AppColors.purpleAccent.withValues(alpha: 0.35),
+                      backgroundColor: AppColors.purpleAccent.withValues(
+                        alpha: 0.35,
+                      ),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
@@ -926,11 +964,14 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        AppColors.cyanAccent.withValues(alpha: 0.3),
+                    backgroundColor: AppColors.cyanAccent.withValues(
+                      alpha: 0.3,
+                    ),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     visualDensity: VisualDensity.compact,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
@@ -959,7 +1000,9 @@ class _NoLyricsPlaceholder extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: context.secondaryText,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     visualDensity: VisualDensity.compact,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     side: BorderSide(
@@ -1043,10 +1086,7 @@ class _EditLyricsDialogState extends ConsumerState<EditLyricsDialog> {
     final text = _controller.text.trim();
     final db = ref.read(appDatabaseProvider);
 
-    await db.updateSongLyrics(
-      widget.songId,
-      text.isEmpty ? null : text,
-    );
+    await db.updateSongLyrics(widget.songId, text.isEmpty ? null : text);
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -1070,9 +1110,7 @@ class _EditLyricsDialogState extends ConsumerState<EditLyricsDialog> {
       backgroundColor: AppColors.surface.withValues(alpha: 0.96),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.15),
-        ),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
       ),
       title: Row(
         children: [
@@ -1167,7 +1205,8 @@ class _EditLyricsDialogState extends ConsumerState<EditLyricsDialog> {
         ),
       ),
       actions: [
-        if (widget.initialLyrics != null && widget.initialLyrics!.isNotEmpty) ...[
+        if (widget.initialLyrics != null &&
+            widget.initialLyrics!.isNotEmpty) ...[
           TextButton(
             onPressed: _isSaving
                 ? null
@@ -1188,9 +1227,7 @@ class _EditLyricsDialogState extends ConsumerState<EditLyricsDialog> {
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
           child: Text(
             'Cancel',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
           ),
         ),
         ElevatedButton(
@@ -1233,19 +1270,14 @@ Future<String?> showSearchLyricsDialog({
   return showDialog<String>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.75),
-    builder: (dialogContext) => SearchLyricsDialog(
-      initialQuery: initialQuery,
-    ),
+    builder: (dialogContext) => SearchLyricsDialog(initialQuery: initialQuery),
   );
 }
 
 /// Fully lifecycle-safe [StatefulWidget] dialog for entering a custom search query.
 /// Disposes [TextEditingController] strictly in [dispose()] to prevent route animation crashes.
 class SearchLyricsDialog extends StatefulWidget {
-  const SearchLyricsDialog({
-    super.key,
-    required this.initialQuery,
-  });
+  const SearchLyricsDialog({super.key, required this.initialQuery});
 
   final String initialQuery;
 
@@ -1276,9 +1308,7 @@ class _SearchLyricsDialogState extends State<SearchLyricsDialog> {
       backgroundColor: AppColors.surface.withValues(alpha: 0.96),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.15),
-        ),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
       ),
       title: Row(
         children: [
@@ -1335,10 +1365,7 @@ class _SearchLyricsDialogState extends State<SearchLyricsDialog> {
             TextField(
               controller: _controller,
               autofocus: true,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'e.g. Ed Sheeran - Shape of You',
                 hintStyle: TextStyle(
@@ -1375,9 +1402,7 @@ class _SearchLyricsDialogState extends State<SearchLyricsDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(
             'Cancel',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
           ),
         ),
         ElevatedButton.icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/widgets/lucid_pressable_card.dart';
 import '../../../shared/glass_card.dart';
 import '../../library/presentation/widgets/song_artwork.dart';
 import '../application/player_controller.dart';
@@ -11,10 +12,7 @@ import 'now_playing_screen.dart';
 ///
 /// Automatically hides when no track is loaded in [PlayerController].
 class MiniPlayer extends ConsumerWidget {
-  const MiniPlayer({
-    super.key,
-    this.bottomPadding = 16.0,
-  });
+  const MiniPlayer({super.key, this.bottomPadding = 16.0});
 
   final double bottomPadding;
 
@@ -43,9 +41,9 @@ class MiniPlayer extends ConsumerWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      child: GestureDetector(
+      child: LucidPressableCard(
+        borderRadius: 24,
         onTap: () => _openNowPlaying(context),
-        behavior: HitTestBehavior.opaque,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
@@ -73,8 +71,9 @@ class MiniPlayer extends ConsumerWidget {
               children: [
                 // Subtle progress indicator line along the top curved edge
                 ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
                   child: SizedBox(
                     height: 3,
                     child: LinearProgressIndicator(
@@ -91,8 +90,10 @@ class MiniPlayer extends ConsumerWidget {
 
                 // Track details and quick player controls
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       // Square rounded album artwork thumbnail
@@ -170,10 +171,11 @@ class MiniPlayer extends ConsumerWidget {
                                 ),
                           boxShadow: [
                             BoxShadow(
-                              color: (isDark
-                                      ? AppColors.purpleAccent
-                                      : const Color(0xFF7C3AED))
-                                  .withValues(alpha: 0.4),
+                              color:
+                                  (isDark
+                                          ? AppColors.purpleAccent
+                                          : const Color(0xFF7C3AED))
+                                      .withValues(alpha: 0.4),
                               blurRadius: 10,
                               spreadRadius: 1,
                             ),
@@ -207,17 +209,20 @@ class MiniPlayer extends ConsumerWidget {
                       // Next Button
                       IconButton(
                         onPressed: playerState.hasNext
-                            ? () =>
-                                ref.read(playerControllerProvider.notifier).next()
+                            ? () => ref
+                                  .read(playerControllerProvider.notifier)
+                                  .next()
                             : null,
                         icon: const Icon(Icons.skip_next_rounded),
                         color: playerState.hasNext
                             ? (isDark
-                                ? Colors.white.withValues(alpha: 0.85)
-                                : const Color(0xFF0F111A).withValues(alpha: 0.85))
+                                  ? Colors.white.withValues(alpha: 0.85)
+                                  : const Color(0xFF0F111A)
+                                        .withValues(alpha: 0.85))
                             : (isDark
-                                ? Colors.white.withValues(alpha: 0.25)
-                                : const Color(0xFF5C6275).withValues(alpha: 0.25)),
+                                  ? Colors.white.withValues(alpha: 0.25)
+                                  : const Color(0xFF5C6275)
+                                        .withValues(alpha: 0.25)),
                         iconSize: 22,
                         visualDensity: VisualDensity.compact,
                         tooltip: 'Next',

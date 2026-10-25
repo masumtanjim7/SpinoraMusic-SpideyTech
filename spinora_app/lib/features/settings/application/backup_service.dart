@@ -113,10 +113,7 @@ String _twoDigits(int n) => n.toString().padLeft(2, '0');
 // ─────────────────────────────────────────────────────────────────────────────
 
 class BackupService {
-  BackupService({
-    required this.db,
-    this.ref,
-  });
+  BackupService({required this.db, this.ref});
 
   final AppDatabase db;
   final Ref? ref;
@@ -141,8 +138,7 @@ class BackupService {
     // 1. User Profile Data
     final profileData = {
       'displayName': prefs.getString(_kDisplayName) ?? 'Music Lover',
-      'vibeSubtitle':
-          prefs.getString(_kVibeSubtitle) ?? 'Finding my frequency',
+      'vibeSubtitle': prefs.getString(_kVibeSubtitle) ?? 'Finding my frequency',
       'avatarPath': prefs.getString(_kAvatarPath),
       'hasCompletedOnboarding': prefs.getBool(_kOnboardingDone) ?? false,
     };
@@ -197,13 +193,15 @@ class BackupService {
         'name': playlist.name,
         'createdAt': playlist.createdAt.toIso8601String(),
         'songs': songs
-            .map((s) => {
-                  'title': s.title,
-                  'artist': s.artist,
-                  'album': s.album,
-                  'duration': s.duration,
-                  'filePath': s.filePath,
-                })
+            .map(
+              (s) => {
+                'title': s.title,
+                'artist': s.artist,
+                'album': s.album,
+                'duration': s.duration,
+                'filePath': s.filePath,
+              },
+            )
             .toList(),
       });
     }
@@ -287,7 +285,8 @@ class BackupService {
     final version = data['version'];
     if (version == null || version is! num) {
       throw const FormatException(
-          'Incompatible backup file: missing version tag');
+        'Incompatible backup file: missing version tag',
+      );
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -322,7 +321,9 @@ class BackupService {
 
       if (ref != null) {
         try {
-          await ref!.read(userProfileProvider.notifier).updateProfile(
+          await ref!
+              .read(userProfileProvider.notifier)
+              .updateProfile(
                 displayName: displayName,
                 vibeSubtitle: vibeSubtitle,
                 avatarPath: avatarPath,
@@ -343,7 +344,9 @@ class BackupService {
         await prefs.setString(_kThemePrefKey, themeModeStr);
         if (ref != null) {
           try {
-            await ref!.read(themeModeProvider.notifier).setTheme(
+            await ref!
+                .read(themeModeProvider.notifier)
+                .setTheme(
                   themeModeStr == 'light' ? ThemeMode.light : ThemeMode.dark,
                 );
           } catch (_) {}
@@ -363,7 +366,9 @@ class BackupService {
 
       if (crossfadeDuration != null) {
         await prefs.setDouble(
-            _kCrossfadeDurationKey, crossfadeDuration.toDouble());
+          _kCrossfadeDurationKey,
+          crossfadeDuration.toDouble(),
+        );
         if (ref != null) {
           try {
             await ref!
@@ -379,7 +384,7 @@ class BackupService {
     final allSongs = await db.getAllSongs();
     final byPath = <String, Song>{for (final s in allSongs) s.filePath: s};
     final byTitleArtist = <String, Song>{
-      for (final s in allSongs) _normalizeKey(s.title, s.artist): s
+      for (final s in allSongs) _normalizeKey(s.title, s.artist): s,
     };
 
     Song? findMatchingSong(Map<String, dynamic> map) {
@@ -422,7 +427,7 @@ class BackupService {
           .toList();
       final existingPlaylists = await db.getAllPlaylists();
       final existingByName = <String, Playlist>{
-        for (final p in existingPlaylists) p.name.trim().toLowerCase(): p
+        for (final p in existingPlaylists) p.name.trim().toLowerCase(): p,
       };
 
       for (final p in playlists) {
@@ -446,7 +451,8 @@ class BackupService {
 
         final songsInPlaylist = p['songs'] as List?;
         if (songsInPlaylist != null) {
-          for (final songItem in songsInPlaylist.whereType<Map<String, dynamic>>()) {
+          for (final songItem
+              in songsInPlaylist.whereType<Map<String, dynamic>>()) {
             final matched = findMatchingSong(songItem);
             if (matched != null) {
               await db.addSongToPlaylist(

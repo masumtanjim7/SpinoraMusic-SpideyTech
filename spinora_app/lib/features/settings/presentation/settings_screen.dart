@@ -13,6 +13,7 @@ import '../../../features/profile/presentation/edit_profile_sheet.dart';
 import '../application/audio_settings_provider.dart';
 import '../application/backup_service.dart';
 import '../application/theme_provider.dart';
+import '../../../core/widgets/lucid_cascade_item.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings Screen — Lucid Glass Dashboard
@@ -35,6 +36,7 @@ class SettingsScreen extends ConsumerWidget {
     final playerState = ref.watch(playerControllerProvider);
     final trackCount = songsAsync.value?.length ?? 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tick = ref.watch(tabEntryTicksProvider.select((t) => t[4]));
 
     return Scaffold(
       backgroundColor: showMiniPlayer
@@ -48,7 +50,11 @@ class SettingsScreen extends ConsumerWidget {
             bottom: false,
             child: Column(
               children: [
-                _buildHeader(context, profile, isDark),
+                LucidCascadeItem(
+                  index: 0,
+                  triggerKey: tick,
+                  child: _buildHeader(context, profile, isDark),
+                ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(
@@ -62,111 +68,167 @@ class SettingsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Appearance
-                        const _SectionLabel(label: 'APPEARANCE'),
-                        const SizedBox(height: 12),
-                        const _AppearanceTile(),
+                        LucidCascadeItem(
+                          index: 1,
+                          triggerKey: tick,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SectionLabel(label: 'APPEARANCE'),
+                              const SizedBox(height: 12),
+                              const _AppearanceTile(),
+                            ],
+                          ),
+                        ),
 
                         const SizedBox(height: 28),
 
                         // ── Audio Playback & Crossfade
-                        const _SectionLabel(
-                            label: 'AUDIO PLAYBACK & CROSSFADE'),
-                        const SizedBox(height: 12),
-                        const _CrossfadeCard(),
-                        const SizedBox(height: 10),
-                        _SettingsTile(
-                          icon: Icons.graphic_eq_rounded,
-                          iconColor: const Color(0xFF8B5CF6),
-                          title: 'Equalizer & Bass Boost',
-                          subtitle: playerState.equalizerEnabled
-                              ? 'EQ active • ${playerState.equalizerPreset.name}'
-                              : 'Tap to open hardware equalizer',
-                          trailingWidget: playerState.equalizerEnabled
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    color: const Color(0xFF8B5CF6)
-                                        .withValues(alpha: 0.2),
-                                    border: Border.all(
-                                        color: const Color(0xFF8B5CF6)
-                                            .withValues(alpha: 0.5)),
-                                  ),
-                                  child: const Text('ON',
-                                      style: TextStyle(
-                                          color: Color(0xFF8B5CF6),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 1.2)),
-                                )
-                              : null,
-                          onTap: () => _openEqualizer(context, ref),
+                        LucidCascadeItem(
+                          index: 2,
+                          triggerKey: tick,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SectionLabel(
+                                label: 'AUDIO PLAYBACK & CROSSFADE',
+                              ),
+                              const SizedBox(height: 12),
+                              const _CrossfadeCard(),
+                              const SizedBox(height: 10),
+                              _SettingsTile(
+                                icon: Icons.graphic_eq_rounded,
+                                iconColor: const Color(0xFF8B5CF6),
+                                title: 'Equalizer & Bass Boost',
+                                subtitle: playerState.equalizerEnabled
+                                    ? 'EQ active • ${playerState.equalizerPreset.name}'
+                                    : 'Tap to open hardware equalizer',
+                                trailingWidget: playerState.equalizerEnabled
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          color: const Color(0xFF8B5CF6)
+                                              .withValues(alpha: 0.2),
+                                          border: Border.all(
+                                            color: const Color(0xFF8B5CF6)
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'ON',
+                                          style: TextStyle(
+                                            color: Color(0xFF8B5CF6),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
+                                onTap: () => _openEqualizer(context, ref),
+                              ),
+                              const SizedBox(height: 10),
+                              _SleepTimerTile(
+                                playerState: playerState,
+                                ref: ref,
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 10),
-                        _SleepTimerTile(playerState: playerState, ref: ref),
 
                         const SizedBox(height: 28),
 
                         // ── Library
-                        const _SectionLabel(label: 'LIBRARY'),
-                        const SizedBox(height: 12),
-                        _SettingsTile(
-                          icon: Icons.library_music_rounded,
-                          iconColor: const Color(0xFF10B981),
-                          title: 'Rescan Local Audio Library',
-                          subtitle: scanState.isScanning
-                              ? 'Scanning… ${scanState.scannedCount} tracks found'
-                              : '$trackCount tracks indexed',
-                          trailingWidget: scanState.isScanning
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                )
-                              : Icon(Icons.refresh_rounded,
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.35)
-                                      : const Color(0xFF5C6275),
-                                  size: 20),
-                          onTap: scanState.isScanning
-                              ? null
-                              : () => ref
-                                  .read(audioScannerStateProvider.notifier)
-                                  .scan(),
+                        LucidCascadeItem(
+                          index: 3,
+                          triggerKey: tick,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SectionLabel(label: 'LIBRARY'),
+                              const SizedBox(height: 12),
+                              _SettingsTile(
+                                icon: Icons.library_music_rounded,
+                                iconColor: const Color(0xFF10B981),
+                                title: 'Rescan Local Audio Library',
+                                subtitle: scanState.isScanning
+                                    ? 'Scanning… ${scanState.scannedCount} tracks found'
+                                    : '$trackCount tracks indexed',
+                                trailingWidget: scanState.isScanning
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF10B981),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.refresh_rounded,
+                                        color: isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.35,
+                                              )
+                                            : const Color(0xFF5C6275),
+                                        size: 20,
+                                      ),
+                                onTap: scanState.isScanning
+                                    ? null
+                                    : () => ref
+                                          .read(
+                                            audioScannerStateProvider.notifier,
+                                          )
+                                          .scan(),
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              // ── Profile
+                              const _SectionLabel(label: 'PROFILE'),
+                              const SizedBox(height: 12),
+                              _ProfileQuickTile(profile: profile),
+                            ],
+                          ),
                         ),
 
                         const SizedBox(height: 28),
 
-                        // ── Profile
-                        const _SectionLabel(label: 'PROFILE'),
-                        const SizedBox(height: 12),
-                        _ProfileQuickTile(profile: profile),
-
-                        const SizedBox(height: 28),
-
                         // ── Lyrics
-                        const _SectionLabel(label: 'LYRICS'),
-                        const SizedBox(height: 12),
-                        const _LyricsTile(),
+                        LucidCascadeItem(
+                          index: 4,
+                          triggerKey: tick,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SectionLabel(label: 'LYRICS'),
+                              const SizedBox(height: 12),
+                              const _LyricsTile(),
 
-                        const SizedBox(height: 28),
+                              const SizedBox(height: 28),
 
-                        // ── Data & Backup
-                        const _SectionLabel(label: 'DATA & BACKUP'),
-                        const SizedBox(height: 12),
-                        const _BackupSection(),
+                              // ── Data & Backup
+                              const _SectionLabel(label: 'DATA & BACKUP'),
+                              const SizedBox(height: 12),
+                              const _BackupSection(),
 
-                        const SizedBox(height: 28),
+                              const SizedBox(height: 28),
 
-                        // ── About
-                        const _SectionLabel(label: 'ABOUT'),
-                        const SizedBox(height: 12),
-                        _VersionBadge(
-                            version: _appVersion, appName: _appName),
+                              // ── About
+                              const _SectionLabel(label: 'ABOUT'),
+                              const SizedBox(height: 12),
+                              _VersionBadge(
+                                version: _appVersion,
+                                appName: _appName,
+                              ),
+                            ],
+                          ),
+                        ),
 
                         const SizedBox(height: 40),
                       ],
@@ -181,95 +243,110 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(
-      BuildContext context, UserProfile? profile, bool isDark) {
+  Widget _buildHeader(BuildContext context, UserProfile? profile, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.85),
-            border: Border.all(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.09)
-                  : Colors.white.withValues(alpha: 0.95),
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.85),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.09)
+                    : Colors.white.withValues(alpha: 0.95),
+              ),
+              boxShadow: isDark ? null : AppTheme.lightCardShadow,
             ),
-            boxShadow: isDark ? null : AppTheme.lightCardShadow,
+            child: const Icon(
+              Icons.settings_rounded,
+              color: Color(0xFF8B5CF6),
+              size: 20,
+            ),
           ),
-          child: const Icon(Icons.settings_rounded,
-              color: Color(0xFF8B5CF6), size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Settings',
-                style: TextStyle(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Settings',
+                  style: TextStyle(
                     color: isDark ? Colors.white : const Color(0xFF0F111A),
                     fontSize: 20,
-                    fontWeight: FontWeight.w800)),
-            Text(profile?.displayName ?? 'Music Lover',
-                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  profile?.displayName ?? 'Music Lover',
+                  style: TextStyle(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.45)
                         : const Color(0xFF5C6275),
-                    fontSize: 12)),
-          ]),
-        ),
-      ]),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildAmbientBlobs(bool isDark) {
-    return Stack(children: [
-      Positioned(
-        top: -60,
-        right: -60,
-        child: Container(
-          width: 280,
-          height: 280,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: isDark
-                  ? [
-                      const Color(0xFF8B5CF6).withValues(alpha: 0.13),
-                      Colors.transparent,
-                    ]
-                  : [
-                      const Color(0xFFDDD6FE).withValues(alpha: 0.35),
-                      Colors.transparent,
-                    ],
+    return Stack(
+      children: [
+        Positioned(
+          top: -60,
+          right: -60,
+          child: Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: isDark
+                    ? [
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.13),
+                        Colors.transparent,
+                      ]
+                    : [
+                        const Color(0xFFDDD6FE).withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ],
+              ),
             ),
           ),
         ),
-      ),
-      Positioned(
-        bottom: 100,
-        left: -40,
-        child: Container(
-          width: 220,
-          height: 220,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: isDark
-                  ? [
-                      const Color(0xFF10B981).withValues(alpha: 0.08),
-                      Colors.transparent,
-                    ]
-                  : [
-                      const Color(0xFFFDE8EF).withValues(alpha: 0.40),
-                      Colors.transparent,
-                    ],
+        Positioned(
+          bottom: 100,
+          left: -40,
+          child: Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: isDark
+                    ? [
+                        const Color(0xFF10B981).withValues(alpha: 0.08),
+                        Colors.transparent,
+                      ]
+                    : [
+                        const Color(0xFFFDE8EF).withValues(alpha: 0.40),
+                        Colors.transparent,
+                      ],
+              ),
             ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 
   void _openEqualizer(BuildContext context, WidgetRef ref) {
@@ -369,8 +446,8 @@ class _AppearanceTile extends ConsumerWidget {
                 },
                 activeThumbColor: const Color(0xFF8B5CF6),
                 inactiveThumbColor: const Color(0xFFE63946),
-                inactiveTrackColor:
-                    const Color(0xFFE63946).withValues(alpha: 0.25),
+                inactiveTrackColor: const Color(0xFFE63946)
+                    .withValues(alpha: 0.25),
               ),
             ],
           ),
@@ -412,8 +489,9 @@ class _AppearanceTile extends ConsumerWidget {
                           'Dark Cosmos',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight:
-                                isDark ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isDark
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: isDark
                                 ? Colors.white
                                 : const Color(0xFF5C6275),
@@ -459,8 +537,9 @@ class _AppearanceTile extends ConsumerWidget {
                           'Lucid Light',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight:
-                                !isDark ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: !isDark
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: !isDark
                                 ? const Color(0xFF0F111A)
                                 : Colors.white60,
@@ -564,10 +643,11 @@ class _CrossfadeCard extends ConsumerWidget {
                       .setCrossfadeEnabled(val);
                 },
                 activeThumbColor: const Color(0xFF00E5FF),
-                activeTrackColor:
-                    const Color(0xFF00E5FF).withValues(alpha: 0.35),
-                inactiveThumbColor:
-                    isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                activeTrackColor: const Color(0xFF00E5FF)
+                    .withValues(alpha: 0.35),
+                inactiveThumbColor: isDark
+                    ? Colors.white38
+                    : const Color(0xFF94A3B8),
                 inactiveTrackColor: isDark
                     ? Colors.white.withValues(alpha: 0.1)
                     : const Color(0xFFE2E8F0),
@@ -633,8 +713,9 @@ class _CrossfadeCard extends ConsumerWidget {
                 thumbColor: const Color(0xFF00E5FF),
                 overlayColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
                 trackHeight: 3.5,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 7.0),
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 7.0,
+                ),
               ),
               child: Slider(
                 value: duration.clamp(1.0, 8.0),
@@ -699,14 +780,17 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Text(label,
-        style: TextStyle(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.35)
-                : const Color(0xFF5C6275).withValues(alpha: 0.8),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.8));
+    return Text(
+      label,
+      style: TextStyle(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.35)
+            : const Color(0xFF5C6275).withValues(alpha: 0.8),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.8,
+      ),
+    );
   }
 }
 
@@ -752,39 +836,50 @@ class _SettingsTile extends StatelessWidget {
           ),
           boxShadow: isDark ? null : AppTheme.lightCardShadow,
         ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              color: iconColor.withValues(alpha: 0.15),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(11),
+                color: iconColor.withValues(alpha: 0.15),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title,
-                  style: TextStyle(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
                       color: isDark ? Colors.white : const Color(0xFF0F111A),
                       fontSize: 14,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text(subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.45)
                           : const Color(0xFF5C6275),
-                      fontSize: 11)),
-            ]),
-          ),
-          if (trailingWidget != null) ...[
-            const SizedBox(width: 10),
-            trailingWidget!,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (trailingWidget != null) ...[
+              const SizedBox(width: 10),
+              trailingWidget!,
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -817,27 +912,34 @@ class _SleepTimerTile extends StatelessWidget {
       title: 'Sleep Timer',
       subtitle: isActive
           ? (playerState.stopAtEndOfTrack
-              ? 'Stops after current track'
-              : 'Remaining: ${_formatDuration(remaining)}')
+                ? 'Stops after current track'
+                : 'Remaining: ${_formatDuration(remaining)}')
           : 'Not active',
       trailingWidget: isActive
           ? GestureDetector(
-              onTap: () =>
-                  ref.read(playerControllerProvider.notifier).cancelSleepTimer(),
+              onTap: () => ref
+                  .read(playerControllerProvider.notifier)
+                  .cancelSleepTimer(),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: const Color(0xFFFF758F).withValues(alpha: 0.15),
                   border: Border.all(
-                      color: const Color(0xFFFF758F).withValues(alpha: 0.4)),
+                    color: const Color(0xFFFF758F).withValues(alpha: 0.4),
+                  ),
                 ),
-                child: const Text('Cancel',
-                    style: TextStyle(
-                        color: Color(0xFFFF758F),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Color(0xFFFF758F),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             )
           : null,
@@ -875,55 +977,75 @@ class _ProfileQuickTile extends StatelessWidget {
           ),
           boxShadow: isDark ? null : AppTheme.lightCardShadow,
         ),
-        child: Row(children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: avatarPath == null
-                  ? const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight)
-                  : null,
-              image: avatarPath != null
-                  ? DecorationImage(
-                      image: FileImage(File(avatarPath)), fit: BoxFit.cover)
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: avatarPath == null
+                    ? const LinearGradient(
+                        colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                image: avatarPath != null
+                    ? DecorationImage(
+                        image: FileImage(File(avatarPath)),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: avatarPath == null
+                  ? const Center(
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    )
                   : null,
             ),
-            child: avatarPath == null
-                ? const Center(
-                    child: Icon(Icons.person_rounded,
-                        color: Colors.white, size: 20))
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(profile?.displayName ?? 'Music Lover',
-                  style: TextStyle(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile?.displayName ?? 'Music Lover',
+                    style: TextStyle(
                       color: isDark ? Colors.white : const Color(0xFF0F111A),
                       fontSize: 14,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text(profile?.vibeSubtitle ?? 'Finding my frequency',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile?.vibeSubtitle ?? 'Finding my frequency',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.45)
                           : const Color(0xFF5C6275),
-                      fontSize: 11)),
-            ]),
-          ),
-          const SizedBox(width: 10),
-          Icon(Icons.edit_rounded,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              Icons.edit_rounded,
               color: isDark
                   ? Colors.white.withValues(alpha: 0.3)
                   : const Color(0xFF5C6275),
-              size: 18),
-        ]),
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -940,8 +1062,9 @@ class AutoFetchLyricsNotifier extends Notifier<bool> {
   void toggle(bool value) => state = value;
 }
 
-final autoFetchLyricsProvider =
-    NotifierProvider<AutoFetchLyricsNotifier, bool>(AutoFetchLyricsNotifier.new);
+final autoFetchLyricsProvider = NotifierProvider<AutoFetchLyricsNotifier, bool>(
+  AutoFetchLyricsNotifier.new,
+);
 
 class _LyricsTile extends ConsumerWidget {
   const _LyricsTile();
@@ -951,76 +1074,93 @@ class _LyricsTile extends ConsumerWidget {
     final autoFetch = ref.watch(autoFetchLyricsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(children: [
-      // Auto-fetch toggle
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.04)
-              : Colors.white.withValues(alpha: 0.85),
-          border: Border.all(
+    return Column(
+      children: [
+        // Auto-fetch toggle
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
             color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.95),
-            width: isDark ? 1.0 : 1.2,
-          ),
-          boxShadow: isDark ? null : AppTheme.lightCardShadow,
-        ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.85),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.white.withValues(alpha: 0.95),
+              width: isDark ? 1.0 : 1.2,
             ),
-            child: const Icon(Icons.lyrics_rounded,
-                color: Color(0xFF3B82F6), size: 18),
+            boxShadow: isDark ? null : AppTheme.lightCardShadow,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Auto-Fetch Synced Lyrics',
-                  style: TextStyle(
-                      color: isDark ? Colors.white : const Color(0xFF0F111A),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text('Fetch LRC lyrics automatically on playback',
-                  style: TextStyle(
-                      color: isDark
-                          ? const Color(0x66FFFFFF)
-                          : const Color(0xFF5C6275),
-                      fontSize: 11)),
-            ]),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(11),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                ),
+                child: const Icon(
+                  Icons.lyrics_rounded,
+                  color: Color(0xFF3B82F6),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Auto-Fetch Synced Lyrics',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F111A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Fetch LRC lyrics automatically on playback',
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0x66FFFFFF)
+                            : const Color(0xFF5C6275),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Switch(
+                value: autoFetch,
+                onChanged: (v) =>
+                    ref.read(autoFetchLyricsProvider.notifier).toggle(v),
+                activeThumbColor: const Color(0xFF3B82F6),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Switch(
-            value: autoFetch,
-            onChanged: (v) => ref
-                .read(autoFetchLyricsProvider.notifier)
-                .toggle(v),
-            activeThumbColor: const Color(0xFF3B82F6),
-          ),
-        ]),
-      ),
-      const SizedBox(height: 10),
+        ),
+        const SizedBox(height: 10),
 
-      // Clear lyrics cache
-      _SettingsTile(
-        icon: Icons.delete_sweep_rounded,
-        iconColor: const Color(0xFFFF758F),
-        title: 'Clear Lyrics Cache',
-        subtitle: 'Remove all cached lyrics from database',
-        trailingWidget: Icon(Icons.chevron_right_rounded,
+        // Clear lyrics cache
+        _SettingsTile(
+          icon: Icons.delete_sweep_rounded,
+          iconColor: const Color(0xFFFF758F),
+          title: 'Clear Lyrics Cache',
+          subtitle: 'Remove all cached lyrics from database',
+          trailingWidget: Icon(
+            Icons.chevron_right_rounded,
             color: isDark
                 ? Colors.white.withValues(alpha: 0.25)
                 : const Color(0xFF5C6275),
-            size: 20),
-        onTap: () => _clearLyricsCache(context, ref),
-      ),
-    ]);
+            size: 20,
+          ),
+          onTap: () => _clearLyricsCache(context, ref),
+        ),
+      ],
+    );
   }
 
   void _clearLyricsCache(BuildContext context, WidgetRef ref) {
@@ -1031,24 +1171,33 @@ class _LyricsTile extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF12101E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Clear Lyrics Cache',
-            style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF0F111A),
-                fontWeight: FontWeight.w700)),
+        title: Text(
+          'Clear Lyrics Cache',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F111A),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         content: Text(
-            'This will remove all stored lyrics. They will be re-fetched when songs play.',
-            style: TextStyle(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.6)
-                    : const Color(0xFF5C6275))),
+          'This will remove all stored lyrics. They will be re-fetched when songs play.',
+          style: TextStyle(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.6)
+                : const Color(0xFF5C6275),
+          ),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel',
-                  style: TextStyle(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.5)
-                          : const Color(0xFF5C6275)))),
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.5)
+                    : const Color(0xFF5C6275),
+              ),
+            ),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -1058,13 +1207,18 @@ class _LyricsTile extends ConsumerWidget {
                   backgroundColor: const Color(0xFF1A1A2E),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               );
             },
-            child: const Text('Clear',
-                style: TextStyle(
-                    color: Color(0xFFFF758F), fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Clear',
+              style: TextStyle(
+                color: Color(0xFFFF758F),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -1101,61 +1255,74 @@ class _VersionBadge extends StatelessWidget {
         ),
         boxShadow: isDark ? null : AppTheme.lightCardShadow,
       ),
-      child: Column(children: [
-        // Animated spinning logo
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 2 * math.pi),
-          duration: const Duration(seconds: 8),
-          builder: (_, angle, child) => Transform.rotate(
-            angle: angle,
-            child: child,
-          ),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      child: Column(
+        children: [
+          // Animated spinning logo
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 2 * math.pi),
+            duration: const Duration(seconds: 8),
+            builder: (_, angle, child) =>
+                Transform.rotate(angle: angle, child: child),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFFFF758F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Icon(
+                Icons.graphic_eq_rounded,
+                color: Colors.white,
+                size: 24,
               ),
             ),
-            child: const Icon(Icons.graphic_eq_rounded,
-                color: Colors.white, size: 24),
           ),
-        ),
-        const SizedBox(height: 12),
-        Text('Spinora Music',
+          const SizedBox(height: 12),
+          Text(
+            'Spinora Music',
             style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF0F111A),
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5)),
-        const SizedBox(height: 4),
-        Text('by SpideyTech • v$version',
-            style: TextStyle(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.4)
-                    : const Color(0xFF5C6275),
-                fontSize: 12)),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-            border: Border.all(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+              color: isDark ? Colors.white : const Color(0xFF0F111A),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
           ),
-          child: const Text('Zero budget • Privacy first • Offline ready',
+          const SizedBox(height: 4),
+          Text(
+            'by SpideyTech • v$version',
+            style: TextStyle(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.4)
+                  : const Color(0xFF5C6275),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+              border: Border.all(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+              ),
+            ),
+            child: const Text(
+              'Zero budget • Privacy first • Offline ready',
               style: TextStyle(
-                  color: Color(0xFF8B5CF6),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5)),
-        ),
-      ]),
+                color: Color(0xFF8B5CF6),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1196,8 +1363,9 @@ class _BackupSectionState extends ConsumerState<_BackupSection> {
             content: Text('Failed to export backup: $e'),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -1494,8 +1662,9 @@ class _BackupSuccessSheet extends StatelessWidget {
                   icon: const Icon(Icons.copy_rounded, size: 16),
                   label: const Text('Copy Path'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor:
-                        isDark ? Colors.white : const Color(0xFF0F111A),
+                    foregroundColor: isDark
+                        ? Colors.white
+                        : const Color(0xFF0F111A),
                     side: BorderSide(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.15)
@@ -1582,8 +1751,9 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
   Future<void> _loadBackups() async {
     setState(() => _isLoading = true);
     try {
-      final list =
-          await ref.read(backupServiceProvider).getAvailableLocalBackups();
+      final list = await ref
+          .read(backupServiceProvider)
+          .getAvailableLocalBackups();
       if (mounted) {
         setState(() {
           _backups = list;
@@ -1686,8 +1856,7 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
         throw const FormatException('Empty backup data provided.');
       }
 
-      final summary =
-          await ref.read(backupServiceProvider).importData(jsonStr);
+      final summary = await ref.read(backupServiceProvider).importData(jsonStr);
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -1699,8 +1868,9 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
           ),
           backgroundColor: const Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     } catch (e) {
@@ -1711,8 +1881,9 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
           content: Text('Failed to restore backup: $e'),
           backgroundColor: const Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -1808,7 +1979,9 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                 onPressed: () {
                   setState(() => _isManualInput = !_isManualInput);
                 },
-                tooltip: _isManualInput ? 'Show local files' : 'Paste JSON/path',
+                tooltip: _isManualInput
+                    ? 'Show local files'
+                    : 'Paste JSON/path',
                 icon: Icon(
                   _isManualInput
                       ? Icons.folder_open_rounded
@@ -1834,8 +2007,10 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                     SizedBox(height: 16),
                     Text(
                       'Restoring playlists & favorites…',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -1860,8 +2035,7 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                 fontFamily: 'monospace',
               ),
               decoration: InputDecoration(
-                hintText:
-                    '{\n  "version": 1,\n  "appName": "Spinora Music",\n  ...\n} or /path/to/backup.spinora',
+                hintText: '{\n  "version": 1,\n  "appName": "Spinora Music",\n  ...\n} or /path/to/backup.spinora',
                 hintStyle: TextStyle(
                   color: isDark ? Colors.white24 : Colors.black26,
                   fontSize: 12,
@@ -1924,7 +2098,9 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                       final f = File(text);
                       if (f.existsSync()) {
                         _confirmAndRestore(
-                            file: f, title: f.uri.pathSegments.last);
+                          file: f,
+                          title: f.uri.pathSegments.last,
+                        );
                         return;
                       }
                     }
@@ -2008,7 +2184,8 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                            color: const Color(0xFF8B5CF6)
+                                .withValues(alpha: 0.15),
                           ),
                           child: const Icon(
                             Icons.description_rounded,
@@ -2055,8 +2232,8 @@ class _RestoreBackupSheetState extends ConsumerState<_RestoreBackupSheet> {
                             title: item.fileName,
                           ),
                           style: FilledButton.styleFrom(
-                            backgroundColor:
-                                const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                            backgroundColor: const Color(0xFF8B5CF6)
+                                .withValues(alpha: 0.2),
                             foregroundColor: const Color(0xFF8B5CF6),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -2157,4 +2334,3 @@ class _BackupStatBadge extends StatelessWidget {
     );
   }
 }
-

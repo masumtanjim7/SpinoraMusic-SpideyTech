@@ -12,10 +12,7 @@ import 'widgets/song_options_sheet.dart';
 
 /// Screen displaying the songs belonging to a specific custom playlist.
 class PlaylistDetailScreen extends ConsumerWidget {
-  const PlaylistDetailScreen({
-    super.key,
-    required this.playlist,
-  });
+  const PlaylistDetailScreen({super.key, required this.playlist});
 
   final Playlist playlist;
 
@@ -119,8 +116,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.purpleAccent
-                                    .withValues(alpha: 0.35),
+                                color: AppColors.purpleAccent.withValues(
+                                  alpha: 0.35,
+                                ),
                                 blurRadius: 16,
                                 spreadRadius: 1,
                               ),
@@ -200,8 +198,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.purpleAccent
-                                    .withValues(alpha: 0.3),
+                                color: AppColors.purpleAccent.withValues(
+                                  alpha: 0.3,
+                                ),
                                 blurRadius: 14,
                                 spreadRadius: 1,
                               ),
@@ -262,7 +261,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             onTap: () async {
                               final songs = songsAsync.asData?.value ?? [];
                               if (songs.isEmpty) return;
-                              final shuffled = List<Song>.from(songs)..shuffle();
+                              final shuffled = List<Song>.from(songs)
+                                ..shuffle();
                               await ref
                                   .read(playerControllerProvider.notifier)
                                   .playPlaylist(shuffled);
@@ -327,7 +327,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                   Text(
                                     'No tracks added to this playlist yet. Return to the Music Library and tap the 3-dot menu on any song to add it here.',
                                     style: tt.bodySmall?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.6),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6,
+                                      ),
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -350,7 +352,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final song = songs[index];
-                          final isCurrent = playerState.currentTrack?.id ==
+                          final isCurrent =
+                              playerState.currentTrack?.id ==
                               'local_${song.id}';
 
                           return Material(
@@ -361,8 +364,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(16),
                               side: BorderSide(
                                 color: isCurrent
-                                    ? AppColors.cyanAccent
-                                        .withValues(alpha: 0.4)
+                                    ? AppColors.cyanAccent.withValues(
+                                        alpha: 0.4,
+                                      )
                                     : Colors.white.withValues(alpha: 0.08),
                                 width: isCurrent ? 1.5 : 1,
                               ),
@@ -411,8 +415,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: tt.bodySmall?.copyWith(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.6),
+                                              color: Colors.white.withValues(
+                                                alpha: 0.6,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -428,7 +433,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                             color: isCurrent
                                                 ? AppColors.cyanAccent
                                                 : AppColors.cyanAccent
-                                                    .withValues(alpha: 0.8),
+                                                      .withValues(alpha: 0.8),
                                             fontWeight: isCurrent
                                                 ? FontWeight.w700
                                                 : FontWeight.w500,
@@ -449,8 +454,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                           ),
                                           tooltip: 'Remove from Playlist',
                                           onPressed: () async {
-                                            final db =
-                                                ref.read(appDatabaseProvider);
+                                            final db = ref.read(
+                                              appDatabaseProvider,
+                                            );
                                             await db.removeSongFromPlaylist(
                                               playlistId: playlist.id,
                                               songId: song.id,
@@ -509,10 +515,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: MiniPlayer(bottomPadding: 16),
-            ),
+            child: SafeArea(top: false, child: MiniPlayer(bottomPadding: 16)),
           ),
         ],
       ),
@@ -530,16 +533,11 @@ class PlaylistDetailScreen extends ConsumerWidget {
           backgroundColor: const Color(0xFF181528),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.redAccent.withValues(alpha: 0.3),
-            ),
+            side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
           ),
           title: const Text(
             'Delete Playlist?',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
             'Are you sure you want to delete "${playlist.name}"? The songs will remain in your music library.',
@@ -555,9 +553,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
               child: const Text('Delete'),
             ),
           ],

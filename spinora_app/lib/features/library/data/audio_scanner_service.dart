@@ -50,11 +50,9 @@ class AudioScanState {
 /// Service responsible for querying local audio files from device storage
 /// (via Android MediaStore or platform channels) and syncing them to [AppDatabase].
 class AudioScannerService {
-  AudioScannerService({
-    required this.db,
-    MethodChannel? channel,
-  }) : _channel = channel ??
-            const MethodChannel('com.spideytech.spinora/media_store');
+  AudioScannerService({required this.db, MethodChannel? channel})
+    : _channel =
+          channel ?? const MethodChannel('com.spideytech.spinora/media_store');
 
   final AppDatabase db;
   final MethodChannel _channel;
@@ -69,14 +67,13 @@ class AudioScannerService {
     }
 
     try {
-      final result =
-          await _channel.invokeListMethod<Map<dynamic, dynamic>>('querySongs');
+      final result = await _channel.invokeListMethod<Map<dynamic, dynamic>>(
+        'querySongs',
+      );
       if (result == null) return const [];
 
       return result.map((item) {
-        return item.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
+        return item.map((key, value) => MapEntry(key.toString(), value));
       }).toList();
     } on MissingPluginException catch (_) {
       debugPrint(
@@ -148,12 +145,15 @@ class AudioScannerService {
           newlyInserted++;
         } else {
           // If song was custom edited by user, preserve user-edited title, artist, album.
-          final effectiveTitle =
-              existing.isCustomEdited ? existing.title : title;
-          final effectiveArtist =
-              existing.isCustomEdited ? existing.artist : artist;
-          final effectiveAlbum =
-              existing.isCustomEdited ? existing.album : album;
+          final effectiveTitle = existing.isCustomEdited
+              ? existing.title
+              : title;
+          final effectiveArtist = existing.isCustomEdited
+              ? existing.artist
+              : artist;
+          final effectiveAlbum = existing.isCustomEdited
+              ? existing.album
+              : album;
 
           // Update metadata if it has changed.
           if (existing.title != effectiveTitle ||
@@ -182,10 +182,10 @@ class AudioScannerService {
       }
     });
 
-    final totalCount = await (db.selectOnly(db.songs)
-          ..addColumns([db.songs.id.count()]))
-        .map((row) => row.read(db.songs.id.count()) ?? 0)
-        .getSingle();
+    final totalCount =
+        await (db.selectOnly(db.songs)..addColumns([db.songs.id.count()]))
+            .map((row) => row.read(db.songs.id.count()) ?? 0)
+            .getSingle();
 
     debugPrint(
       '[AudioScanner] Indexed $newlyInserted new songs. Total in DB: $totalCount',
@@ -209,7 +209,10 @@ class AudioScannerNotifier extends Notifier<AudioScanState> {
 
   /// Triggers a scan of device audio files and indexes them in Drift.
   Future<int> scan() async {
-    state = state.copyWith(status: AudioScanStatus.scanning, errorMessage: null);
+    state = state.copyWith(
+      status: AudioScanStatus.scanning,
+      errorMessage: null,
+    );
 
     try {
       final service = ref.read(audioScannerServiceProvider);
@@ -239,8 +242,8 @@ class AudioScannerNotifier extends Notifier<AudioScanState> {
 
 final audioScannerStateProvider =
     NotifierProvider<AudioScannerNotifier, AudioScanState>(
-  AudioScannerNotifier.new,
-);
+      AudioScannerNotifier.new,
+    );
 
 /// Reactive stream of all non-hidden songs currently indexed in the local Drift database.
 final localSongsStreamProvider = StreamProvider<List<Song>>((ref) {

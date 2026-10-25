@@ -38,19 +38,17 @@ class SmartMixDetailScreen extends ConsumerWidget {
   void _playAll(WidgetRef ref) {
     if (mix.songs.isEmpty) return;
     final tracks = mix.songs.map(Track.fromSong).toList();
-    ref.read(playerControllerProvider.notifier).playTrack(
-          tracks.first,
-          queue: tracks,
-        );
+    ref
+        .read(playerControllerProvider.notifier)
+        .playTrack(tracks.first, queue: tracks);
   }
 
   void _shufflePlay(WidgetRef ref) {
     if (mix.songs.isEmpty) return;
     final tracks = mix.songs.map(Track.fromSong).toList()..shuffle();
-    ref.read(playerControllerProvider.notifier).playTrack(
-          tracks.first,
-          queue: tracks,
-        );
+    ref
+        .read(playerControllerProvider.notifier)
+        .playTrack(tracks.first, queue: tracks);
   }
 
   @override
@@ -88,9 +86,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             ? const Color(0xFF08070F).withValues(alpha: 0.65)
                             : Colors.white.withValues(alpha: 0.85),
                         border: Border.all(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.18)
-                                : Colors.white.withValues(alpha: 0.9)),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.18)
+                              : Colors.white.withValues(alpha: 0.9),
+                        ),
                         boxShadow: isDark
                             ? null
                             : [
@@ -101,9 +100,11 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                 ),
                               ],
                       ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded,
-                          color: isDark ? Colors.white : const Color(0xFF0F111A),
-                          size: 16),
+                      child: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: isDark ? Colors.white : const Color(0xFF0F111A),
+                        size: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -130,19 +131,26 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             // Pill badge
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 color: mix.accentColor.withValues(alpha: 0.25),
                                 border: Border.all(
-                                    color:
-                                        mix.accentColor.withValues(alpha: 0.45)),
+                                  color: mix.accentColor.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(mix.icon,
-                                      color: mix.accentColor, size: 13),
+                                  Icon(
+                                    mix.icon,
+                                    color: mix.accentColor,
+                                    size: 13,
+                                  ),
                                   const SizedBox(width: 5),
                                   Text(
                                     'SMART PICK',
@@ -168,9 +176,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                 height: 1.15,
                                 shadows: [
                                   Shadow(
-                                      color: Colors.black87,
-                                      blurRadius: 10,
-                                      offset: Offset(0, 2)),
+                                    color: Colors.black87,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 2),
+                                  ),
                                 ],
                               ),
                             ),
@@ -222,8 +231,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             child: GestureDetector(
                               onTap: () => _playAll(ref),
                               child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
                                   gradient: LinearGradient(
@@ -236,8 +246,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: mix.accentColor
-                                          .withValues(alpha: 0.35),
+                                      color: mix.accentColor.withValues(
+                                        alpha: 0.35,
+                                      ),
                                       blurRadius: 16,
                                       offset: const Offset(0, 4),
                                     ),
@@ -246,8 +257,11 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                 child: const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.play_arrow_rounded,
-                                        color: Colors.white, size: 22),
+                                    Icon(
+                                      Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
                                     SizedBox(width: 6),
                                     Text(
                                       'Play All',
@@ -267,23 +281,26 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             child: GestureDetector(
                               onTap: () => _shufflePlay(ref),
                               child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
                                   color: isDark
                                       ? Colors.white.withValues(alpha: 0.06)
                                       : Colors.white.withValues(alpha: 0.85),
                                   border: Border.all(
-                                      color: isDark
-                                          ? Colors.white.withValues(alpha: 0.15)
-                                          : Colors.white.withValues(alpha: 0.9)),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.15)
+                                        : Colors.white.withValues(alpha: 0.9),
+                                  ),
                                   boxShadow: isDark
                                       ? null
                                       : [
                                           BoxShadow(
-                                            color: Colors.black
-                                                .withValues(alpha: 0.05),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
+                                            ),
                                             blurRadius: 10,
                                             offset: const Offset(0, 3),
                                           ),
@@ -292,11 +309,13 @@ class SmartMixDetailScreen extends ConsumerWidget {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.shuffle_rounded,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF0F111A),
-                                        size: 18),
+                                    Icon(
+                                      Icons.shuffle_rounded,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F111A),
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Shuffle Mix',
@@ -323,9 +342,7 @@ class SmartMixDetailScreen extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               'TRACKS (${mix.songs.length})',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
+                              style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: isDark
                                         ? Colors.white.withValues(alpha: 0.45)
@@ -355,7 +372,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 40),
+                      horizontal: 20,
+                      vertical: 40,
+                    ),
                     child: Container(
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
@@ -364,9 +383,10 @@ class SmartMixDetailScreen extends ConsumerWidget {
                             ? Colors.white.withValues(alpha: 0.04)
                             : Colors.white.withValues(alpha: 0.85),
                         border: Border.all(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.white.withValues(alpha: 0.9)),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.white.withValues(alpha: 0.9),
+                        ),
                         boxShadow: isDark
                             ? null
                             : [
@@ -379,9 +399,11 @@ class SmartMixDetailScreen extends ConsumerWidget {
                       ),
                       child: Column(
                         children: [
-                          Icon(mix.icon,
-                              color: mix.accentColor.withValues(alpha: 0.5),
-                              size: 40),
+                          Icon(
+                            mix.icon,
+                            color: mix.accentColor.withValues(alpha: 0.5),
+                            size: 40,
+                          ),
                           const SizedBox(height: 14),
                           Text(
                             'No songs in this mix yet',
@@ -414,173 +436,187 @@ class SmartMixDetailScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final song = mix.songs[index];
-                        final isPlayingThis =
-                            currentTrackId == 'local_${song.id}';
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final song = mix.songs[index];
+                      final isPlayingThis =
+                          currentTrackId == 'local_${song.id}';
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: GestureDetector(
-                            onTap: () {
-                              final tracks =
-                                  mix.songs.map(Track.fromSong).toList();
-                              ref
-                                  .read(playerControllerProvider.notifier)
-                                  .playTrack(
-                                    tracks[index],
-                                    queue: tracks,
-                                  );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                color: isPlayingThis
-                                    ? mix.accentColor.withValues(alpha: isDark ? 0.12 : 0.10)
-                                    : (isDark
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: GestureDetector(
+                          onTap: () {
+                            final tracks = mix.songs
+                                .map(Track.fromSong)
+                                .toList();
+                            ref
+                                .read(playerControllerProvider.notifier)
+                                .playTrack(tracks[index], queue: tracks);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: isPlayingThis
+                                  ? mix.accentColor.withValues(
+                                      alpha: isDark ? 0.12 : 0.10,
+                                    )
+                                  : (isDark
                                         ? Colors.white.withValues(alpha: 0.03)
                                         : Colors.white.withValues(alpha: 0.85)),
-                                border: Border.all(
-                                  color: isPlayingThis
-                                      ? mix.accentColor.withValues(alpha: 0.35)
-                                      : (isDark
+                              border: Border.all(
+                                color: isPlayingThis
+                                    ? mix.accentColor.withValues(alpha: 0.35)
+                                    : (isDark
                                           ? Colors.white.withValues(alpha: 0.06)
-                                          : Colors.white.withValues(alpha: 0.9)),
-                                ),
-                                boxShadow: isDark
-                                    ? null
-                                    : [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.04),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 3),
-                                        ),
-                                      ],
+                                          : Colors.white.withValues(
+                                              alpha: 0.9,
+                                            )),
                               ),
-                              child: Row(
-                                children: [
-                                  // Index or playing indicator
-                                  SizedBox(
-                                    width: 26,
-                                    child: isPlayingThis
-                                        ? Icon(Icons.graphic_eq_rounded,
-                                            color: mix.accentColor, size: 18)
-                                        : Text(
-                                            '${index + 1}',
-                                            style: TextStyle(
-                                              color: isDark
-                                                  ? Colors.white
-                                                      .withValues(alpha: 0.35)
-                                                  : const Color(0xFF5C6275),
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                  ),
-                                  const SizedBox(width: 8),
-
-                                  // Song Artwork
-                                  SongArtwork.fromSong(
-                                    song,
-                                    size: 46,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // Title and Artist
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          song.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: isPlayingThis
-                                                ? mix.accentColor
-                                                : (isDark
-                                                    ? Colors.white
-                                                    : const Color(0xFF0F111A)),
-                                            fontSize: 14,
-                                            fontWeight: isPlayingThis
-                                                ? FontWeight.w700
-                                                : FontWeight.w600,
-                                          ),
+                              boxShadow: isDark
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.04,
                                         ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          song.artist,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                            ),
+                            child: Row(
+                              children: [
+                                // Index or playing indicator
+                                SizedBox(
+                                  width: 26,
+                                  child: isPlayingThis
+                                      ? Icon(
+                                          Icons.graphic_eq_rounded,
+                                          color: mix.accentColor,
+                                          size: 18,
+                                        )
+                                      : Text(
+                                          '${index + 1}',
                                           style: TextStyle(
                                             color: isDark
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.5)
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.35,
+                                                  )
                                                 : const Color(0xFF5C6275),
-                                            fontSize: 12,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
+                                ),
+                                const SizedBox(width: 8),
 
-                                  // Trailing info: duration & playCount badge
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                // Song Artwork
+                                SongArtwork.fromSong(
+                                  song,
+                                  size: 46,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Title and Artist
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _formatDuration(song.duration),
+                                        song.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isPlayingThis
+                                              ? mix.accentColor
+                                              : (isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF0F111A)),
+                                          fontSize: 14,
+                                          fontWeight: isPlayingThis
+                                              ? FontWeight.w700
+                                              : FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        song.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: isDark
-                                              ? Colors.white
-                                                  .withValues(alpha: 0.4)
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.5,
+                                                )
                                               : const Color(0xFF5C6275),
                                           fontSize: 12,
                                         ),
                                       ),
-                                      if (song.playCount > 0) ...[
-                                        const SizedBox(height: 2),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            color: isDark
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.06)
-                                                : Colors.black
-                                                    .withValues(alpha: 0.05),
-                                          ),
-                                          child: Text(
-                                            '${song.playCount} plays',
-                                            style: TextStyle(
-                                              color: isDark
-                                                  ? Colors.white
-                                                      .withValues(alpha: 0.45)
-                                                  : const Color(0xFF5C6275),
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 10),
+
+                                // Trailing info: duration & playCount badge
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      _formatDuration(song.duration),
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.4,
+                                              )
+                                            : const Color(0xFF5C6275),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    if (song.playCount > 0) ...[
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          color: isDark
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.06,
+                                                )
+                                              : Colors.black.withValues(
+                                                  alpha: 0.05,
+                                                ),
+                                        ),
+                                        child: Text(
+                                          '${song.playCount} plays',
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.45,
+                                                  )
+                                                : const Color(0xFF5C6275),
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                        );
-                      },
-                      childCount: mix.songs.length,
-                    ),
+                        ),
+                      );
+                    }, childCount: mix.songs.length),
                   ),
                 ),
 
@@ -596,10 +632,7 @@ class SmartMixDetailScreen extends ConsumerWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: MiniPlayer(bottomPadding: 16),
-            ),
+            child: SafeArea(top: false, child: MiniPlayer(bottomPadding: 16)),
           ),
         ],
       ),
@@ -609,42 +642,44 @@ class SmartMixDetailScreen extends ConsumerWidget {
   Widget _buildAmbientBlobs(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Stack(children: [
-      Positioned(
-        top: -60,
-        right: -60,
-        child: Container(
-          width: 300,
-          height: 300,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                mix.accentColor.withValues(alpha: isDark ? 0.22 : 0.08),
-                Colors.transparent,
-              ],
+    return Stack(
+      children: [
+        Positioned(
+          top: -60,
+          right: -60,
+          child: Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  mix.accentColor.withValues(alpha: isDark ? 0.22 : 0.08),
+                  Colors.transparent,
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      Positioned(
-        top: 250,
-        left: -80,
-        child: Container(
-          width: 260,
-          height: 260,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                mix.secondaryColor.withValues(alpha: isDark ? 0.15 : 0.06),
-                Colors.transparent,
-              ],
+        Positioned(
+          top: 250,
+          left: -80,
+          child: Container(
+            width: 260,
+            height: 260,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  mix.secondaryColor.withValues(alpha: isDark ? 0.15 : 0.06),
+                  Colors.transparent,
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 }
 

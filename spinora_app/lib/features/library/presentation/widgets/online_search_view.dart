@@ -28,8 +28,9 @@ class OnlineSearchView extends ConsumerWidget {
       return _OnlineSearchEmptyPrompt(onSuggestionTap: onSuggestionTap);
     }
 
-    final searchResultsAsync =
-        ref.watch(onlineSearchResultsProvider(searchQuery.trim()));
+    final searchResultsAsync = ref.watch(
+      onlineSearchResultsProvider(searchQuery.trim()),
+    );
 
     return searchResultsAsync.when(
       loading: () => Center(
@@ -101,8 +102,9 @@ class OnlineSearchView extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
-                onPressed: () => ref
-                    .refresh(onlineSearchResultsProvider(searchQuery.trim())),
+                onPressed: () => ref.refresh(
+                  onlineSearchResultsProvider(searchQuery.trim()),
+                ),
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('Try Again'),
                 style: OutlinedButton.styleFrom(
@@ -173,7 +175,8 @@ class OnlineSearchView extends ConsumerWidget {
           separatorBuilder: (context, index) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final song = songs[index];
-            final isCurrent = playerState.currentTrack?.uri == song.filePath ||
+            final isCurrent =
+                playerState.currentTrack?.uri == song.filePath ||
                 playerState.currentTrack?.id == 'online_${song.id}';
             return _OnlineSongCard(
               song: song,
@@ -181,7 +184,9 @@ class OnlineSearchView extends ConsumerWidget {
               isPlaying: isCurrent && playerState.isPlaying,
               onTap: () async {
                 final messenger = ScaffoldMessenger.maybeOf(context);
-                await ref.read(playerControllerProvider.notifier).playSong(song);
+                await ref
+                    .read(playerControllerProvider.notifier)
+                    .playSong(song);
                 final error = ref.read(playerControllerProvider).errorMessage;
                 if (error != null && error.isNotEmpty) {
                   messenger?.showSnackBar(
@@ -194,14 +199,19 @@ class OnlineSearchView extends ConsumerWidget {
                       ),
                       content: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded,
-                              color: Colors.redAccent, size: 20),
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               error,
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 13),
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
@@ -269,10 +279,7 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFE50914),
-                    AppColors.cyanAccent,
-                  ],
+                  colors: [Color(0xFFE50914), AppColors.cyanAccent],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -527,8 +534,10 @@ class _OnlineSongCard extends StatelessWidget {
                   tooltip: 'Play Next',
                   onPressed: onPlayNext,
                   iconSize: 22,
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   padding: EdgeInsets.zero,
                 ),
               ],

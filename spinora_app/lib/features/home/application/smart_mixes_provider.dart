@@ -51,7 +51,8 @@ class ForgottenFavoritesSessionNotifier extends Notifier<List<int>?> {
 
 final forgottenFavoritesSessionProvider =
     NotifierProvider<ForgottenFavoritesSessionNotifier, List<int>?>(
-        ForgottenFavoritesSessionNotifier.new);
+      ForgottenFavoritesSessionNotifier.new,
+    );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Deterministic Smart Mixes Provider
@@ -69,10 +70,13 @@ final smartMixesProvider = Provider<List<SmartMixInfo>>((ref) {
       if (pcComp != 0) return pcComp;
       return a.id.compareTo(b.id);
     });
-  final top10Filtered =
-      mostPlayed.where((s) => s.playCount > 0).take(10).toList();
-  final top10Final =
-      top10Filtered.isNotEmpty ? top10Filtered : allSongs.take(10).toList();
+  final top10Filtered = mostPlayed
+      .where((s) => s.playCount > 0)
+      .take(10)
+      .toList();
+  final top10Final = top10Filtered.isNotEmpty
+      ? top10Filtered
+      : allSongs.take(10).toList();
 
   // 2. Forgotten Favorites (Session-memoized, deterministic)
   final sessionIds = ref.watch(forgottenFavoritesSessionProvider);
@@ -138,11 +142,17 @@ final smartMixesProvider = Provider<List<SmartMixInfo>>((ref) {
   final spidey = [...allSongs]
     ..sort((a, b) {
       final hashA =
-          (a.title.hashCode ^ (a.artist.hashCode * 17) ^ (a.id * 101) ^ 0xFF2A5F) &
-              0x7FFFFFFF;
+          (a.title.hashCode ^
+              (a.artist.hashCode * 17) ^
+              (a.id * 101) ^
+              0xFF2A5F) &
+          0x7FFFFFFF;
       final hashB =
-          (b.title.hashCode ^ (b.artist.hashCode * 17) ^ (b.id * 101) ^ 0xFF2A5F) &
-              0x7FFFFFFF;
+          (b.title.hashCode ^
+              (b.artist.hashCode * 17) ^
+              (b.id * 101) ^
+              0xFF2A5F) &
+          0x7FFFFFFF;
       return hashB.compareTo(hashA);
     });
   final spideyMix = spidey.take(15).toList();
@@ -445,7 +455,11 @@ class _SmartMixArtPainter extends CustomPainter {
     final wavePath = Path();
     wavePath.moveTo(0, size.height * 0.6);
     wavePath.quadraticBezierTo(
-        size.width * 0.4, size.height * 0.4, size.width, size.height * 0.7);
+      size.width * 0.4,
+      size.height * 0.4,
+      size.width,
+      size.height * 0.7,
+    );
     wavePath.lineTo(size.width, size.height);
     wavePath.lineTo(0, size.height);
     wavePath.close();
@@ -508,10 +522,7 @@ class _SmartMixArtPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: Alignment.bottomRight,
         radius: 0.9,
-        colors: [
-          primaryColor.withValues(alpha: 0.45),
-          Colors.transparent,
-        ],
+        colors: [primaryColor.withValues(alpha: 0.45), Colors.transparent],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, glow);
   }

@@ -76,13 +76,8 @@ class EqualizerBandState {
           maxDecibels == other.maxDecibels;
 
   @override
-  int get hashCode => Object.hash(
-        index,
-        centerFrequency,
-        gain,
-        minDecibels,
-        maxDecibels,
-      );
+  int get hashCode =>
+      Object.hash(index, centerFrequency, gain, minDecibels, maxDecibels);
 
   @override
   String toString() =>
@@ -95,35 +90,14 @@ class EqualizerBandState {
 
 /// Standard built-in equalizer curve presets.
 enum EqualizerPreset {
-  flat(
-    displayName: 'Flat',
-    gains: [0.0, 0.0, 0.0, 0.0, 0.0],
-  ),
-  bassBoost(
-    displayName: 'Bass Boost',
-    gains: [6.0, 4.5, 1.5, 0.0, 0.0],
-  ),
-  pop(
-    displayName: 'Pop',
-    gains: [-1.5, 2.0, 4.5, 3.0, -1.0],
-  ),
-  rock(
-    displayName: 'Rock',
-    gains: [5.0, 3.0, -1.0, 3.5, 5.5],
-  ),
-  vocal(
-    displayName: 'Vocal',
-    gains: [-3.0, 1.0, 5.0, 4.0, 0.5],
-  ),
-  custom(
-    displayName: 'Custom',
-    gains: [],
-  );
+  flat(displayName: 'Flat', gains: [0.0, 0.0, 0.0, 0.0, 0.0]),
+  bassBoost(displayName: 'Bass Boost', gains: [6.0, 4.5, 1.5, 0.0, 0.0]),
+  pop(displayName: 'Pop', gains: [-1.5, 2.0, 4.5, 3.0, -1.0]),
+  rock(displayName: 'Rock', gains: [5.0, 3.0, -1.0, 3.5, 5.5]),
+  vocal(displayName: 'Vocal', gains: [-3.0, 1.0, 5.0, 4.0, 0.5]),
+  custom(displayName: 'Custom', gains: []);
 
-  const EqualizerPreset({
-    required this.displayName,
-    required this.gains,
-  });
+  const EqualizerPreset({required this.displayName, required this.gains});
 
   final String displayName;
   final List<double> gains;
