@@ -1134,10 +1134,9 @@ class _HeroCardState extends ConsumerState<_HeroCard>
       } else if (playerState.hasTrack && isTrackFromMix) {
         ref.read(playerControllerProvider.notifier).togglePlayPause();
       } else {
-        final tracks = widget.allSongs.map(Track.fromSong).toList()..shuffle();
         ref
             .read(playerControllerProvider.notifier)
-            .playTrack(tracks.first, queue: tracks);
+            .playPlaylist(widget.allSongs, shuffle: true);
       }
     }
 

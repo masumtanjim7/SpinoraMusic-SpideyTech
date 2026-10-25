@@ -261,11 +261,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             onTap: () async {
                               final songs = songsAsync.asData?.value ?? [];
                               if (songs.isEmpty) return;
-                              final shuffled = List<Song>.from(songs)
-                                ..shuffle();
                               await ref
                                   .read(playerControllerProvider.notifier)
-                                  .playPlaylist(shuffled);
+                                  .playPlaylist(songs, shuffle: true);
                             },
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16),

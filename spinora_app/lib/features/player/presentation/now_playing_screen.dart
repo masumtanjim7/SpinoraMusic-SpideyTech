@@ -628,20 +628,52 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 // Shuffle Button
-                                IconButton(
-                                  onPressed: () => ref
-                                      .read(playerControllerProvider.notifier)
-                                      .toggleShuffle(),
-                                  icon: Icon(
-                                    Icons.shuffle_rounded,
-                                    color: playerState.isShuffled
-                                        ? context.primaryAccent
-                                        : context.secondaryText,
-                                    size: 22,
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOutCubic,
+                                  decoration: BoxDecoration(
+                                    color: playerState.isShuffleEnabled
+                                        ? context.primaryAccent.withValues(
+                                            alpha: isLight ? 0.12 : 0.18,
+                                          )
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: playerState.isShuffleEnabled
+                                          ? context.primaryAccent.withValues(
+                                              alpha: isLight ? 0.35 : 0.45,
+                                            )
+                                          : Colors.transparent,
+                                      width: 1,
+                                    ),
+                                    boxShadow: playerState.isShuffleEnabled
+                                        ? [
+                                            BoxShadow(
+                                              color: context.primaryAccent
+                                                  .withValues(
+                                                    alpha: isLight ? 0.2 : 0.3,
+                                                  ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                  tooltip: playerState.isShuffled
-                                      ? 'Shuffle: On'
-                                      : 'Shuffle: Off',
+                                  child: IconButton(
+                                    onPressed: () => ref
+                                        .read(playerControllerProvider.notifier)
+                                        .toggleShuffle(),
+                                    icon: Icon(
+                                      Icons.shuffle_rounded,
+                                      color: playerState.isShuffleEnabled
+                                          ? context.primaryAccent
+                                          : context.secondaryText,
+                                      size: 22,
+                                    ),
+                                    tooltip: playerState.isShuffleEnabled
+                                        ? 'Shuffle: On'
+                                        : 'Shuffle: Off',
+                                  ),
                                 ),
 
                                 // Previous Track

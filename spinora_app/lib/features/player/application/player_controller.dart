@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:drift/drift.dart';
@@ -26,6 +27,7 @@ class PlayerState {
     this.currentTrack,
     this.queue = const [],
     this.originalQueue,
+    this.shuffledIndices,
     this.currentIndex = -1,
     this.isPlaying = false,
     this.isBuffering = false,
@@ -47,6 +49,7 @@ class PlayerState {
   final Track? currentTrack;
   final List<Track> queue;
   final List<Track>? originalQueue;
+  final List<int>? shuffledIndices;
   final int currentIndex;
   final bool isPlaying;
   final bool isBuffering;
@@ -67,6 +70,7 @@ class PlayerState {
   bool get hasTrack => currentTrack != null;
   bool get hasNext => queue.isNotEmpty && currentIndex < queue.length - 1;
   bool get hasPrevious => queue.isNotEmpty && currentIndex > 0;
+  bool get isShuffleEnabled => isShuffled;
   bool get isSleepTimerActive =>
       remainingSleepDuration != null || stopAtEndOfTrack;
   bool get isLoading => isBuffering;
@@ -80,11 +84,15 @@ class PlayerState {
     Track? currentTrack,
     List<Track>? queue,
     List<Track>? originalQueue,
+    bool clearOriginalQueue = false,
+    List<int>? shuffledIndices,
+    bool clearShuffledIndices = false,
     int? currentIndex,
     bool? isPlaying,
     bool? isLoading,
     bool? isBuffering,
     bool? isShuffled,
+    bool? isShuffleEnabled,
     LoopMode? loopMode,
     Duration? position,
     Duration? duration,
@@ -103,11 +111,16 @@ class PlayerState {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
       queue: queue ?? this.queue,
-      originalQueue: originalQueue ?? this.originalQueue,
+      originalQueue: clearOriginalQueue
+          ? null
+          : (originalQueue ?? this.originalQueue),
+      shuffledIndices: clearShuffledIndices
+          ? null
+          : (shuffledIndices ?? this.shuffledIndices),
       currentIndex: currentIndex ?? this.currentIndex,
       isPlaying: isPlaying ?? this.isPlaying,
       isBuffering: isLoading ?? isBuffering ?? this.isBuffering,
-      isShuffled: isShuffled ?? this.isShuffled,
+      isShuffled: isShuffleEnabled ?? isShuffled ?? this.isShuffled,
       loopMode: loopMode ?? this.loopMode,
       position: position ?? this.position,
       duration: duration ?? this.duration,
@@ -416,10 +429,9 @@ class PlayerController extends Notifier<PlayerState> {
           if (state.loopMode == LoopMode.one) {
             seek(Duration.zero);
             play();
-          } else if (state.hasNext) {
+          } else if (state.hasNext ||
+              (state.loopMode == LoopMode.all && state.queue.isNotEmpty)) {
             next();
-          } else if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
-            playTrack(state.queue.first);
           } else {
             pause();
             seek(Duration.zero);
@@ -462,6 +474,48 @@ class PlayerController extends Notifier<PlayerState> {
     );
   }
 
+  /// Generates an unbiased Fisher-Yates random permutation of [list].
+  static List<T> fisherYatesShuffle<T>(List<T> list, [Random? random]) {
+    final result = List<T>.from(list);
+    if (result.length <= 1) return result;
+    final rng = random ?? Random();
+    for (var i = result.length - 1; i > 0; i--) {
+      final j = rng.nextInt(i + 1);
+      final temp = result[i];
+      result[i] = result[j];
+      result[j] = temp;
+    }
+    return result;
+  }
+
+  /// Returns the next track in the queue, taking loopMode and shuffle into account.
+  Track? getNextTrack() {
+    if (state.queue.isEmpty) return null;
+    if (state.hasNext) {
+      return state.queue[state.currentIndex + 1];
+    }
+    if (state.loopMode == LoopMode.all) {
+      if (state.isShuffled && state.queue.length > 1) {
+        final original = state.originalQueue ?? state.queue;
+        return original.first;
+      }
+      return state.queue.first;
+    }
+    return null;
+  }
+
+  /// Returns the previous track in the queue, taking loopMode into account.
+  Track? getPreviousTrack() {
+    if (state.queue.isEmpty) return null;
+    if (state.hasPrevious) {
+      return state.queue[state.currentIndex - 1];
+    }
+    if (state.loopMode == LoopMode.all) {
+      return state.queue.last;
+    }
+    return null;
+  }
+
   void _handleCrossfadeOnPosition(Duration pos) {
     final audioSettings = ref.read(audioSettingsProvider);
     if (!audioSettings.crossfadeEnabled || !state.isPlaying) {
@@ -473,6 +527,16 @@ class PlayerController extends Notifier<PlayerState> {
     }
 
     if (_isFadingIn) {
+      return;
+    }
+
+    // Ensure there is a valid next track to crossfade into before starting fade-out
+    final nextTrack = getNextTrack();
+    if (nextTrack == null) {
+      if (_isFadingOut) {
+        _isFadingOut = false;
+        player.setVolume(1.0);
+      }
       return;
     }
 
@@ -639,13 +703,43 @@ class PlayerController extends Notifier<PlayerState> {
   /// Plays a given [Track], optionally initializing a new track [queue].
   Future<void> playTrack(Track track, {List<Track>? queue}) async {
     final requestId = ++_playbackRequestId;
-    final activeQueue = queue != null
-        ? List<Track>.from(queue)
-        : (state.queue.isEmpty ? [track] : List<Track>.from(state.queue));
-    var index = activeQueue.indexWhere((t) => t.id == track.id);
-    if (index == -1) {
-      index = activeQueue.length;
-      activeQueue.add(track);
+    final List<Track> activeQueue;
+    final List<Track>? originalQueue;
+    final int index;
+
+    final bool isNewQueue = queue != null &&
+        queue.isNotEmpty &&
+        !listEquals(queue, state.queue) &&
+        !listEquals(queue, state.originalQueue);
+
+    if (isNewQueue) {
+      if (state.isShuffled && queue.length > 1) {
+        originalQueue = List<Track>.unmodifiable(queue);
+        final others = List<Track>.from(queue)
+          ..removeWhere((t) => t.id == track.id);
+        final shuffledOthers = fisherYatesShuffle(others);
+        activeQueue = [track, ...shuffledOthers];
+        index = 0;
+      } else {
+        originalQueue = List<Track>.unmodifiable(queue);
+        activeQueue = List<Track>.from(queue);
+        var foundIndex = activeQueue.indexWhere((t) => t.id == track.id);
+        if (foundIndex == -1) {
+          foundIndex = activeQueue.length;
+          activeQueue.add(track);
+        }
+        index = foundIndex;
+      }
+    } else {
+      originalQueue = state.originalQueue;
+      activeQueue =
+          state.queue.isEmpty ? [track] : List<Track>.from(state.queue);
+      var foundIndex = activeQueue.indexWhere((t) => t.id == track.id);
+      if (foundIndex == -1) {
+        foundIndex = activeQueue.length;
+        activeQueue.add(track);
+      }
+      index = foundIndex;
     }
 
     final isOnline = track.uri.startsWith('yt://');
@@ -654,6 +748,7 @@ class PlayerController extends Notifier<PlayerState> {
     state = state.copyWith(
       currentTrack: track,
       queue: List.unmodifiable(activeQueue),
+      originalQueue: originalQueue,
       currentIndex: index,
       isBuffering: isOnline,
       isPlaying: false,
@@ -787,11 +882,30 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   /// Plays an entire list of [Song]s as a playlist, starting from [initialIndex].
-  Future<void> playPlaylist(List<Song> songs, {int initialIndex = 0}) async {
+  Future<void> playPlaylist(
+    List<Song> songs, {
+    int initialIndex = 0,
+    bool shuffle = false,
+  }) async {
     if (songs.isEmpty) return;
     final tracks = songs.map(Track.fromSong).toList();
     final safeIndex = initialIndex.clamp(0, tracks.length - 1);
-    await playTrack(tracks[safeIndex], queue: tracks);
+
+    if (shuffle) {
+      final initialTrack = tracks[safeIndex];
+      final others = List<Track>.from(tracks)..removeAt(safeIndex);
+      final shuffledQueue = [
+        initialTrack,
+        ...fisherYatesShuffle(others),
+      ];
+      state = state.copyWith(
+        isShuffled: true,
+        originalQueue: List.unmodifiable(tracks),
+      );
+      await playTrack(initialTrack, queue: shuffledQueue);
+    } else {
+      await playTrack(tracks[safeIndex], queue: tracks);
+    }
   }
 
   /// Inserts a [Track] directly after the currently playing song in the queue.
@@ -818,8 +932,16 @@ class PlayerController extends Notifier<PlayerState> {
     final insertIndex = (newCurrentIndex + 1).clamp(0, newQueue.length);
     newQueue.insert(insertIndex, track);
 
+    final newOriginal = state.originalQueue != null
+        ? (List<Track>.from(state.originalQueue!)
+          ..removeWhere((t) => t.id == track.id)
+          ..add(track))
+        : null;
+
     state = state.copyWith(
       queue: List.unmodifiable(newQueue),
+      originalQueue:
+          newOriginal != null ? List.unmodifiable(newOriginal) : null,
       currentIndex: newCurrentIndex,
     );
 
@@ -887,8 +1009,14 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> removeFromQueue(int index) async {
     if (index < 0 || index >= state.queue.length) return;
 
+    final removedTrack = state.queue[index];
     final newQueue = List<Track>.from(state.queue);
     newQueue.removeAt(index);
+
+    final newOriginal = state.originalQueue != null
+        ? (List<Track>.from(state.originalQueue!)
+          ..removeWhere((t) => t.id == removedTrack.id))
+        : null;
 
     if (newQueue.isEmpty) {
       await stop();
@@ -903,6 +1031,8 @@ class PlayerController extends Notifier<PlayerState> {
       newCurrentTrack = newQueue[newCurrentIndex];
       state = state.copyWith(
         queue: List.unmodifiable(newQueue),
+        originalQueue:
+            newOriginal != null ? List.unmodifiable(newOriginal) : null,
         currentIndex: newCurrentIndex,
         currentTrack: newCurrentTrack,
       );
@@ -927,6 +1057,8 @@ class PlayerController extends Notifier<PlayerState> {
       }
       state = state.copyWith(
         queue: List.unmodifiable(newQueue),
+        originalQueue:
+            newOriginal != null ? List.unmodifiable(newOriginal) : null,
         currentIndex: newCurrentIndex,
       );
       try {
@@ -986,23 +1118,50 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> toggleShuffle() async {
     final newShuffled = !state.isShuffled;
     if (newShuffled) {
-      final original = List<Track>.from(state.queue);
-      final shuffled = List<Track>.from(state.queue)..shuffle();
+      if (state.queue.isEmpty) {
+        state = state.copyWith(isShuffled: true);
+        return;
+      }
+
+      final original = state.originalQueue ?? List<Track>.from(state.queue);
       final current = state.currentTrack;
-      final newIndex = current != null ? shuffled.indexOf(current) : 0;
+      final currentIdx =
+          state.currentIndex >= 0 && state.currentIndex < state.queue.length
+              ? state.currentIndex
+              : 0;
+      final activeTrack = current ?? state.queue[currentIdx];
+
+      // Keep active track as current item so audio doesn't interrupt,
+      // and Fisher-Yates randomize remaining tracks in the queue.
+      final remaining = <Track>[];
+      for (int i = 0; i < state.queue.length; i++) {
+        if (i != currentIdx) {
+          remaining.add(state.queue[i]);
+        }
+      }
+
+      final shuffledRemaining = fisherYatesShuffle(remaining);
+      final shuffledQueue = [activeTrack, ...shuffledRemaining];
+      const newIndex = 0;
+
+      final shuffledIndices = shuffledQueue.map((t) {
+        final idx = original.indexWhere((o) => o.id == t.id);
+        return idx != -1 ? idx : 0;
+      }).toList();
 
       state = state.copyWith(
         isShuffled: true,
-        originalQueue: original,
-        queue: List.unmodifiable(shuffled),
+        originalQueue: List.unmodifiable(original),
+        queue: List.unmodifiable(shuffledQueue),
         currentIndex: newIndex,
+        shuffledIndices: shuffledIndices,
       );
 
-      if (shuffled.length > 1) {
-        final hasOnline = shuffled.any((t) => t.uri.startsWith('yt://'));
+      if (shuffledQueue.length > 1) {
+        final hasOnline = shuffledQueue.any((t) => t.uri.startsWith('yt://'));
         if (!hasOnline) {
           try {
-            final sources = shuffled.map(_buildAudioSource).toList();
+            final sources = shuffledQueue.map(_buildAudioSource).toList();
             await player.setAudioSources(
               sources,
               initialIndex: newIndex,
@@ -1014,12 +1173,15 @@ class PlayerController extends Notifier<PlayerState> {
     } else {
       final original = state.originalQueue ?? state.queue;
       final current = state.currentTrack;
-      final newIndex = current != null ? original.indexOf(current) : 0;
+      final foundIndex =
+          current != null ? original.indexWhere((t) => t.id == current.id) : 0;
+      final newIndex = foundIndex != -1 ? foundIndex : 0;
 
       state = state.copyWith(
         isShuffled: false,
         queue: List.unmodifiable(original),
         currentIndex: newIndex,
+        clearShuffledIndices: true,
       );
 
       if (original.length > 1) {
@@ -1132,13 +1294,22 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> next() async {
     if (!state.hasNext) {
       if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
+        if (state.isShuffled && state.queue.length > 1) {
+          final original = state.originalQueue ?? state.queue;
+          final reshuffled = fisherYatesShuffle(original);
+          final nextTrack = reshuffled.first;
+          await playTrack(nextTrack, queue: reshuffled);
+          return;
+        }
         await playTrack(state.queue.first, queue: state.queue);
       }
       return;
     }
 
     final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
-    if (!hasOnline && player.hasNext) {
+    if (!hasOnline &&
+        player.hasNext &&
+        player.currentIndex == state.currentIndex) {
       await player.seekToNext();
     } else {
       final nextIndex = state.currentIndex + 1;
@@ -1146,6 +1317,9 @@ class PlayerController extends Notifier<PlayerState> {
       await playTrack(nextTrack, queue: state.queue);
     }
   }
+
+  /// Alias for skipToNext for explicit media / lock screen compatibility.
+  Future<void> skipToNext() => next();
 
   /// Skips to the previous song, or restarts the track if > 3s played.
   Future<void> previous() async {
@@ -1155,12 +1329,19 @@ class PlayerController extends Notifier<PlayerState> {
     }
 
     if (!state.hasPrevious) {
+      if (state.loopMode == LoopMode.all && state.queue.isNotEmpty) {
+        final lastTrack = state.queue.last;
+        await playTrack(lastTrack, queue: state.queue);
+        return;
+      }
       await seek(Duration.zero);
       return;
     }
 
     final hasOnline = state.queue.any((t) => t.uri.startsWith('yt://'));
-    if (!hasOnline && player.hasPrevious) {
+    if (!hasOnline &&
+        player.hasPrevious &&
+        player.currentIndex == state.currentIndex) {
       await player.seekToPrevious();
     } else {
       final prevIndex = state.currentIndex - 1;
@@ -1168,6 +1349,9 @@ class PlayerController extends Notifier<PlayerState> {
       await playTrack(prevTrack, queue: state.queue);
     }
   }
+
+  /// Alias for skipToPrevious for explicit media / lock screen compatibility.
+  Future<void> skipToPrevious() => previous();
 
   Future<void> stop() async {
     cancelSleepTimer();

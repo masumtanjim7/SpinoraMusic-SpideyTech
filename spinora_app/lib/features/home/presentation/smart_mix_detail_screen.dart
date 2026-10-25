@@ -45,10 +45,9 @@ class SmartMixDetailScreen extends ConsumerWidget {
 
   void _shufflePlay(WidgetRef ref) {
     if (mix.songs.isEmpty) return;
-    final tracks = mix.songs.map(Track.fromSong).toList()..shuffle();
     ref
         .read(playerControllerProvider.notifier)
-        .playTrack(tracks.first, queue: tracks);
+        .playPlaylist(mix.songs, shuffle: true);
   }
 
   @override

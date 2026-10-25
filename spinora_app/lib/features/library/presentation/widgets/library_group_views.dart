@@ -629,8 +629,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    final shuffled = List<Song>.from(songs)..shuffle();
-                    playerController.playPlaylist(shuffled);
+                    playerController.playPlaylist(songs, shuffle: true);
                     Navigator.of(context).pop();
                   },
                   icon: Icon(
@@ -1093,8 +1092,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    final shuffled = List<Song>.from(songs)..shuffle();
-                    playerController.playPlaylist(shuffled);
+                    playerController.playPlaylist(songs, shuffle: true);
                     Navigator.of(context).pop();
                   },
                   icon: Icon(
