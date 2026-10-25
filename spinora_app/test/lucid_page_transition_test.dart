@@ -5,142 +5,54 @@ import 'package:spinora/core/navigation/lucid_page_transition.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('LucidTabTransitionSwitcher Widget Tests', () {
-    testWidgets('renders initial tab child cleanly', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: LucidTabTransitionSwitcher(
-              currentIndex: 0,
-              previousIndex: 0,
-              child: Text('Tab 0 Content'),
-            ),
+  Widget host(int index) => MaterialApp(
+        home: Scaffold(
+          body: LucidTabTransitionSwitcher(
+            currentIndex: index,
+            tabBuilder: (context, i) => Text('Tab $i Content'),
           ),
         ),
       );
 
+  group('LucidTabTransitionSwitcher', () {
+    testWidgets('renders initial tab with no BackdropFilter', (tester) async {
+      await tester.pumpWidget(host(0));
       expect(find.text('Tab 0 Content'), findsOneWidget);
-      // Stationary: BackdropFilter must be bypassed (zero GPU overhead)
       expect(find.byType(BackdropFilter), findsNothing);
     });
 
-    testWidgets('switches tabs smoothly and settles with zero BackdropFilter nodes',
+    testWidgets('keeps tabs alive, never uses BackdropFilter, hides wave at rest',
         (tester) async {
-      int currentIndex = 0;
-      int previousIndex = 0;
+      await tester.pumpWidget(host(0));
+      await tester.pumpWidget(host(1));
+      await tester.pump(const Duration(milliseconds: 150));
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) {
-                return Column(
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          previousIndex = currentIndex;
-                          currentIndex = 1;
-                        });
-                      },
-                      child: const Text('Switch to Tab 1'),
-                    ),
-                    Expanded(
-                      child: LucidTabTransitionSwitcher(
-                        currentIndex: currentIndex,
-                        previousIndex: previousIndex,
-                        child: Text(
-                          'Tab $currentIndex Content',
-                          key: ValueKey<int>(currentIndex),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Tab 0 Content'), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNothing);
-
-      // Trigger tab switch
-      await tester.tap(find.text('Switch to Tab 1'));
-      await tester.pump();
-      // Pump mid-animation (e.g. 200ms into the 480ms transition)
-      await tester.pump(const Duration(milliseconds: 200));
-
-      // Both outgoing tab and incoming tab must be rendered simultaneously in the Stack
+      // Both tabs visible mid-whip; no blur anywhere.
       expect(find.text('Tab 0 Content'), findsOneWidget);
       expect(find.text('Tab 1 Content'), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(FractionalTranslation), findsWidgets);
 
-      // Mid-transition blur pulse should be present on moving window
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
-      // Settle animation completely
       await tester.pumpAndSettle();
 
+      // Tab 0 is preserved offstage (state kept), not rebuilt/disposed.
+      expect(find.text('Tab 0 Content', skipOffstage: false), findsOneWidget);
       expect(find.text('Tab 0 Content'), findsNothing);
       expect(find.text('Tab 1 Content'), findsOneWidget);
-      // Once settled, BackdropFilter must be bypassed again
       expect(find.byType(BackdropFilter), findsNothing);
     });
 
-    testWidgets('supports reverse tab direction correctly', (tester) async {
-      int currentIndex = 3;
-      int previousIndex = 3;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) {
-                return Column(
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          previousIndex = currentIndex;
-                          currentIndex = 1;
-                        });
-                      },
-                      child: const Text('Switch Backward'),
-                    ),
-                    Expanded(
-                      child: LucidTabTransitionSwitcher(
-                        currentIndex: currentIndex,
-                        previousIndex: previousIndex,
-                        child: Text(
-                          'Tab $currentIndex Content',
-                          key: ValueKey<int>(currentIndex),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Tab 3 Content'), findsOneWidget);
-
-      // Switch backward
-      await tester.tap(find.text('Switch Backward'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
+    testWidgets('supports reverse direction', (tester) async {
+      await tester.pumpWidget(host(3));
+      await tester.pumpWidget(host(1));
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(find.byType(BackdropFilter), findsNothing);
       await tester.pumpAndSettle();
       expect(find.text('Tab 1 Content'), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNothing);
     });
   });
 
-  group('LucidGlassPageRoute & LucidGlassPageTransition Tests', () {
+  group('LucidGlassPageRoute & transition', () {
     testWidgets('pushes and pops with LucidGlassPageRoute', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -150,9 +62,8 @@ void main() {
                 onPressed: () {
                   Navigator.of(context).push(
                     LucidGlassPageRoute<void>(
-                      builder: (_) => const Scaffold(
-                        body: Text('Destination Screen'),
-                      ),
+                      builder: (_) =>
+                          const Scaffold(body: Text('Destination Screen')),
                     ),
                   );
                 },
@@ -163,45 +74,28 @@ void main() {
         ),
       );
 
-      expect(find.text('Push Route'), findsOneWidget);
-      expect(find.text('Destination Screen'), findsNothing);
-
-      // Tap push
       await tester.tap(find.text('Push Route'));
       await tester.pump();
-      // Mid-transition
-      await tester.pump(const Duration(milliseconds: 220));
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
-      // Settle
-      await tester.pumpAndSettle();
-      expect(find.text('Destination Screen'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 150));
       expect(find.byType(BackdropFilter), findsNothing);
 
-      // Pop route
-      final navigatorState = tester.state<NavigatorState>(find.byType(Navigator));
-      navigatorState.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Destination Screen'), findsOneWidget);
 
-      // Mid-reverse
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
       expect(find.text('Destination Screen'), findsNothing);
       expect(find.text('Push Route'), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNothing);
     });
 
-    testWidgets('buildLucidGlassPageTransition creates configured CustomTransitionPage',
-        (tester) async {
+    testWidgets('buildLucidGlassPageTransition uses 380ms', (tester) async {
       final page = buildLucidGlassPageTransition<void>(
         key: const ValueKey('test_key'),
         child: const Text('Route Page'),
       );
 
-      expect(page.transitionDuration, const Duration(milliseconds: 480));
-      expect(page.reverseTransitionDuration, const Duration(milliseconds: 420));
+      expect(page.transitionDuration, const Duration(milliseconds: 380));
+      expect(page.reverseTransitionDuration, const Duration(milliseconds: 380));
     });
   });
 }

@@ -1,226 +1,139 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lucid Glass Transition System — macOS Stage Manager / Desktop Space 3D Morph
+// Lucid Glass Transition System — macOS Spring-Whip + Prism Wave
+//
+// Pure GPU compositor transforms only: translate / scale / opacity plus a
+// gradient sweep overlay. NO BackdropFilter, NO ImageFilter.blur, NO 3D rotate.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Snappy macOS Stage Manager spring curve with subtle elastic overshoot ("twitch").
-const Curve kMacOSSpringTwitchCurve = Cubic(0.18, 1.18, 0.32, 1.0);
+/// Snappy macOS spring curve with a crisp overshoot.
+const Curve kMacOSSpringTwitchCurve = Cubic(0.16, 1.14, 0.3, 1.0);
 
-/// Floating Lucid Glass Window frame and refraction wrapper.
+/// Default transition duration for tabs and routes.
+const Duration kLucidTransitionDuration = Duration(milliseconds: 380);
+
+const double _kSlideDistance = 0.22;
+const double _kStartScale = 0.92;
+const Curve _kFadeCurve = Interval(0.0, 0.55);
+
+/// Incoming whip: slide + zoom pop + fade, evaluated at animation value [t].
+({Offset offset, double scale, double opacity}) _incomingValues(
+  double t,
+  bool isForward,
+) {
+  final double spring = kMacOSSpringTwitchCurve.transform(t);
+  final double dir = isForward ? _kSlideDistance : -_kSlideDistance;
+  return (
+    offset: Offset(dir * (1.0 - spring), 0.0),
+    scale: _kStartScale + ((1.0 - _kStartScale) * Curves.easeOutBack.transform(t)),
+    opacity: _kFadeCurve.transform(t).clamp(0.0, 1.0),
+  );
+}
+
+/// Hardware-accelerated "Lucid Glass Prism Wave": an angled gradient sheet that
+/// sweeps across the screen as [animation] moves 0 → 1. Zero blur cost.
 ///
-/// While in motion (`0.005 < progress < 0.995`):
-/// - Morphs into a floating rounded glass window with animated corner radius:
-///   `sin(progress * pi) * 32.0`
-/// - Draws a glowing 1.5px specular glass border (Light Mode: luminous white; Dark Mode: neon lavender)
-/// - Emits a deep floating window box shadow with subtle ambient neon bloom
-/// - Applies an optical blur pulse (`sin(progress * pi) * 10.0`)
-/// - Sweeps a diagonal specular glass light sheen across the surface
-///
-/// When stationary (`progress <= 0.005 || progress >= 0.995`), returns [child] directly
-/// with ZERO `BackdropFilter`, `ClipRRect`, or `Transform` overhead.
-class _LucidGlassWindow extends StatelessWidget {
-  const _LucidGlassWindow({
+/// Fully hidden when `animation.value == 0.0 || animation.value == 1.0`.
+class LucidPrismWave extends StatelessWidget {
+  const LucidPrismWave({
     super.key,
-    required this.child,
-    required this.progress,
-    required this.scale,
-    required this.translation,
-    required this.rotationY,
-    required this.opacity,
+    required this.animation,
+    required this.isForward,
     required this.isDark,
-    this.showGlassOverlay = true,
   });
 
-  final Widget child;
-  final double progress;
-  final double scale;
-  final Offset translation;
-  final double rotationY;
-  final double opacity;
+  final Animation<double> animation;
+  final bool isForward;
   final bool isDark;
-  final bool showGlassOverlay;
+
+  static const double _widthFactor = 0.7;
+
+  LinearGradient _gradient() {
+    final List<Color> colors;
+    final List<double> stops;
+    if (isDark) {
+      final violet = const Color(0xFF9D50BB);
+      final pink = const Color(0xFFFF5E99);
+      colors = [
+        violet.withValues(alpha: 0.0),
+        violet.withValues(alpha: 0.32),
+        Colors.white.withValues(alpha: 0.28),
+        pink.withValues(alpha: 0.25),
+        pink.withValues(alpha: 0.0),
+      ];
+      stops = const [0.0, 0.3, 0.55, 0.8, 1.0];
+    } else {
+      final lavender = const Color(0xFFA78BFA);
+      colors = [
+        Colors.white.withValues(alpha: 0.0),
+        Colors.white.withValues(alpha: 0.65),
+        lavender.withValues(alpha: 0.28),
+        lavender.withValues(alpha: 0.28),
+        Colors.white.withValues(alpha: 0.95), // crisp specular leading edge
+        Colors.white.withValues(alpha: 0.0),
+      ];
+      stops = const [0.0, 0.3, 0.65, 0.975, 0.988, 1.0];
+    }
+
+    if (isForward) {
+      return LinearGradient(
+        begin: const Alignment(-1.0, -0.4),
+        end: const Alignment(1.0, 0.4),
+        colors: colors,
+        stops: stops,
+      );
+    }
+    // Mirror so the specular edge leads when sweeping right → left.
+    return LinearGradient(
+      begin: const Alignment(-1.0, -0.4),
+      end: const Alignment(1.0, 0.4),
+      colors: colors.reversed.toList(),
+      stops: stops.reversed.map((s) => 1.0 - s).toList(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Zero-overhead stationary bypass
-    if (progress <= 0.005 || progress >= 0.995) {
-      return child;
-    }
-
-    final double sinVal = math.sin(progress.clamp(0.0, 1.0) * math.pi);
-    final double radius = sinVal * 32.0;
-    final double blurSigma = sinVal * 10.0;
-
-    final border = Border.all(
-      color: isDark
-          ? const Color(0xFFD8B4FE).withValues(alpha: 0.55 * sinVal)
-          : Colors.white.withValues(alpha: 0.75 * sinVal),
-      width: 1.5,
+    final Widget sheet = DecoratedBox(
+      decoration: BoxDecoration(gradient: _gradient()),
+      child: const SizedBox.expand(),
     );
 
-    final boxShadow = [
-      BoxShadow(
-        color: (isDark ? const Color(0xFF0A0714) : Colors.black)
-            .withValues(alpha: 0.40 * sinVal),
-        blurRadius: 28 * sinVal,
-        spreadRadius: 2 * sinVal,
-        offset: Offset(0, 12 * sinVal),
-      ),
-      if (isDark)
-        BoxShadow(
-          color: const Color(0xFF9D50BB).withValues(alpha: 0.22 * sinVal),
-          blurRadius: 36 * sinVal,
-          offset: const Offset(0, 4),
-        ),
-    ];
+    return AnimatedBuilder(
+      animation: animation,
+      child: sheet,
+      builder: (context, child) {
+        final double v = animation.value;
+        if (v <= 0.0 || v >= 1.0) return const SizedBox.shrink();
 
-    final transform = Matrix4.identity()
-      ..setEntry(3, 2, 0.0012)
-      ..rotateY(rotationY);
+        final double dx = isForward
+            ? -1.0 + (1.0 + 1.0 / _widthFactor) * v
+            : 1.0 - (1.0 + 1.0 / _widthFactor) * v;
 
-    return FractionalTranslation(
-      translation: translation,
-      child: Transform(
-        transform: transform,
-        alignment: Alignment.center,
-        child: Transform.scale(
-          scale: scale,
-          child: Opacity(
-            opacity: opacity.clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(radius),
-                boxShadow: boxShadow,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(radius),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Underlying view content
-                    child,
-
-                    // Specular Glass Border Frame
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(radius),
-                            border: border,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Live Frosted Glass Overlay (BackdropFilter)
-                    if (showGlassOverlay && blurSigma > 0.1)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(radius),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: blurSigma,
-                                sigmaY: blurSigma,
-                              ),
-                              child: Container(
-                                color: (isDark ? Colors.black : Colors.white)
-                                    .withValues(
-                                  alpha: sinVal * (isDark ? 0.10 : 0.06),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Transient Diagonal Specular Glass Light Sheen
-                    if (showGlassOverlay)
-                      Positioned.fill(
-                        child: _SpecularGlassSheenProgress(
-                          progress: progress,
-                          isDark: isDark,
-                          radius: radius,
-                        ),
-                      ),
-                  ],
-                ),
+        return IgnorePointer(
+          child: RepaintBoundary(
+            child: FractionallySizedBox(
+              widthFactor: _widthFactor,
+              heightFactor: 1.0,
+              alignment:
+                  isForward ? Alignment.centerLeft : Alignment.centerRight,
+              child: FractionalTranslation(
+                translation: Offset(dx, 0.0),
+                child: child,
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-/// Transient diagonal specular glass sheen overlay.
-class _SpecularGlassSheenProgress extends StatelessWidget {
-  const _SpecularGlassSheenProgress({
-    required this.progress,
-    required this.isDark,
-    required this.radius,
-  });
-
-  final double progress;
-  final bool isDark;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    if (progress <= 0.01 || progress >= 0.99) {
-      return const SizedBox.shrink();
-    }
-
-    final double alphaFactor = math.sin(progress.clamp(0.0, 1.0) * math.pi);
-    if (alphaFactor <= 0.01) {
-      return const SizedBox.shrink();
-    }
-
-    final double sweepX = -1.8 + (3.6 * progress);
-
-    final gradient = isDark
-        ? LinearGradient(
-            begin: Alignment(sweepX - 0.7, -1.0),
-            end: Alignment(sweepX + 0.7, 1.0),
-            colors: [
-              Colors.transparent,
-              const Color(0xFF9D50BB).withValues(alpha: 0.24 * alphaFactor),
-              const Color(0xFF00E5FF).withValues(alpha: 0.32 * alphaFactor),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.45, 0.55, 1.0],
-          )
-        : LinearGradient(
-            begin: Alignment(sweepX - 0.7, -1.0),
-            end: Alignment(sweepX + 0.7, 1.0),
-            colors: [
-              Colors.white.withValues(alpha: 0.0),
-              const Color(0xFFE9D5FF).withValues(alpha: 0.28 * alphaFactor),
-              Colors.white.withValues(alpha: 0.50 * alphaFactor),
-              Colors.white.withValues(alpha: 0.0),
-            ],
-            stops: const [0.0, 0.45, 0.55, 1.0],
-          );
-
-    return IgnorePointer(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Container(
-          decoration: BoxDecoration(gradient: gradient),
-        ),
-      ),
-    );
-  }
-}
-
-/// Transition widget providing the macOS Stage Manager 3D Lucid Glass transition
-/// for route pages.
+/// Route transition: spring slide + zoom pop + fade, with the prism wave.
 class LucidGlassPageTransition extends StatefulWidget {
   const LucidGlassPageTransition({
     super.key,
@@ -266,72 +179,46 @@ class _LucidGlassPageTransitionState extends State<LucidGlassPageTransition> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sec = widget.secondaryAnimation;
 
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        widget.animation,
-        if (widget.secondaryAnimation != null) widget.secondaryAnimation!,
-      ]),
-      builder: (context, _) {
-        final double t = widget.animation.value;
-        final bool isStationary =
-            (t <= 0.005 || t >= 0.995) &&
-            (widget.secondaryAnimation == null ||
-                widget.secondaryAnimation!.value <= 0.005);
+      animation: Listenable.merge([widget.animation, ?sec]),
+      child: RepaintBoundary(child: widget.child),
+      builder: (context, child) {
+        final inV = _incomingValues(
+          widget.animation.value.clamp(0.0, 1.0),
+          widget.isForward,
+        );
+        // Receding page when another route is pushed on top.
+        final double secT = sec == null
+            ? 0.0
+            : Curves.easeOutCubic.transform(sec.value.clamp(0.0, 1.0));
 
-        if (isStationary) {
-          return widget.child;
-        }
-
-        // Secondary animation: receding macOS space window when another route is pushed on top
-        if (widget.secondaryAnimation != null &&
-            widget.secondaryAnimation!.value > 0.005) {
-          final double secT = widget.secondaryAnimation!.value;
-          final double outProgress = Curves.easeInOutCubic.transform(secT);
-          final double outScale = 1.0 - (0.14 * outProgress);
-          final double outSlideX = -0.35 * outProgress;
-          final double outRotationY = 0.14 * outProgress;
-          final double outOpacity = (1.0 - outProgress).clamp(0.0, 1.0);
-
-          return _LucidGlassWindow(
-            progress: secT,
-            scale: outScale,
-            translation: Offset(outSlideX, 0.0),
-            rotationY: outRotationY,
-            opacity: outOpacity,
-            isDark: isDark,
-            showGlassOverlay: false,
-            child: widget.child,
-          );
-        }
-
-        // Primary animation: incoming snapping macOS window with spring twitch overshoot
-        final double inSpringValue = kMacOSSpringTwitchCurve.transform(t);
-        final double inSlideX =
-            (widget.isForward ? 0.45 : -0.45) * (1.0 - inSpringValue);
-        final double inScale = 0.88 + (0.12 * inSpringValue);
-        final double inRotationY =
-            (widget.isForward ? -0.16 : 0.16) * (1.0 - inSpringValue);
-        final double inOpacity = (t * 2.5).clamp(0.0, 1.0);
-
-        return _LucidGlassWindow(
-          progress: t,
-          scale: inScale,
-          translation: Offset(inSlideX, 0.0),
-          rotationY: inRotationY,
-          opacity: inOpacity,
-          isDark: isDark,
-          showGlassOverlay: true,
-          child: widget.child,
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            FractionalTranslation(
+              translation: Offset(inV.offset.dx - (0.06 * secT), 0.0),
+              child: Transform.scale(
+                scale: inV.scale * (1.0 - (0.03 * secT)),
+                child: Opacity(opacity: inV.opacity, child: child),
+              ),
+            ),
+            Positioned.fill(
+              child: LucidPrismWave(
+                animation: widget.animation,
+                isForward: widget.isForward,
+                isDark: isDark,
+              ),
+            ),
+          ],
         );
       },
     );
   }
 }
 
-/// A [CustomTransitionPage] implementing the macOS Stage Manager Lucid Glass transition.
-///
-/// Default transition duration is 480ms with 420ms reverse.
+/// A [CustomTransitionPage] implementing the Lucid Glass spring-whip transition.
 class LucidGlassTransitionPage<T> extends CustomTransitionPage<T> {
   LucidGlassTransitionPage({
     required super.child,
@@ -339,8 +226,8 @@ class LucidGlassTransitionPage<T> extends CustomTransitionPage<T> {
     super.name,
     super.arguments,
     super.restorationId,
-    Duration duration = const Duration(milliseconds: 480),
-    Duration reverseDuration = const Duration(milliseconds: 420),
+    Duration duration = kLucidTransitionDuration,
+    Duration reverseDuration = kLucidTransitionDuration,
     bool isForward = true,
   }) : super(
           transitionDuration: duration,
@@ -363,8 +250,8 @@ CustomTransitionPage<T> buildLucidGlassPageTransition<T>({
   String? name,
   Object? arguments,
   String? restorationId,
-  Duration duration = const Duration(milliseconds: 480),
-  Duration reverseDuration = const Duration(milliseconds: 420),
+  Duration duration = kLucidTransitionDuration,
+  Duration reverseDuration = kLucidTransitionDuration,
   bool isForward = true,
 }) {
   return LucidGlassTransitionPage<T>(
@@ -384,8 +271,8 @@ class LucidGlassPageRoute<T> extends PageRouteBuilder<T> {
   LucidGlassPageRoute({
     required WidgetBuilder builder,
     super.settings,
-    Duration duration = const Duration(milliseconds: 480),
-    Duration reverseDuration = const Duration(milliseconds: 420),
+    Duration duration = kLucidTransitionDuration,
+    Duration reverseDuration = kLucidTransitionDuration,
     bool isForward = true,
     super.maintainState,
     super.fullscreenDialog,
@@ -409,32 +296,30 @@ class LucidGlassPageRoute<T> extends PageRouteBuilder<T> {
         );
 }
 
-/// Directional dual-window 3D tab switcher for bottom navigation bars.
+// ─────────────────────────────────────────────────────────────────────────────
+// Zero-Buffer Tab Switcher
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum _TabRole { idle, current, outgoing }
+
+/// Zero-buffer tab host.
 ///
-/// Features:
-/// - Dual-window simultaneous 3D rendering (outgoing receding glass window + incoming snapping glass window)
-/// - Receding window: scales down `1.0` -> `0.86`, slides away `0.0` -> `±0.35`, tilts `±0.14` Y-rotation, fades `1.0` -> `0.0`
-/// - Incoming window: spring curve [kMacOSSpringTwitchCurve] (`Cubic(0.18, 1.18, 0.32, 1.0)`) with elastic overshoot "twitch"
-///   gliding from `±0.45` -> `0.0`, scales up `0.88` -> `1.0`, and un-tilts `∓0.16` -> `0.0`
-/// - Lucid Glass Window Frame: dynamic corner radius (`sin(t * pi) * 32.0`), 1.5px glowing specular border, floating shadow
-/// - Mid-shift optical blur pulse (`sin(t * pi) * 10.0`) and moving specular diagonal light sheen
-/// - Tactile haptic feedback on tab change
-/// - Zero GPU overhead when stationary (`animation.value == 0.0 || 1.0` bypasses BackdropFilter and ClipRRect)
+/// - Each tab is built lazily ONCE, wrapped in a [RepaintBoundary], and kept
+///   alive (state + scroll position + Drift streams) for the app's lifetime.
+/// - Switching only animates cached layers via transforms/opacity; tab bodies
+///   are never rebuilt during the 380ms whip.
+/// - Hidden tabs are [Offstage] with tickers muted.
 class LucidTabTransitionSwitcher extends StatefulWidget {
   const LucidTabTransitionSwitcher({
     super.key,
     required this.currentIndex,
-    required this.previousIndex,
-    required this.child,
-    this.duration = const Duration(milliseconds: 480),
-    this.reverseDuration = const Duration(milliseconds: 420),
+    required this.tabBuilder,
+    this.duration = kLucidTransitionDuration,
   });
 
   final int currentIndex;
-  final int previousIndex;
-  final Widget child;
+  final Widget Function(BuildContext context, int index) tabBuilder;
   final Duration duration;
-  final Duration reverseDuration;
 
   @override
   State<LucidTabTransitionSwitcher> createState() =>
@@ -444,25 +329,17 @@ class LucidTabTransitionSwitcher extends StatefulWidget {
 class _LucidTabTransitionSwitcherState extends State<LucidTabTransitionSwitcher>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  Widget? _outgoingChild;
-  late Widget _incomingChild;
-  late int _currentTab;
-  late int _previousTab;
+  final Map<int, Widget> _tabs = <int, Widget>{};
+  int? _from;
+  bool _isForward = true;
 
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.currentIndex;
-    _previousTab = widget.previousIndex;
-    _incomingChild = widget.child;
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          setState(() {
-            _outgoingChild = null;
-          });
+    _controller = AnimationController(vsync: this, duration: widget.duration)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _from = null);
         }
       });
   }
@@ -471,14 +348,9 @@ class _LucidTabTransitionSwitcherState extends State<LucidTabTransitionSwitcher>
   void didUpdateWidget(covariant LucidTabTransitionSwitcher oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.currentIndex != oldWidget.currentIndex) {
-      _previousTab = oldWidget.currentIndex;
-      _currentTab = widget.currentIndex;
-      _outgoingChild = oldWidget.child;
-      _incomingChild = widget.child;
+      _from = oldWidget.currentIndex;
+      _isForward = widget.currentIndex > oldWidget.currentIndex;
       _controller.forward(from: 0.0);
-      HapticFeedback.selectionClick();
-    } else if (widget.child != oldWidget.child) {
-      _incomingChild = widget.child;
     }
   }
 
@@ -488,71 +360,96 @@ class _LucidTabTransitionSwitcherState extends State<LucidTabTransitionSwitcher>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final double t = _controller.value;
-        final bool isStationary =
-            _controller.isDismissed ||
-            _controller.isCompleted ||
-            _outgoingChild == null;
-
-        if (isStationary) {
-          return widget.child;
-        }
-
-        final bool isForward = _currentTab >= _previousTab;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-
-        // Outgoing receding macOS window calculations
-        final double outProgress = Curves.easeInOutCubic.transform(t);
-        final double outScale = 1.0 - (0.14 * outProgress);
-        final double outSlideX = (isForward ? -0.35 : 0.35) * outProgress;
-        final double outRotationY = (isForward ? 0.14 : -0.14) * outProgress;
-        final double outOpacity = (1.0 - outProgress).clamp(0.0, 1.0);
-
-        // Incoming snapping macOS window with spring twitch overshoot
-        final double inSpringValue = kMacOSSpringTwitchCurve.transform(t);
-        final double inSlideX =
-            (isForward ? 0.45 : -0.45) * (1.0 - inSpringValue);
-        final double inScale = 0.88 + (0.12 * inSpringValue);
-        final double inRotationY =
-            (isForward ? -0.16 : 0.16) * (1.0 - inSpringValue);
-        final double inOpacity = (t * 2.5).clamp(0.0, 1.0);
-
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            // Outgoing receding macOS glass window
-            _LucidGlassWindow(
-              key: ValueKey('outgoing_$_previousTab'),
-              progress: t,
-              scale: outScale,
-              translation: Offset(outSlideX, 0.0),
-              rotationY: outRotationY,
-              opacity: outOpacity,
-              isDark: isDark,
-              showGlassOverlay: false,
-              child: _outgoingChild!,
-            ),
-
-            // Incoming snapping macOS glass window with spring twitch
-            _LucidGlassWindow(
-              key: ValueKey('incoming_$_currentTab'),
-              progress: t,
-              scale: inScale,
-              translation: Offset(inSlideX, 0.0),
-              rotationY: inRotationY,
-              opacity: inOpacity,
-              isDark: isDark,
-              showGlassOverlay: true,
-              child: _incomingChild,
-            ),
-          ],
-        );
-      },
+  Widget _tab(int index) {
+    return _tabs.putIfAbsent(
+      index,
+      () => RepaintBoundary(
+        key: ValueKey<String>('lucid_tab_boundary_$index'),
+        child: widget.tabBuilder(context, index),
+      ),
     );
   }
+
+  Widget _slot(int index, _TabRole role) {
+    final Widget tab = _tab(index);
+    final bool visible = role != _TabRole.idle;
+
+    return KeyedSubtree(
+      key: ValueKey<int>(index),
+      child: Offstage(
+        offstage: !visible,
+        child: TickerMode(
+          enabled: visible,
+          child: IgnorePointer(
+            ignoring: role == _TabRole.outgoing,
+            child: AnimatedBuilder(
+              animation: _controller,
+              child: tab,
+              builder: (context, child) {
+                Offset offset = Offset.zero;
+                double scale = 1.0;
+                double opacity = 1.0;
+
+                if (_from != null && role == _TabRole.current) {
+                  final v = _incomingValues(_controller.value, _isForward);
+                  offset = v.offset;
+                  scale = v.scale;
+                  opacity = v.opacity;
+                } else if (_from != null && role == _TabRole.outgoing) {
+                  final double t = _controller.value;
+                  offset = Offset(
+                    (_isForward ? -0.08 : 0.08) * Curves.easeOutCubic.transform(t),
+                    0.0,
+                  );
+                  scale = 1.0 - (0.03 * t);
+                  opacity = 1.0 -
+                      const Interval(0.0, 0.5, curve: Curves.easeIn)
+                          .transform(t);
+                }
+
+                return FractionalTranslation(
+                  translation: offset,
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final int current = widget.currentIndex;
+    _tab(current); // ensure built
+
+    final List<int> built = _tabs.keys.toList()..sort();
+    final int? from = _from;
+
+    // Paint order: idle tabs, outgoing tab, then the incoming/current tab on top.
+    final List<Widget> children = [
+      for (final i in built)
+        if (i != current && i != from) _slot(i, _TabRole.idle),
+      if (from != null && from != current) _slot(from, _TabRole.outgoing),
+      _slot(current, _TabRole.current),
+      Positioned.fill(
+        key: const ValueKey<String>('lucid_prism_wave'),
+        child: LucidPrismWave(
+          animation: _controller,
+          isForward: _isForward,
+          isDark: isDark,
+        ),
+      ),
+    ];
+
+    return Stack(fit: StackFit.expand, children: children);
+  }
 }
+
+/// Shared helper exposing the sine pulse used for synchronized nav-bar effects.
+double lucidPulse(double t) => math.sin(t.clamp(0.0, 1.0) * math.pi);

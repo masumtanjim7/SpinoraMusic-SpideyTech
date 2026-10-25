@@ -38,13 +38,11 @@ class MainScaffold extends ConsumerStatefulWidget {
 
 class _MainScaffoldState extends ConsumerState<MainScaffold> {
   int _selectedIndex = 0;
-  int _previousIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = ref.read(mainNavTabProvider);
-    _previousIndex = _selectedIndex;
   }
 
   void _onTabTapped(int index) {
@@ -61,14 +59,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
 
     setState(() {
-      _previousIndex = _selectedIndex;
       _selectedIndex = index;
     });
 
     ref.read(mainNavTabProvider.notifier).setTab(index);
   }
 
-  Widget _buildTab(int index) {
+  Widget _buildTab(BuildContext context, int index) {
     switch (index) {
       case 0:
         return const HomeDashboardView();
@@ -104,8 +101,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           Positioned.fill(
             child: LucidTabTransitionSwitcher(
               currentIndex: _selectedIndex,
-              previousIndex: _previousIndex,
-              child: _buildTab(_selectedIndex),
+              tabBuilder: _buildTab,
             ),
           ),
         ],
@@ -145,30 +141,33 @@ class GlassBottomNavBar extends StatefulWidget {
 
 class _GlassBottomNavBarState extends State<GlassBottomNavBar>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmerController;
+  /// Synchronized with the 380ms page whip.
+  late final AnimationController _pillController;
+  late int _fromIndex;
 
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
+    _fromIndex = widget.selectedIndex;
+    _pillController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: kLucidTransitionDuration,
+      value: 1.0,
     );
-    // Initial entrance light sweep shimmer
-    _shimmerController.forward();
   }
 
   @override
   void didUpdateWidget(covariant GlassBottomNavBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedIndex != widget.selectedIndex) {
-      _shimmerController.forward(from: 0.0);
+      _fromIndex = oldWidget.selectedIndex;
+      _pillController.forward(from: 0.0);
     }
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
+    _pillController.dispose();
     super.dispose();
   }
 
@@ -226,24 +225,49 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
                   final double tabWidth = totalWidth / 5.0;
                   final double pillWidth = math.min(tabWidth - 4.0, 56.0);
                   const double pillHeight = 32.0;
-                  final double pillLeft = (widget.selectedIndex * tabWidth) +
-                      ((tabWidth - pillWidth) / 2.0);
+                  final double inset = (tabWidth - pillWidth) / 2.0;
+                  final double fromLeft = (_fromIndex * tabWidth) + inset;
+                  final double toLeft = (widget.selectedIndex * tabWidth) + inset;
+                  final bool forward = widget.selectedIndex >= _fromIndex;
                   const double pillTop = 4.0;
 
                   return Stack(
                     children: [
-                      // Sliding & Morphing Lucid Glass Active Tab Pill
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 380),
-                        curve: Curves.easeOutBack,
-                        left: pillLeft,
-                        top: pillTop,
-                        width: pillWidth,
-                        height: pillHeight,
-                        child: _ActiveGlassPill(
-                          isDark: isDark,
-                          shimmerAnimation: _shimmerController,
-                        ),
+                      // Stretching & gliding Lucid Glass Active Tab Pill: the
+                      // leading edge springs ahead, the trailing edge lags, then
+                      // snaps back (elastic stretch).
+                      AnimatedBuilder(
+                        animation: _pillController,
+                        builder: (context, _) {
+                          final double t = _pillController.value;
+                          final double lead =
+                              kMacOSSpringTwitchCurve.transform(t);
+                          final double trail = const Interval(
+                            0.14,
+                            1.0,
+                            curve: Curves.easeOutCubic,
+                          ).transform(t);
+
+                          final double fromRight = fromLeft + pillWidth;
+                          final double toRight = toLeft + pillWidth;
+                          final double leftEdge = forward
+                              ? fromLeft + ((toLeft - fromLeft) * trail)
+                              : fromLeft + ((toLeft - fromLeft) * lead);
+                          final double rightEdge = forward
+                              ? fromRight + ((toRight - fromRight) * lead)
+                              : fromRight + ((toRight - fromRight) * trail);
+
+                          return Positioned(
+                            left: leftEdge,
+                            top: pillTop,
+                            width: math.max(pillWidth * 0.8, rightEdge - leftEdge),
+                            height: pillHeight,
+                            child: _ActiveGlassPill(
+                              isDark: isDark,
+                              progress: t,
+                            ),
+                          );
+                        },
                       ),
 
                       // Interactive 5 Tabs
@@ -294,16 +318,19 @@ class _GlassBottomNavBarState extends State<GlassBottomNavBar>
   }
 }
 
-/// Tactile Lucid Glass selection capsule with BackdropFilter, specular borders,
-/// neon/lavender glow drop shadows, and a diagonal specular light sweep animation.
+/// Tactile Lucid Glass selection capsule with specular border pulse (synced to
+/// the page whip), neon/lavender glow, and a diagonal specular light sweep.
+/// No BackdropFilter: the nav bar already provides the frosted backdrop.
 class _ActiveGlassPill extends StatelessWidget {
   const _ActiveGlassPill({
     required this.isDark,
-    required this.shimmerAnimation,
+    required this.progress,
   });
 
   final bool isDark;
-  final Animation<double> shimmerAnimation;
+
+  /// 0 → 1 over the 380ms tab switch (1.0 when idle).
+  final double progress;
 
   @override
   Widget build(BuildContext context) {
@@ -325,25 +352,29 @@ class _ActiveGlassPill extends StatelessWidget {
             ],
           );
 
+    final double pulse = lucidPulse(progress);
+    final bool animating = progress > 0.0 && progress < 1.0;
+
+    // Specular border brightens & thickens at mid-whip.
     final border = Border.all(
       color: isDark
-          ? Colors.white.withValues(alpha: 0.28)
+          ? Colors.white.withValues(alpha: 0.28 + (0.50 * pulse))
           : Colors.white.withValues(alpha: 0.95),
-      width: isDark ? 1.0 : 1.2,
+      width: (isDark ? 1.0 : 1.2) + (0.8 * pulse),
     );
 
     final boxShadow = [
       if (isDark)
         BoxShadow(
-          color: const Color(0xFF9D50BB).withValues(alpha: 0.35),
-          blurRadius: 16,
+          color: const Color(0xFF9D50BB).withValues(alpha: 0.35 + (0.30 * pulse)),
+          blurRadius: 16 + (10 * pulse),
           spreadRadius: 1,
           offset: const Offset(0, 2),
         )
       else
         BoxShadow(
-          color: const Color(0xFF7A5CFF).withValues(alpha: 0.20),
-          blurRadius: 14,
+          color: const Color(0xFF7A5CFF).withValues(alpha: 0.20 + (0.22 * pulse)),
+          blurRadius: 14 + (10 * pulse),
           spreadRadius: 1,
           offset: const Offset(0, 2),
         ),
@@ -356,53 +387,36 @@ class _ActiveGlassPill extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Glass body capsule with gradient & specular border
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Glass body capsule with gradient & specular border
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: gradient,
+                border: border,
+              ),
+            ),
+
+            // Diagonal specular light sweep synced to the page whip
+            if (animating)
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  gradient: gradient,
-                  border: border,
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.8 + (3.6 * progress) - 0.7, -1.0),
+                    end: Alignment(-1.8 + (3.6 * progress) + 0.7, 1.0),
+                    colors: [
+                      Colors.white.withValues(alpha: 0.0),
+                      Colors.white.withValues(alpha: isDark ? 0.38 : 0.50),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
-
-              // Diagonal specular light sweep / glass shimmer on selection
-              AnimatedBuilder(
-                animation: shimmerAnimation,
-                builder: (context, child) {
-                  final progress = shimmerAnimation.value;
-                  if (progress <= 0.0 || progress >= 1.0) {
-                    return const SizedBox.shrink();
-                  }
-
-                  // Sweeps diagonally across from top-left to bottom-right
-                  final double sweepX = -1.8 + (3.6 * progress);
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        begin: Alignment(sweepX - 0.7, -1.0),
-                        end: Alignment(sweepX + 0.7, 1.0),
-                        colors: [
-                          Colors.white.withValues(alpha: 0.0),
-                          Colors.white.withValues(
-                            alpha: isDark ? 0.38 : 0.50,
-                          ),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
