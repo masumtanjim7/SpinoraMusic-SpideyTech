@@ -532,4 +532,113 @@ void main() {
       expect(find.text('3:00'), findsOneWidget);
     });
   });
+
+  group('Resilient MP4 stream selection, caching, and YouTubeByteStreamSource fallback tests', () {
+    test('resolveStream prioritizes MP4 (itag 140) over higher-bitrate WebM (itag 251) and caches for 30 minutes', () async {
+      int playerCalls = 0;
+      final mockInnerTubePlayerJson = jsonEncode({
+        'playabilityStatus': {'status': 'OK'},
+        'streamingData': {
+          'adaptiveFormats': [
+            {
+              'itag': 251,
+              'mimeType': 'audio/webm; codecs="opus"',
+              'bitrate': 160000,
+              'contentLength': '4000000',
+              'url': 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=mp4TestVid&itag=251',
+            },
+            {
+              'itag': 140,
+              'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+              'bitrate': 128000,
+              'contentLength': '3200000',
+              'url': 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=mp4TestVid&itag=140',
+            },
+          ],
+        },
+      });
+
+      final mockClient = _MockHttpClient((req) async {
+        if (req.url.toString().contains('youtubei/v1/player')) {
+          playerCalls++;
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(mockInnerTubePlayerJson)),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (req.url.host.contains('googlevideo.com')) {
+          return http.StreamedResponse(
+            Stream.value([1, 2, 3, 4]),
+            206,
+            headers: {
+              'content-type': 'audio/mp4',
+              'content-range': 'bytes 0-3/3200000',
+              'content-length': '4',
+            },
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{}')),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      final resolved = await service.resolveStream('mp4TestVid');
+      expect(resolved.url.contains('itag=140'), true, reason: 'Must select MP4 itag 140 over WebM itag 251');
+      expect(resolved.mimeType, 'audio/mp4');
+
+      final callsAfterFirst = playerCalls;
+      final cachedResolved = await service.resolveStream('mp4TestVid');
+      expect(cachedResolved.url, resolved.url);
+      expect(playerCalls, callsAfterFirst, reason: 'Must serve from 30-min cache without re-fetching');
+
+      // Invalidate on error and verify re-fetch
+      service.invalidateStreamCache('mp4TestVid');
+      await service.resolveStream('mp4TestVid');
+      expect(playerCalls > callsAfterFirst, true, reason: 'Must re-fetch after cache invalidation');
+      service.dispose();
+    });
+
+    test('YouTubeByteStreamSource streams chunked range bytes cleanly', () async {
+      final mockBytes = List<int>.generate(1024, (i) => i % 256);
+      final mockClient = _MockHttpClient((req) async {
+        return http.StreamedResponse(
+          Stream.value(mockBytes),
+          200,
+          headers: {
+            'content-type': 'audio/mp4',
+            'content-length': '${mockBytes.length}',
+          },
+        );
+      });
+
+      final service = YoutubeAudioService(httpClient: mockClient);
+      const resolved = ResolvedAudioStream(
+        url: 'https://rr1---sn-mock.googlevideo.com/videoplayback?id=byteTest&itag=140',
+        userAgent: kYouTubeVrUserAgent,
+        mimeType: 'audio/mp4',
+        contentLength: 1024,
+      );
+
+      final byteSource = YouTubeByteStreamSource(
+        videoId: 'byteTest',
+        resolvedStream: resolved,
+        youtubeService: service,
+      );
+
+      final response = await byteSource.request(0, 1024);
+      expect(response.contentType, 'audio/mp4');
+      expect(response.sourceLength, 1024);
+
+      final collected = <int>[];
+      await for (final chunk in response.stream) {
+        collected.addAll(chunk);
+      }
+      expect(collected.length, 1024);
+      service.dispose();
+    });
+  });
 }

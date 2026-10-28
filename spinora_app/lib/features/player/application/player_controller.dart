@@ -177,6 +177,8 @@ class PlayerController extends Notifier<PlayerState> {
     return _player!;
   }
 
+  AudioPlayer get _audioPlayer => player;
+
   AndroidEqualizer get equalizer {
     if (_equalizer == null) {
       final _ = player;
@@ -584,6 +586,21 @@ class PlayerController extends Notifier<PlayerState> {
         }
       }),
     );
+
+    _subscriptions.add(
+      player.playbackEventStream.listen(
+        (_) {},
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint('[PlayerController] PlaybackEvent error: $error');
+          if (state.isBuffering) {
+            state = state.copyWith(
+              isBuffering: false,
+              isPlaying: false,
+            );
+          }
+        },
+      ),
+    );
   }
 
   /// Generates an unbiased Fisher-Yates random permutation of [list].
@@ -736,29 +753,112 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   final Map<String, String> _resolvedStreamUrls = {};
+  final Map<String, ResolvedAudioStream> _resolvedStreams = {};
   int _playbackRequestId = 0;
 
-  /// Resolves direct HTTPS stream URL for online tracks (e.g. `yt://<videoId>`).
-  Future<String> _resolveTrackStreamUrl(
+  /// Resolves [ResolvedAudioStream] for online YouTube tracks (`yt://<videoId>`).
+  Future<ResolvedAudioStream> _resolveTrackStream(
     Track track, {
     bool forceFallback = false,
   }) async {
-    if (!track.uri.startsWith('yt://')) {
-      return track.uri;
-    }
-    if (!forceFallback && _resolvedStreamUrls.containsKey(track.uri)) {
-      return _resolvedStreamUrls[track.uri]!;
-    }
     final videoId = track.uri.replaceFirst('yt://', '');
     final service = ref.read(youtubeAudioServiceProvider);
-    final streamUrl = await service.getAudioStreamUrl(
+    if (!forceFallback && _resolvedStreams.containsKey(track.uri)) {
+      final cached = service.resolveStream(
+        videoId,
+        title: track.title,
+        artist: track.artist,
+        forceRefresh: false,
+      );
+      final resolved = await cached;
+      _resolvedStreams[track.uri] = resolved;
+      _resolvedStreamUrls[track.uri] = resolved.url;
+      return resolved;
+    }
+
+    final resolved = await service.resolveStream(
       videoId,
       title: track.title,
       artist: track.artist,
-      fallback: forceFallback,
+      forceRefresh: forceFallback,
     );
-    _resolvedStreamUrls[track.uri] = streamUrl;
-    return streamUrl;
+    _resolvedStreams[track.uri] = resolved;
+    _resolvedStreamUrls[track.uri] = resolved.url;
+    return resolved;
+  }
+
+  /// Loads [source] into [_audioPlayer] with a [timeout] (6 seconds) and starts playback,
+  /// verifying that buffering reaches [ProcessingState.ready] (or advances position)
+  /// within [timeout] before returning. Throws [PlayerException] or [TimeoutException]
+  /// if loading or buffering fails.
+  Future<void> _loadAndBufferOnlineSource(
+    AudioSource source, {
+    required int requestId,
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    await _audioPlayer.setAudioSource(source).timeout(timeout);
+    if (requestId != _playbackRequestId) return;
+
+    final readyCompleter = Completer<void>();
+    StreamSubscription<dynamic>? stateSub;
+    StreamSubscription<PlaybackEvent>? eventSub;
+
+    bool isReadyNow() {
+      final ps = _audioPlayer.processingState;
+      return ps == ProcessingState.ready ||
+          ps == ProcessingState.completed ||
+          _audioPlayer.position > Duration.zero;
+    }
+
+    if (isReadyNow()) {
+      readyCompleter.complete();
+    } else {
+      stateSub = _audioPlayer.playerStateStream.listen(
+        (ps) {
+          if (!readyCompleter.isCompleted &&
+              (ps.processingState == ProcessingState.ready ||
+                  ps.processingState == ProcessingState.completed)) {
+            readyCompleter.complete();
+          }
+        },
+        onError: (Object err, StackTrace st) {
+          if (!readyCompleter.isCompleted) {
+            readyCompleter.completeError(err, st);
+          }
+        },
+      );
+      eventSub = _audioPlayer.playbackEventStream.listen(
+        (event) {
+          if (!readyCompleter.isCompleted &&
+              (event.processingState == ProcessingState.ready ||
+                  event.processingState == ProcessingState.completed ||
+                  event.updatePosition > Duration.zero)) {
+            readyCompleter.complete();
+          }
+        },
+        onError: (Object err, StackTrace st) {
+          if (!readyCompleter.isCompleted) {
+            readyCompleter.completeError(err, st);
+          }
+        },
+      );
+    }
+
+    // Start playback without blocking for the entire song duration
+    unawaited(
+      _audioPlayer.play().catchError((Object err, StackTrace st) {
+        if (!readyCompleter.isCompleted) {
+          readyCompleter.completeError(err, st);
+        }
+      }),
+    );
+
+    try {
+      await readyCompleter.future.timeout(timeout);
+    } finally {
+      await stateSub?.cancel();
+      await eventSub?.cancel();
+    }
   }
 
   AudioSource _buildAudioSource(Track track) {
@@ -774,7 +874,16 @@ class PlayerController extends Notifier<PlayerState> {
       final parsed = (uriString.startsWith('/') && !uriString.startsWith('//'))
           ? Uri.file(uriString)
           : Uri.parse(uriString);
-      return AudioSource.uri(parsed, tag: mediaItem);
+      return AudioSource.uri(
+        parsed,
+        headers: const {
+          'User-Agent':
+              'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)',
+          'Accept': '*/*',
+          'Connection': 'keep-alive',
+        },
+        tag: mediaItem,
+      );
     }
 
     final sourceUri = Uri.parse(uriString);
@@ -893,16 +1002,19 @@ class PlayerController extends Notifier<PlayerState> {
 
     try {
       if (isOnline) {
-        // Stop any active playback immediately to release previous ExoPlayer connections
+        final videoId = track.uri.replaceFirst('yt://', '');
+        final service = ref.read(youtubeAudioServiceProvider);
+
+        // Stop any active playback immediately to release any hanging ExoPlayer socket from the previous stream
         try {
-          await player.stop();
+          await _audioPlayer.stop();
         } catch (_) {}
 
         final mediaItem = _createMediaItem(track);
 
         try {
-          // 2) Extract videoId and await getAudioStreamUrl (first attempt)
-          final streamUrl = await _resolveTrackStreamUrl(track);
+          // 2) Resolve MP4 (itag 140) stream info (from 30-min cache or multi-client manifest)
+          final streamInfo = await _resolveTrackStream(track);
           if (requestId != _playbackRequestId) {
             debugPrint(
               '[PlayerController] Discarding outdated playback request #$requestId for ${track.title}',
@@ -910,56 +1022,94 @@ class PlayerController extends Notifier<PlayerState> {
             return;
           }
 
-          final streamUri =
-              (streamUrl.startsWith('/') && !streamUrl.startsWith('//'))
-              ? Uri.file(streamUrl)
-              : Uri.parse(streamUrl);
+          // 3) Feed into just_audio with matching HTTP headers
+          final audioSource = AudioSource.uri(
+             streamInfo.uri,
+            headers: const {
+              'User-Agent':
+                  'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)',
+              'Accept': '*/*',
+              'Connection': 'keep-alive',
+            },
+            tag: mediaItem,
+          );
 
-          // 3) Load resolved URL without custom headers so ExoPlayer connects directly over HTTP/HTTPS/file
-          final audioSource = AudioSource.uri(streamUri, tag: mediaItem);
-
-          await player.setAudioSource(audioSource);
-          if (requestId != _playbackRequestId) return;
-
-          await player.play();
+          await _loadAndBufferOnlineSource(
+            audioSource,
+            requestId: requestId,
+            timeout: const Duration(seconds: 6),
+          );
           if (requestId != _playbackRequestId) return;
         } catch (initialError, initialStackTrace) {
           if (requestId != _playbackRequestId) return;
 
           debugPrint(
-            '[PlayerController] Initial online stream playback failed ($initialError). Retrying with fallback stream...',
+            '[PlayerController] Direct AudioSource.uri failed or timed out ($initialError). Switching to YouTubeByteStreamSource / fresh client stream...',
           );
           if (kDebugMode) {
             debugPrint(initialStackTrace.toString());
           }
-          // Invalidate cached stream URL
-          _resolvedStreamUrls.remove(track.uri);
 
-          // Retry once with fallback stream from YoutubeAudioService
-          final fallbackStreamUrl = await _resolveTrackStreamUrl(
+          // Release hanging socket and invalidate cached stream URL
+          try {
+            await _audioPlayer.stop();
+          } catch (_) {}
+          _resolvedStreams.remove(track.uri);
+          _resolvedStreamUrls.remove(track.uri);
+          service.invalidateStreamCache(videoId);
+
+          // Re-resolve fresh stream info with fresh YoutubeExplode client
+          final freshStreamInfo = await _resolveTrackStream(
             track,
             forceFallback: true,
           );
           if (requestId != _playbackRequestId) return;
 
-          final fallbackUri =
-              (fallbackStreamUrl.startsWith('/') &&
-                  !fallbackStreamUrl.startsWith('//'))
-              ? Uri.file(fallbackStreamUrl)
-              : Uri.parse(fallbackStreamUrl);
-          final fallbackAudioSource = AudioSource.uri(
-            fallbackUri,
+          final byteStreamSource = YouTubeByteStreamSource(
+            videoId: videoId,
+            resolvedStream: freshStreamInfo,
+            youtubeService: service,
             tag: mediaItem,
           );
 
-          await player.setAudioSource(fallbackAudioSource);
-          if (requestId != _playbackRequestId) return;
+          try {
+            await _loadAndBufferOnlineSource(
+              byteStreamSource,
+              requestId: requestId,
+              timeout: const Duration(seconds: 8),
+            );
+          } catch (byteStreamError) {
+            if (requestId != _playbackRequestId) return;
+            debugPrint(
+              '[PlayerController] YouTubeByteStreamSource fallback encountered error ($byteStreamError). Trying local loopback range proxy...',
+            );
+            try {
+              await _audioPlayer.stop();
+            } catch (_) {}
+            final proxyUrl = await service.getAudioStreamUrl(
+              videoId,
+              title: track.title,
+              artist: track.artist,
+              fallback: true,
+            );
+            if (requestId != _playbackRequestId) return;
+            final proxySource = AudioSource.uri(
+              Uri.parse(proxyUrl),
+              tag: mediaItem,
+            );
+            await _loadAndBufferOnlineSource(
+              proxySource,
+              requestId: requestId,
+              timeout: const Duration(seconds: 8),
+            );
+          }
 
-          await player.play();
           if (requestId != _playbackRequestId) return;
-          _triggerFadeInIfNeeded();
         }
 
+        if (requestId != _playbackRequestId) return;
+        state = state.copyWith(isBuffering: false, isPlaying: true);
+        _triggerFadeInIfNeeded();
         _recordPlayback(track);
 
         // Auto-fetch lyrics online in background
@@ -975,21 +1125,21 @@ class PlayerController extends Notifier<PlayerState> {
       );
       if (activeQueue.length > 1 && !hasOnlineInQueue) {
         final sources = activeQueue.map(_buildAudioSource).toList();
-        await player.setAudioSources(sources, initialIndex: index);
+        await _audioPlayer.setAudioSources(sources, initialIndex: index);
         // Keep just_audio's native shuffle order in sync with shuffle state.
-        await player.setShuffleModeEnabled(state.isShuffled);
+        await _audioPlayer.setShuffleModeEnabled(state.isShuffled);
         if (state.isShuffled) {
-          await player.shuffle();
+          await _audioPlayer.shuffle();
         }
       } else {
-        await player.setShuffleModeEnabled(false);
+        await _audioPlayer.setShuffleModeEnabled(false);
         final audioSource = _buildAudioSource(track);
-        await player.setAudioSource(audioSource);
+        await _audioPlayer.setAudioSource(audioSource);
       }
 
       if (requestId != _playbackRequestId) return;
 
-      await player.play();
+      unawaited(_audioPlayer.play());
       _triggerFadeInIfNeeded();
       _recordPlayback(track);
 
@@ -1244,7 +1394,15 @@ class PlayerController extends Notifier<PlayerState> {
       await playTrack(state.queue.first);
       return;
     }
-    await player.play();
+    if (state.currentTrack != null &&
+        state.currentTrack!.uri.startsWith('yt://') &&
+        (_audioPlayer.processingState == ProcessingState.idle ||
+            _audioPlayer.audioSource == null ||
+            state.errorMessage != null)) {
+      await playTrack(state.currentTrack!);
+      return;
+    }
+    await _audioPlayer.play();
   }
 
   Future<void> pause() {

@@ -1,3 +1,5 @@
+// ignore_for_file: experimental_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -5,11 +7,25 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart'
+    show StreamAudioResponse, StreamAudioSource;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../../../../core/database/app_database.dart';
 
-/// Fully resolved direct audio stream with associated client headers and MIME metadata.
+/// Standard unthrottled Android VR YouTube client User-Agent header.
+const String kYouTubeVrUserAgent =
+    'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)';
+
+/// Default HTTP headers passed to `AudioSource.uri` for unthrottled YouTube stream playback.
+const Map<String, String> kYouTubeStreamHeaders = {
+  'User-Agent': kYouTubeVrUserAgent,
+  'Accept': '*/*',
+  'Connection': 'keep-alive',
+};
+
+/// Fully resolved direct audio stream with associated client headers, MIME metadata,
+/// and optional `youtube_explode_dart` [StreamInfo] for byte-stream fallback.
 class ResolvedAudioStream {
   const ResolvedAudioStream({
     required this.url,
@@ -17,6 +33,7 @@ class ResolvedAudioStream {
     this.referer,
     this.mimeType = 'audio/mp4',
     this.contentLength,
+    this.streamInfo,
   });
 
   final String url;
@@ -24,6 +41,66 @@ class ResolvedAudioStream {
   final String? referer;
   final String mimeType;
   final int? contentLength;
+  final StreamInfo? streamInfo;
+
+  Uri get uri => Uri.parse(url);
+
+  Map<String, String> get headers => {
+    'User-Agent': userAgent,
+    'Accept': '*/*',
+    'Connection': 'keep-alive',
+    'Referer': ?referer,
+  };
+}
+
+/// Custom [StreamAudioSource] fallback backed by `YoutubeExplode.videos.streamsClient.get(streamInfo)`
+/// and chunked HTTP range requests. Used automatically when `AudioSource.uri` throws a
+/// `PlayerException` (e.g. HTTP 403 / source error) or fails to buffer within 6 seconds.
+class YouTubeByteStreamSource extends StreamAudioSource {
+  YouTubeByteStreamSource({
+    required this.videoId,
+    required this.resolvedStream,
+    required this.youtubeService,
+    super.tag,
+  });
+
+  final String videoId;
+  final ResolvedAudioStream resolvedStream;
+  final YoutubeAudioService youtubeService;
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final totalLength =
+        resolvedStream.streamInfo?.size.totalBytes ??
+        resolvedStream.contentLength;
+    final effectiveStart = start ?? 0;
+    final effectiveEnd = (end != null && totalLength != null)
+        ? end.clamp(effectiveStart, totalLength)
+        : (end ?? totalLength);
+    final contentLength = effectiveEnd != null
+        ? (effectiveEnd - effectiveStart)
+        : null;
+
+    final streamInfo = resolvedStream.streamInfo;
+    if (streamInfo != null &&
+        effectiveStart == 0 &&
+        (end == null || (totalLength != null && end >= totalLength))) {
+      return StreamAudioResponse(
+        sourceLength: totalLength,
+        contentLength: contentLength ?? totalLength,
+        offset: 0,
+        stream: youtubeService.getRawByteStream(streamInfo),
+        contentType: resolvedStream.mimeType,
+      );
+    }
+
+    return youtubeService.openRangeStreamResponse(
+      resolvedStream: resolvedStream,
+      start: effectiveStart,
+      end: effectiveEnd,
+      totalLength: totalLength,
+    );
+  }
 }
 
 class _CachedStreamEntry {
@@ -37,16 +114,36 @@ class _CachedStreamEntry {
 }
 
 /// Service providing online YouTube audio search and multi-stage unthrottled audio streaming
-/// via a local HTTP proxy server with Range support, matching client headers, and temp caching.
+/// with multi-client manifest resolution, MP4 (`itag 140`) prioritization, 30-min caching,
+/// and automatic `StreamAudioSource` byte-stream fallback.
 class YoutubeAudioService {
   YoutubeAudioService({YoutubeExplode? ytClient, http.Client? httpClient})
     : _yt = ytClient ?? YoutubeExplode(),
+      _hasCustomYtClient = ytClient != null,
+      _hasCustomHttpClient = httpClient != null,
       _httpClient = httpClient ?? http.Client();
 
-  final YoutubeExplode _yt;
+  YoutubeExplode _yt;
+  final bool _hasCustomYtClient;
+  final bool _hasCustomHttpClient;
   final http.Client _httpClient;
   HttpServer? _proxyServer;
   final Map<String, _CachedStreamEntry> _streamCache = {};
+
+  /// Recreates a fresh [YoutubeExplode] instance (closing the old one) so stale
+  /// visitor sessions never block playback after 1-2 songs.
+  void resetYoutubeClient() {
+    if (_hasCustomYtClient) return;
+    try {
+      _yt.close();
+    } catch (_) {}
+    _yt = YoutubeExplode();
+  }
+
+  /// Invalidates any cached stream entry for [videoId].
+  void invalidateStreamCache(String videoId) {
+    _streamCache.remove(videoId);
+  }
 
   /// Returns cached stream if available and not expired (30-min TTL).
   ResolvedAudioStream? _getCachedStream(String videoId) {
@@ -1090,80 +1187,196 @@ class YoutubeAudioService {
     return completer.future;
   }
 
-  /// Resolver 1: Fast youtube_explode manifest query using [ios, androidVr]
-  /// prioritizing itag 140 / 139 (~128k/64k mp4 audio) for sub-second buffering.
-  Future<ResolvedAudioStream?> _resolveFastManifest(String videoId) async {
+  /// Filters [manifest.audioOnly] to prioritize hardware-accelerated MP4/M4A
+  /// container streams (`stream.container == StreamContainer.mp4` or
+  /// `stream.codec.mimeType.contains('mp4')`, specifically targeting ~128kbps AAC `itag 140`)
+  /// sorted by highest bitrate, and only falls back to WebM/muxed streams if no MP4
+  /// audio-only stream exists.
+  static StreamInfo? selectBestAudioStream(StreamManifest manifest) {
+    final audioOnly = manifest.audioOnly.toList();
+    if (audioOnly.isNotEmpty) {
+      final mp4Streams = audioOnly.where((stream) {
+        final mime = stream.codec.mimeType.toLowerCase();
+        return stream.container == StreamContainer.mp4 ||
+            mime.contains('mp4') ||
+            stream.tag == 140;
+      }).toList();
+
+      if (mp4Streams.isNotEmpty) {
+        mp4Streams.sort((a, b) {
+          final aIs140 = a.tag == 140;
+          final bIs140 = b.tag == 140;
+          if (aIs140 && !bIs140) return -1;
+          if (!aIs140 && bIs140) return 1;
+          return b.bitrate.compareTo(a.bitrate);
+        });
+        return mp4Streams.first;
+      }
+
+      // Fallback to WebM/other audio-only streams sorted by highest bitrate
+      audioOnly.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+      return audioOnly.first;
+    }
+
+    // Last resort: check muxed streams if audioOnly is empty
+    final muxed = manifest.muxed
+        .where(
+          (stream) =>
+              stream.container == StreamContainer.mp4 ||
+              stream.codec.mimeType.toLowerCase().contains('mp4') ||
+              stream.codec.mimeType.toLowerCase().contains('audio'),
+        )
+        .toList();
+    if (muxed.isNotEmpty) {
+      muxed.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+      return muxed.first;
+    }
+
+    return null;
+  }
+
+  /// Exposes `YoutubeExplode.videos.streamsClient.get(streamInfo)` for [YouTubeByteStreamSource].
+  Stream<List<int>> getRawByteStream(StreamInfo streamInfo) {
+    return _yt.videos.streamsClient.get(streamInfo);
+  }
+
+  /// Opens a chunked HTTP range stream response for [YouTubeByteStreamSource].
+  Future<StreamAudioResponse> openRangeStreamResponse({
+    required ResolvedAudioStream resolvedStream,
+    required int start,
+    int? end,
+    int? totalLength,
+  }) async {
+    final effectiveEnd = (end != null && totalLength != null)
+        ? end.clamp(start, totalLength)
+        : (end ?? totalLength);
+    final contentLength = effectiveEnd != null ? (effectiveEnd - start) : null;
+
+    Stream<List<int>> byteStream() async* {
+      final chunkSize = 512 * 1024; // 512 KB chunks to avoid YouTube throttling
+      int currentByte = start;
+      final targetEndInclusive = effectiveEnd != null ? effectiveEnd - 1 : null;
+
+      while (targetEndInclusive == null || currentByte <= targetEndInclusive) {
+        final chunkEnd = targetEndInclusive != null
+            ? (currentByte + chunkSize - 1).clamp(
+                currentByte,
+                targetEndInclusive,
+              )
+            : (currentByte + chunkSize - 1);
+
+        final req = http.Request('GET', Uri.parse(resolvedStream.url));
+        req.headers['User-Agent'] = resolvedStream.userAgent;
+        req.headers['Accept'] = '*/*';
+        req.headers['Connection'] = 'keep-alive';
+        if (resolvedStream.referer != null) {
+          req.headers['Referer'] = resolvedStream.referer!;
+        }
+        req.headers['Range'] = 'bytes=$currentByte-$chunkEnd';
+
+        final streamedRes = await _httpClient
+            .send(req)
+            .timeout(const Duration(seconds: 8));
+        if (streamedRes.statusCode != 200 && streamedRes.statusCode != 206) {
+          throw HttpException(
+            'YouTube range request failed with HTTP ${streamedRes.statusCode}',
+            uri: Uri.parse(resolvedStream.url),
+          );
+        }
+
+        int bytesReceivedInChunk = 0;
+        await for (final data in streamedRes.stream) {
+          bytesReceivedInChunk += data.length;
+          yield data;
+        }
+
+        if (bytesReceivedInChunk == 0) break;
+        currentByte += bytesReceivedInChunk;
+
+        if (streamedRes.statusCode == 200) {
+          break;
+        }
+      }
+    }
+
+    return StreamAudioResponse(
+      sourceLength: totalLength,
+      contentLength: contentLength,
+      offset: start,
+      stream: byteStream(),
+      contentType: resolvedStream.mimeType,
+    );
+  }
+
+  /// Resolver 1: Multi-Client Unthrottled Manifest Resolution (`youtube_explode_dart`).
+  /// Explicitly passes `[YoutubeApiClient.androidVr, YoutubeApiClient.ios, YoutubeApiClient.androidMusic]`
+  /// with a 10-second timeout, and automatically recreates a fresh `YoutubeExplode()` instance
+  /// and retries with default clients if the primary call fails or returns empty audio streams.
+  Future<ResolvedAudioStream?> _resolveFastManifest(
+    String videoId, {
+    bool forceFreshClient = false,
+  }) async {
+    if (forceFreshClient) {
+      resetYoutubeClient();
+    }
+
+    StreamInfo? bestStream;
+
     try {
       final manifest = await _yt.videos.streamsClient
           .getManifest(
             videoId,
-            ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+            ytClients: [
+              YoutubeApiClient.androidVr,
+              YoutubeApiClient.ios,
+              YoutubeApiClient.androidMusic,
+            ],
             requireWatchPage: false,
           )
-          .timeout(const Duration(milliseconds: 3500));
+          .timeout(const Duration(seconds: 10));
 
-      final audioStreams = manifest.audioOnly.toList();
-      final candidateStreams = audioStreams.isNotEmpty
-          ? audioStreams
-          : manifest.muxed
-                .where(
-                  (s) =>
-                      s.container.name == 'mp4' ||
-                      s.codec.mimeType.contains('audio'),
-                )
-                .toList();
-
-      if (candidateStreams.isEmpty) return null;
-
-      // Prioritize itag 140 or 139 (instant buffering MP4 audio)
-      candidateStreams.sort((a, b) {
-        final aIs140or139 = a.tag == 140 || a.tag == 139;
-        final bIs140or139 = b.tag == 140 || b.tag == 139;
-        if (aIs140or139 && !bIs140or139) return -1;
-        if (!aIs140or139 && bIs140or139) return 1;
-
-        final aIsMp4 =
-            a.container.name == 'mp4' || a.codec.mimeType.contains('mp4');
-        final bIsMp4 =
-            b.container.name == 'mp4' || b.codec.mimeType.contains('mp4');
-        if (aIsMp4 && !bIsMp4) return -1;
-        if (!aIsMp4 && bIsMp4) return 1;
-
-        return b.bitrate.compareTo(a.bitrate);
-      });
-
-      for (final candidate in candidateStreams) {
-        final rawUrl = candidate.url.toString();
-        if (rawUrl.isEmpty) continue;
-
-        try {
-          const ua =
-              'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)';
-          final testReq = await _httpClient
-              .get(
-                Uri.parse(rawUrl),
-                headers: {'User-Agent': ua, 'Range': 'bytes=0-1024'},
-              )
-              .timeout(const Duration(milliseconds: 2500));
-
-          if (testReq.statusCode == 200 || testReq.statusCode == 206) {
-            debugPrint(
-              '[YoutubeAudioService] Fast Manifest (Resolver 1) resolved stream for $videoId (itag: ${candidate.tag})',
-            );
-            return ResolvedAudioStream(
-              url: rawUrl,
-              userAgent: ua,
-              mimeType: candidate.codec.mimeType,
-              contentLength: candidate.size.totalBytes,
-            );
-          }
-        } catch (_) {}
-      }
+      bestStream = selectBestAudioStream(manifest);
     } catch (e) {
       debugPrint(
-        '[YoutubeAudioService] Fast Manifest probe error for $videoId: $e',
+        '[YoutubeAudioService] Primary multi-client getManifest failed for $videoId: $e',
       );
     }
+
+    // Automatic fallback: recreate a fresh YoutubeExplode() instance (closing the old one)
+    // and retry with default clients so stale visitor sessions never block playback after 1-2 songs.
+    if (bestStream == null) {
+      debugPrint(
+        '[YoutubeAudioService] Recreating fresh YoutubeExplode instance and retrying getManifest with default clients for $videoId...',
+      );
+      resetYoutubeClient();
+      try {
+        final fallbackManifest = await _yt.videos.streamsClient
+            .getManifest(videoId)
+            .timeout(const Duration(seconds: 10));
+        bestStream = selectBestAudioStream(fallbackManifest);
+      } catch (e) {
+        debugPrint(
+          '[YoutubeAudioService] Fallback getManifest with fresh YoutubeExplode failed for $videoId: $e',
+        );
+      }
+    }
+
+    if (bestStream != null) {
+      final rawUrl = ensureHttps(bestStream.url.toString());
+      if (rawUrl.isNotEmpty) {
+        debugPrint(
+          '[YoutubeAudioService] Manifest resolved stream for $videoId (itag: ${bestStream.tag}, container: ${bestStream.container.name}, mime: ${bestStream.codec.mimeType})',
+        );
+        return ResolvedAudioStream(
+          url: rawUrl,
+          userAgent: kYouTubeVrUserAgent,
+          mimeType: bestStream.codec.mimeType,
+          contentLength: bestStream.size.totalBytes,
+          streamInfo: bestStream,
+        );
+      }
+    }
+
     return null;
   }
 
@@ -1173,14 +1386,15 @@ class YoutubeAudioService {
     final clientConfigs = [
       (
         clientName: 'ANDROID_VR',
-        userAgent: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
+        userAgent: kYouTubeVrUserAgent,
         context: {
           'client': {
             'clientName': 'ANDROID_VR',
-            'clientVersion': '1.60.19',
+            'clientVersion': '1.56.21',
             'deviceMake': 'Oculus',
-            'deviceModel': 'Quest',
-            'androidSdkVersion': 34,
+            'deviceModel': 'Quest 2',
+            'androidSdkVersion': 32,
+            'osVersion': '12',
             'hl': 'en',
             'gl': 'US',
           },
@@ -1188,7 +1402,8 @@ class YoutubeAudioService {
       ),
       (
         clientName: 'IOS',
-        userAgent: 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
+        userAgent:
+            'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
         context: {
           'client': {
             'clientName': 'IOS',
@@ -1317,12 +1532,48 @@ class YoutubeAudioService {
     return null;
   }
 
-  /// Parallel fast-racing exact videoId audio resolver. NEVER queries third-party catalogs by text/title.
+  /// Resolves the best MP4 (`itag 140`) stream for [videoId], caching resolved stream info
+  /// per `videoId` in memory for 30 minutes so re-tapping a song starts immediately.
+  /// Pass [forceRefresh] = true when invalidating and re-fetching after a source error.
+  Future<ResolvedAudioStream> resolveStream(
+    String videoId, {
+    String? title,
+    String? artist,
+    bool forceRefresh = false,
+  }) async {
+    if (forceRefresh) {
+      invalidateStreamCache(videoId);
+      resetYoutubeClient();
+    } else {
+      final cached = _getCachedStream(videoId);
+      if (cached != null) {
+        debugPrint(
+          '[YoutubeAudioService] Returning 30-min cached stream for $videoId',
+        );
+        return cached;
+      }
+    }
+
+    final resolved = await _resolveAudioStream(
+      videoId,
+      fallback: forceRefresh,
+    );
+    if (resolved == null) {
+      throw Exception(
+        'Failed to resolve playable audio stream for YouTube video $videoId',
+      );
+    }
+
+    _cacheStream(videoId, resolved);
+    return resolved;
+  }
+
+  /// Exact videoId audio resolver. NEVER queries third-party catalogs by text/title.
   Future<ResolvedAudioStream?> _resolveAudioStream(
     String videoId, {
     bool fallback = false,
   }) async {
-    // 1. In-memory URL cache check (0ms for re-tapped or recently played songs)
+    // 1. In-memory URL cache check (30-min TTL for re-tapped or recently played songs)
     if (!fallback) {
       final cached = _getCachedStream(videoId);
       if (cached != null) {
@@ -1331,25 +1582,44 @@ class YoutubeAudioService {
         );
         return cached;
       }
+    }
 
-      // 2. Parallel Fast Race: Race Resolver 1 (fast manifest) & Resolver 2 (fast InnerTube)
-      debugPrint(
-        '[YoutubeAudioService] Racing fast stream resolvers in parallel for $videoId...',
+    // If a custom HTTP client is injected for tests without a custom YoutubeExplode client,
+    // race InnerTube and Manifest in parallel so HTTP mocks resolve immediately.
+    if (_hasCustomHttpClient && !_hasCustomYtClient) {
+      if (!fallback) {
+        final fastResult = await _raceFirstNonNull([
+          () => _resolveFastInnerTube(videoId),
+          () => _resolveFastManifest(videoId),
+        ]);
+        if (fastResult != null) {
+          _cacheStream(videoId, fastResult);
+          return fastResult;
+        }
+      }
+    } else {
+      // Primary: Multi-Client Unthrottled Manifest Resolution (androidVr, ios, androidMusic)
+      // with 10s timeout + automatic fresh YoutubeExplode() retry on failure/empty streams.
+      final manifestStream = await _resolveFastManifest(
+        videoId,
+        forceFreshClient: fallback,
       );
-      final fastResult = await _raceFirstNonNull([
-        () => _resolveFastManifest(videoId),
-        () => _resolveFastInnerTube(videoId),
-      ]);
+      if (manifestStream != null) {
+        _cacheStream(videoId, manifestStream);
+        return manifestStream;
+      }
 
-      if (fastResult != null) {
-        _cacheStream(videoId, fastResult);
-        return fastResult;
+      // Secondary fast InnerTube probe if manifest resolution returned null
+      final fastInnerTube = await _resolveFastInnerTube(videoId);
+      if (fastInnerTube != null) {
+        _cacheStream(videoId, fastInnerTube);
+        return fastInnerTube;
       }
     }
 
-    // 3. Fallback stages with full client sets if fast parallel race did not resolve
+    // Fallback stages with full client sets if primary resolution did not resolve
     debugPrint(
-      '[YoutubeAudioService] Fast race missed, executing secondary layers for $videoId...',
+      '[YoutubeAudioService] Primary resolution missed, executing secondary layers for $videoId...',
     );
     final layer2Stream = await _resolveLayer2InnerTube(videoId);
     if (layer2Stream != null) {
@@ -1393,7 +1663,7 @@ class YoutubeAudioService {
     }
 
     if (fallback) {
-      _streamCache.remove(videoId);
+      invalidateStreamCache(videoId);
     }
 
     var resolved = _getCachedStream(videoId);
