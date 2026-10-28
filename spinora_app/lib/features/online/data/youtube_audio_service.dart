@@ -13,11 +13,17 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../../../../core/database/app_database.dart';
 
-/// Standard unthrottled Android VR YouTube client User-Agent header.
+/// Client-specific User-Agent strings matched dynamically to YouTube stream URLs (`c=` query parameter).
+const String kYouTubeIosUserAgent =
+    'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)';
 const String kYouTubeVrUserAgent =
     'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)';
+const String kYouTubeSafariUserAgent =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
+const String kYouTubeAndroidUserAgent =
+    'com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US) gzip';
 
-/// Default HTTP headers passed to `AudioSource.uri` for unthrottled YouTube stream playback.
+/// Default HTTP headers passed to `AudioSource.uri` when a fallback header map is needed.
 const Map<String, String> kYouTubeStreamHeaders = {
   'User-Agent': kYouTubeVrUserAgent,
   'Accept': '*/*',
@@ -25,11 +31,12 @@ const Map<String, String> kYouTubeStreamHeaders = {
 };
 
 /// Fully resolved direct audio stream with associated client headers, MIME metadata,
-/// and optional `youtube_explode_dart` [StreamInfo] for byte-stream fallback.
+/// and resolved `youtube_explode_dart` [StreamInfo] ([AudioOnlyStreamInfo]) kept in memory
+/// for zero-re-fetch `YouTubeByteStreamSource` (`streamsClient.get(streamInfo)`) streaming.
 class ResolvedAudioStream {
   const ResolvedAudioStream({
     required this.url,
-    required this.userAgent,
+    this.userAgent,
     this.referer,
     this.mimeType = 'audio/mp4',
     this.contentLength,
@@ -37,25 +44,46 @@ class ResolvedAudioStream {
   });
 
   final String url;
-  final String userAgent;
+  final String? userAgent;
   final String? referer;
   final String mimeType;
   final int? contentLength;
   final StreamInfo? streamInfo;
 
+  /// Returns the resolved [AudioOnlyStreamInfo] if [streamInfo] is an audio-only stream.
+  AudioOnlyStreamInfo? get audioOnlyStreamInfo =>
+      streamInfo is AudioOnlyStreamInfo
+          ? streamInfo as AudioOnlyStreamInfo
+          : null;
+
   Uri get uri => Uri.parse(url);
 
-  Map<String, String> get headers => {
-    'User-Agent': userAgent,
-    'Accept': '*/*',
-    'Connection': 'keep-alive',
-    'Referer': ?referer,
-  };
+  /// Clean MIME type (e.g. `audio/mp4`) stripped of codec parameters.
+  String get cleanMimeType {
+    final base = mimeType.split(';').first.trim();
+    return base.isEmpty ? 'audio/mp4' : base;
+  }
+
+  /// Dynamically matches the HTTP `User-Agent` to the stream URL's `c=` query parameter.
+  String? get matchedUserAgent => YoutubeAudioService.resolveUserAgentForUrl(
+    uri,
+    fallbackUserAgent: userAgent,
+  );
+
+  Map<String, String> get headers {
+    final ua = matchedUserAgent;
+    return {
+      if (ua != null && ua.isNotEmpty) 'User-Agent': ua,
+      'Accept': '*/*',
+      'Connection': 'keep-alive',
+      'Referer': ?referer,
+    };
+  }
 }
 
-/// Custom [StreamAudioSource] fallback backed by `YoutubeExplode.videos.streamsClient.get(streamInfo)`
-/// and chunked HTTP range requests. Used automatically when `AudioSource.uri` throws a
-/// `PlayerException` (e.g. HTTP 403 / source error) or fails to buffer within 6 seconds.
+/// Custom [StreamAudioSource] backed by `YoutubeExplode.videos.streamsClient.get(streamInfo)`
+/// (which uses YouTube's required `&range=0-9898989` URL query parameter chunking) so ExoPlayer
+/// reads a clean byte stream without ever getting `Response code: 403` from `googlevideo.com`.
 class YouTubeByteStreamSource extends StreamAudioSource {
   YouTubeByteStreamSource({
     required this.videoId,
@@ -82,15 +110,20 @@ class YouTubeByteStreamSource extends StreamAudioSource {
         : null;
 
     final streamInfo = resolvedStream.streamInfo;
-    if (streamInfo != null &&
-        effectiveStart == 0 &&
-        (end == null || (totalLength != null && end >= totalLength))) {
+    if (streamInfo != null && effectiveStart == 0) {
+      final rawStream = youtubeService.getRawByteStream(streamInfo);
+      final boundedStream =
+          (contentLength != null &&
+              totalLength != null &&
+              contentLength < totalLength)
+          ? YoutubeAudioService.sliceByteStream(rawStream, 0, contentLength)
+          : rawStream;
       return StreamAudioResponse(
         sourceLength: totalLength,
         contentLength: contentLength ?? totalLength,
         offset: 0,
-        stream: youtubeService.getRawByteStream(streamInfo),
-        contentType: resolvedStream.mimeType,
+        stream: boundedStream,
+        contentType: 'audio/mp4',
       );
     }
 
@@ -113,9 +146,10 @@ class _CachedStreamEntry {
       DateTime.now().difference(cachedAt) > const Duration(minutes: 30);
 }
 
-/// Service providing online YouTube audio search and multi-stage unthrottled audio streaming
-/// with multi-client manifest resolution, MP4 (`itag 140`) prioritization, 30-min caching,
-/// and automatic `StreamAudioSource` byte-stream fallback.
+/// Service providing online YouTube audio search and unthrottled audio streaming
+/// with fast `[ios, androidVr]` manifest resolution (`requireWatchPage: false`),
+/// dynamic `c=` User-Agent matching, active request cancellation, and
+/// `streamsClient.get(streamInfo)` byte streaming.
 class YoutubeAudioService {
   YoutubeAudioService({YoutubeExplode? ytClient, http.Client? httpClient})
     : _yt = ytClient ?? YoutubeExplode(),
@@ -129,6 +163,95 @@ class YoutubeAudioService {
   final http.Client _httpClient;
   HttpServer? _proxyServer;
   final Map<String, _CachedStreamEntry> _streamCache = {};
+
+  /// Active request token and videoId guard so stale Layer 2/3 loops cancel immediately
+  /// when the user taps a new song.
+  int _activeResolveToken = 0;
+  String? _activeVideoId;
+
+  /// Starts a new resolution request for [videoId], immediately invalidating any
+  /// older in-flight resolution loops for previous songs.
+  int beginResolveRequest(String videoId) {
+    _activeVideoId = videoId;
+    return ++_activeResolveToken;
+  }
+
+  /// Cancels any in-flight background stream resolution loops.
+  void cancelActiveResolutions() {
+    _activeVideoId = null;
+    _activeResolveToken++;
+  }
+
+  bool _isRequestActive(String videoId, int? requestToken) {
+    if (requestToken == null) return true;
+    return _activeResolveToken == requestToken && _activeVideoId == videoId;
+  }
+
+  /// Inspects `streamInfo.url.queryParameters['c']` (upper-cased) and returns
+  /// the matching client `User-Agent`:
+  /// - `'IOS'`: `'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)'`
+  /// - `'ANDROID_VR'`: `'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)'`
+  /// - `'SAFARI'` or `'WEB'`: `'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15'`
+  /// - Otherwise: returns [fallbackUserAgent] or a matching Android client User-Agent (or null).
+  static String? resolveUserAgentForUrl(
+    Uri uri, {
+    String? fallbackUserAgent,
+  }) {
+    final cParam = (uri.queryParameters['c'] ?? '').toUpperCase();
+    if (cParam.contains('IOS')) {
+      return kYouTubeIosUserAgent;
+    }
+    if (cParam.contains('ANDROID_VR')) {
+      return kYouTubeVrUserAgent;
+    }
+    if (cParam.contains('SAFARI') || cParam.contains('WEB')) {
+      return kYouTubeSafariUserAgent;
+    }
+    if (cParam.contains('ANDROID')) {
+      return kYouTubeAndroidUserAgent;
+    }
+    if (fallbackUserAgent != null && fallbackUserAgent.isNotEmpty) {
+      return fallbackUserAgent;
+    }
+    return null;
+  }
+
+  /// Slices a byte stream from [startOffset] for [maxBytes] bytes.
+  static Stream<List<int>> sliceByteStream(
+    Stream<List<int>> source,
+    int startOffset,
+    int? maxBytes,
+  ) async* {
+    int skipped = 0;
+    int emitted = 0;
+    await for (final chunk in source) {
+      if (maxBytes != null && emitted >= maxBytes) break;
+      int chunkStart = 0;
+      if (skipped < startOffset) {
+        final remainingToSkip = startOffset - skipped;
+        if (chunk.length <= remainingToSkip) {
+          skipped += chunk.length;
+          continue;
+        }
+        chunkStart = remainingToSkip;
+        skipped = startOffset;
+      }
+      int chunkEnd = chunk.length;
+      if (maxBytes != null) {
+        final remainingToEmit = maxBytes - emitted;
+        if (chunkEnd - chunkStart > remainingToEmit) {
+          chunkEnd = chunkStart + remainingToEmit;
+        }
+      }
+      if (chunkEnd > chunkStart) {
+        final slice = (chunkStart == 0 && chunkEnd == chunk.length)
+            ? chunk
+            : chunk.sublist(chunkStart, chunkEnd);
+        emitted += slice.length;
+        yield slice;
+      }
+    }
+  }
 
   /// Recreates a fresh [YoutubeExplode] instance (closing the old one) so stale
   /// visitor sessions never block playback after 1-2 songs.
@@ -364,23 +487,122 @@ class YoutubeAudioService {
     await request.response.close();
   }
 
-  /// Pipes remote stream bytes directly to ExoPlayer with matching client headers.
-  /// Non-blocking, multi-range supported: opens a fresh upstream connection for every incoming
-  /// HttpRequest, directly forwards status & byte chunks, and aborts upstream immediately on client disconnect.
+  /// Pipes remote stream bytes directly to ExoPlayer.
+  /// When [resolved.streamInfo] is present and the request starts at byte 0, pipes
+  /// `_yt.videos.streamsClient.get(streamInfo)` (which uses YouTube's required
+  /// `&range=0-9898989` URL query parameter chunking) with `Content-Type: audio/mp4`
+  /// and `Content-Length: streamInfo.size.totalBytes` so ExoPlayer never gets HTTP 403.
   Future<void> _streamFromRemote(
     HttpRequest request,
     String videoId,
     ResolvedAudioStream resolved,
   ) async {
+    final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
+    int start = 0;
+    int? end;
+    final isRangeRequest =
+        rangeHeader != null && rangeHeader.startsWith('bytes=');
+    if (isRangeRequest) {
+      final parts = rangeHeader.substring(6).split('-');
+      start = int.tryParse(parts[0]) ?? 0;
+      if (parts.length > 1 && parts[1].isNotEmpty) {
+        end = int.tryParse(parts[1]);
+      }
+    }
+
+    final streamInfo = resolved.streamInfo;
+    if (streamInfo != null && start == 0) {
+      final totalLength = streamInfo.size.totalBytes;
+      final effectiveEnd = (end ?? (totalLength - 1)).clamp(
+        0,
+        totalLength > 0 ? totalLength - 1 : 0,
+      );
+      final chunkLength = (totalLength > 0 && effectiveEnd >= start)
+          ? (effectiveEnd - start + 1)
+          : totalLength;
+
+      request.response.headers.contentType = ContentType('audio', 'mp4');
+      request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+
+      if (isRangeRequest && totalLength > 0) {
+        request.response.statusCode = HttpStatus.partialContent;
+        request.response.headers.set(
+          HttpHeaders.contentRangeHeader,
+          'bytes 0-$effectiveEnd/$totalLength',
+        );
+        request.response.headers.contentLength = chunkLength;
+      } else {
+        request.response.statusCode = HttpStatus.ok;
+        if (totalLength > 0) {
+          request.response.headers.contentLength = totalLength;
+        }
+      }
+
+      if (request.method == 'HEAD') {
+        await request.response.close();
+        return;
+      }
+
+      final rawStream = _yt.videos.streamsClient.get(streamInfo);
+      final streamToPipe = (end != null && chunkLength < totalLength)
+          ? sliceByteStream(rawStream, 0, chunkLength)
+          : rawStream;
+
+      StreamSubscription<List<int>>? subscription;
+      bool isClosed = false;
+
+      Future<void> closeResponse() async {
+        if (isClosed) return;
+        isClosed = true;
+        try {
+          await request.response.close();
+        } catch (_) {}
+      }
+
+      subscription = streamToPipe.listen(
+        (chunk) {
+          if (!isClosed) {
+            try {
+              request.response.add(chunk);
+            } catch (_) {
+              subscription?.cancel();
+              closeResponse();
+            }
+          }
+        },
+        onDone: () async {
+          await closeResponse();
+        },
+        onError: (e) async {
+          debugPrint(
+            '[YoutubeAudioService] streamsClient.get proxy error for $videoId: $e',
+          );
+          await closeResponse();
+        },
+        cancelOnError: true,
+      );
+
+      request.response.done
+          .then((_) {
+            subscription?.cancel();
+          })
+          .catchError((_) {
+            subscription?.cancel();
+          });
+      return;
+    }
+
     final upstreamRequest = http.Request(
       request.method,
       Uri.parse(resolved.url),
     );
-    upstreamRequest.headers['User-Agent'] = resolved.userAgent;
+    final matchedUa = resolved.matchedUserAgent;
+    if (matchedUa != null && matchedUa.isNotEmpty) {
+      upstreamRequest.headers['User-Agent'] = matchedUa;
+    }
     if (resolved.referer != null) {
       upstreamRequest.headers['Referer'] = resolved.referer!;
     }
-    final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
     if (rangeHeader != null) {
       upstreamRequest.headers[HttpHeaders.rangeHeader] = rangeHeader;
     }
@@ -398,7 +620,8 @@ class YoutubeAudioService {
     }
 
     request.response.statusCode = upstreamResponse.statusCode;
-    final cType = upstreamResponse.headers['content-type'] ?? resolved.mimeType;
+    final cType =
+        upstreamResponse.headers['content-type'] ?? resolved.cleanMimeType;
     try {
       request.response.headers.contentType = ContentType.parse(cType);
     } catch (_) {
@@ -659,104 +882,66 @@ class YoutubeAudioService {
   /// Layer 1: Resolves audio stream via youtube_explode_dart with requireWatchPage: false
   /// testing safari, ios, mweb, tv, and android clients individually without probing video streams 133 or 137.
   Future<ResolvedAudioStream?> _resolveLayer1YoutubeExplode(
-    String videoId,
-  ) async {
+    String videoId, {
+    int? requestToken,
+  }) async {
     final clientConfigs = [
       (
         name: 'safari',
         client: YoutubeApiClient.safari,
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        userAgent: kYouTubeSafariUserAgent,
       ),
       (
         name: 'ios',
         client: YoutubeApiClient.ios,
-        userAgent: 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
-      ),
-      (
-        name: 'mweb',
-        client: YoutubeApiClient.mweb,
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+        userAgent: kYouTubeIosUserAgent,
       ),
       (
         name: 'tv',
         client: YoutubeApiClient.tv,
-        userAgent: 'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 TV Safari/537.36',
+        userAgent:
+            'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 TV Safari/537.36',
       ),
       (
         name: 'android',
         client: YoutubeApiClient.android,
-        userAgent: 'com.google.android.youtube/19.45.38 (Linux; U; Android 14)',
+        userAgent: kYouTubeAndroidUserAgent,
       ),
     ];
 
     for (final cfg in clientConfigs) {
+      if (!_isRequestActive(videoId, requestToken)) return null;
       try {
         debugPrint(
           '[YoutubeAudioService] Probing Layer 1 client ${cfg.name} for $videoId (requireWatchPage: false)...',
         );
-        final manifest = await _yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [cfg.client],
-          requireWatchPage: false,
-        );
+        final manifest = await _yt.videos.streamsClient
+            .getManifest(
+              videoId,
+              ytClients: [cfg.client],
+              requireWatchPage: false,
+            )
+            .timeout(const Duration(seconds: 5));
 
-        final audioStreams = manifest.audioOnly.toList();
-        final candidateStreams = audioStreams.isNotEmpty
-            ? audioStreams
-            : manifest.muxed
-                  .where(
-                    (s) =>
-                        s.container.name == 'mp4' ||
-                        s.codec.mimeType.contains('audio'),
-                  )
-                  .toList();
+        if (!_isRequestActive(videoId, requestToken)) return null;
 
-        if (candidateStreams.isEmpty) continue;
-
-        // Prioritize mp4 (itag 140), then highest bitrate
-        candidateStreams.sort((a, b) {
-          final isA140 =
-              a.tag == 140 ||
-              a.container.name == 'mp4' ||
-              a.codec.mimeType.contains('mp4');
-          final isB140 =
-              b.tag == 140 ||
-              b.container.name == 'mp4' ||
-              b.codec.mimeType.contains('mp4');
-          if (isA140 && !isB140) return -1;
-          if (!isA140 && isB140) return 1;
-          return b.bitrate.compareTo(a.bitrate);
-        });
-
-        for (final candidate in candidateStreams) {
-          final rawUrl = candidate.url.toString();
-          if (rawUrl.isEmpty) continue;
-
-          try {
-            final testReq = await _httpClient
-                .get(
-                  Uri.parse(rawUrl),
-                  headers: {
-                    'User-Agent': cfg.userAgent,
-                    'Range': 'bytes=0-1024',
-                  },
-                )
-                .timeout(const Duration(seconds: 4));
-
-            if (testReq.statusCode == 200 || testReq.statusCode == 206) {
-              debugPrint(
-                '[YoutubeAudioService] Resolved stream via Layer 1 (${cfg.name}) for $videoId (itag: ${candidate.tag})',
-              );
-              return ResolvedAudioStream(
-                url: rawUrl,
-                userAgent: cfg.userAgent,
-                mimeType: candidate.codec.mimeType,
-                contentLength: candidate.size.totalBytes,
-              );
-            }
-          } catch (e) {
+        final best = selectBestAudioStream(manifest);
+        if (best != null) {
+          final rawUrl = ensureHttps(best.url.toString());
+          if (rawUrl.isNotEmpty) {
+            final matchedUa = resolveUserAgentForUrl(
+              best.url,
+              fallbackUserAgent: cfg.userAgent,
+            );
             debugPrint(
-              '[YoutubeAudioService] Layer 1 candidate probe error for ${cfg.name}: $e',
+              '[YoutubeAudioService] Resolved stream via Layer 1 (${cfg.name}) for $videoId (itag: ${best.tag})',
+            );
+            return ResolvedAudioStream(
+              url: rawUrl,
+              userAgent: matchedUa,
+              mimeType: best.codec.mimeType,
+              contentLength: best.size.totalBytes,
+              streamInfo: best,
             );
           }
         }
@@ -770,7 +955,12 @@ class YoutubeAudioService {
   }
 
   /// Layer 2: Directly queries YouTube InnerTube player endpoint for exact videoId with VisitorData.
-  Future<ResolvedAudioStream?> _resolveLayer2InnerTube(String videoId) async {
+  Future<ResolvedAudioStream?> _resolveLayer2InnerTube(
+    String videoId, {
+    int? requestToken,
+  }) async {
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
     // 1. Fetch visitorData from YouTube visitor_id endpoint
     String? visitorData;
     try {
@@ -797,8 +987,41 @@ class YoutubeAudioService {
 
     final clientConfigs = [
       (
+        clientName: 'IOS',
+        userAgent: kYouTubeIosUserAgent,
+        context: {
+          'client': {
+            'clientName': 'IOS',
+            'clientVersion': '19.29.1',
+            'deviceMake': 'Apple',
+            'deviceModel': 'iPhone16,2',
+            'osVersion': '17.5.1.21F90',
+            'hl': 'en',
+            'gl': 'US',
+            'visitorData': ?visitorData,
+          },
+        },
+      ),
+      (
+        clientName: 'ANDROID_VR',
+        userAgent: kYouTubeVrUserAgent,
+        context: {
+          'client': {
+            'clientName': 'ANDROID_VR',
+            'clientVersion': '1.56.21',
+            'deviceMake': 'Oculus',
+            'deviceModel': 'Quest 2',
+            'androidSdkVersion': 32,
+            'osVersion': '12',
+            'hl': 'en',
+            'gl': 'US',
+            'visitorData': ?visitorData,
+          },
+        },
+      ),
+      (
         clientName: 'WEB_EMBEDDED_PLAYER',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        userAgent: kYouTubeSafariUserAgent,
         context: {
           'client': {
             'clientName': 'WEB_EMBEDDED_PLAYER',
@@ -812,7 +1035,8 @@ class YoutubeAudioService {
       ),
       (
         clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-        userAgent: 'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 TV Safari/537.36',
+        userAgent:
+            'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/6.0 TV Safari/537.36',
         context: {
           'client': {
             'clientName': 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
@@ -824,54 +1048,10 @@ class YoutubeAudioService {
           'thirdParty': {'embedUrl': 'https://www.youtube.com/embed/$videoId'},
         },
       ),
-      (
-        clientName: 'IOS',
-        userAgent: 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
-        context: {
-          'client': {
-            'clientName': 'IOS',
-            'clientVersion': '19.45.4',
-            'deviceMake': 'Apple',
-            'deviceModel': 'iPhone16,2',
-            'hl': 'en',
-            'gl': 'US',
-            'visitorData': ?visitorData,
-          },
-        },
-      ),
-      (
-        clientName: 'ANDROID_VR',
-        userAgent: 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
-        context: {
-          'client': {
-            'clientName': 'ANDROID_VR',
-            'clientVersion': '1.60.19',
-            'deviceMake': 'Oculus',
-            'deviceModel': 'Quest',
-            'androidSdkVersion': 34,
-            'hl': 'en',
-            'gl': 'US',
-            'visitorData': ?visitorData,
-          },
-        },
-      ),
-      (
-        clientName: 'ANDROID_TESTSUITE',
-        userAgent: 'com.google.android.youtube/1.9 (Linux; U; Android 9; test-user Build/PI)',
-        context: {
-          'client': {
-            'clientName': 'ANDROID_TESTSUITE',
-            'clientVersion': '1.9',
-            'androidSdkVersion': 30,
-            'hl': 'en',
-            'gl': 'US',
-            'visitorData': ?visitorData,
-          },
-        },
-      ),
     ];
 
     for (final cfg in clientConfigs) {
+      if (!_isRequestActive(videoId, requestToken)) return null;
       try {
         debugPrint(
           '[YoutubeAudioService] Probing Layer 2 client ${cfg.clientName} for $videoId...',
@@ -897,6 +1077,7 @@ class YoutubeAudioService {
             )
             .timeout(const Duration(seconds: 4));
 
+        if (!_isRequestActive(videoId, requestToken)) return null;
         if (response.statusCode != 200) continue;
 
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -951,23 +1132,31 @@ class YoutubeAudioService {
         });
 
         for (final format in candidateFormats) {
+          if (!_isRequestActive(videoId, requestToken)) return null;
           final rawUrl = format['url'] as String;
           final mime = (format['mimeType'] as String? ?? 'audio/mp4')
               .split(';')
               .first
               .trim();
           final clen = int.tryParse(format['contentLength']?.toString() ?? '');
+          final parsedUri = Uri.parse(rawUrl);
+          final matchedUa =
+              resolveUserAgentForUrl(
+                parsedUri,
+                fallbackUserAgent: cfg.userAgent,
+              ) ??
+              cfg.userAgent;
 
           try {
             final testReq = await _httpClient
                 .get(
-                  Uri.parse(rawUrl),
+                  parsedUri,
                   headers: {
-                    'User-Agent': cfg.userAgent,
+                    'User-Agent': matchedUa,
                     'Range': 'bytes=0-1024',
                   },
                 )
-                .timeout(const Duration(seconds: 4));
+                .timeout(const Duration(seconds: 3));
 
             if (testReq.statusCode == 200 || testReq.statusCode == 206) {
               debugPrint(
@@ -975,7 +1164,7 @@ class YoutubeAudioService {
               );
               return ResolvedAudioStream(
                 url: rawUrl,
-                userAgent: cfg.userAgent,
+                userAgent: matchedUa,
                 mimeType: mime,
                 contentLength: clen,
               );
@@ -996,34 +1185,32 @@ class YoutubeAudioService {
   }
 
   /// Layer 3: Queries public Piped & Invidious API instances by exact videoId.
+  /// Immediately aborts if [requestToken] is superseded by a newer song tap.
   Future<ResolvedAudioStream?> _resolveLayer3PipedAndInvidious(
-    String videoId,
-  ) async {
-    const defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    String videoId, {
+    int? requestToken,
+  }) async {
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
+    const defaultUa = kYouTubeSafariUserAgent;
 
     final instances = [
-      // Piped API instances (exact videoId stream route)
       (type: 'piped', url: 'https://pipedapi.kavin.rocks/streams/$videoId'),
-      (type: 'piped', url: 'https://pipedapi.tokhmi.xyz/streams/$videoId'),
       (type: 'piped', url: 'https://api.piped.private.coffee/streams/$videoId'),
-      (type: 'piped', url: 'https://pipedapi.leptons.xyz/streams/$videoId'),
-      (type: 'piped', url: 'https://piped-api.lunar.icu/streams/$videoId'),
-      // Invidious API instances (exact videoId video route)
-      (type: 'invidious', url: 'https://inv.tux.pizza/api/v1/videos/$videoId'),
+      (type: 'invidious', url: 'https://inv.nadeko.net/api/v1/videos/$videoId'),
       (
         type: 'invidious',
         url: 'https://invidious.nerdvpn.de/api/v1/videos/$videoId',
       ),
-      (type: 'invidious', url: 'https://inv.nadeko.net/api/v1/videos/$videoId'),
-      (
-        type: 'invidious',
-        url: 'https://invidious.private.coffee/api/v1/videos/$videoId',
-      ),
-      (type: 'invidious', url: 'https://yewtu.be/api/v1/videos/$videoId'),
     ];
 
     for (final inst in instances) {
+      if (!_isRequestActive(videoId, requestToken)) {
+        debugPrint(
+          '[YoutubeAudioService] Canceling stale Layer 3 loop for $videoId',
+        );
+        return null;
+      }
       try {
         final host = Uri.parse(inst.url).host;
         debugPrint(
@@ -1031,8 +1218,9 @@ class YoutubeAudioService {
         );
         final res = await _httpClient
             .get(Uri.parse(inst.url), headers: {'User-Agent': defaultUa})
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(milliseconds: 2500));
 
+        if (!_isRequestActive(videoId, requestToken)) return null;
         if (res.statusCode != 200) continue;
 
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -1063,6 +1251,7 @@ class YoutubeAudioService {
           });
 
           for (final af in candidates) {
+            if (!_isRequestActive(videoId, requestToken)) return null;
             final rawUrl = af['url'] as String;
             final clen = int.tryParse(af['contentLength']?.toString() ?? '');
             try {
@@ -1071,7 +1260,7 @@ class YoutubeAudioService {
                     Uri.parse(rawUrl),
                     headers: {'User-Agent': defaultUa, 'Range': 'bytes=0-1024'},
                   )
-                  .timeout(const Duration(seconds: 3));
+                  .timeout(const Duration(seconds: 2));
 
               if (testRes.statusCode == 200 || testRes.statusCode == 206) {
                 debugPrint(
@@ -1118,6 +1307,7 @@ class YoutubeAudioService {
           });
 
           for (final af in audioFormats) {
+            if (!_isRequestActive(videoId, requestToken)) return null;
             final rawUrl = af['url'] as String;
             final clen = int.tryParse(af['clen']?.toString() ?? '');
             try {
@@ -1126,7 +1316,7 @@ class YoutubeAudioService {
                     Uri.parse(rawUrl),
                     headers: {'User-Agent': defaultUa, 'Range': 'bytes=0-1024'},
                   )
-                  .timeout(const Duration(seconds: 3));
+                  .timeout(const Duration(seconds: 2));
 
               if (testRes.statusCode == 200 || testRes.statusCode == 206) {
                 debugPrint(
@@ -1241,6 +1431,8 @@ class YoutubeAudioService {
   }
 
   /// Opens a chunked HTTP range stream response for [YouTubeByteStreamSource].
+  /// Uses YouTube's `&range=start-end` query parameter chunking on `googlevideo.com` URLs
+  /// and dynamically matches the `User-Agent` to the URL's `c=` parameter.
   Future<StreamAudioResponse> openRangeStreamResponse({
     required ResolvedAudioStream resolvedStream,
     required int start,
@@ -1253,9 +1445,11 @@ class YoutubeAudioService {
     final contentLength = effectiveEnd != null ? (effectiveEnd - start) : null;
 
     Stream<List<int>> byteStream() async* {
-      final chunkSize = 512 * 1024; // 512 KB chunks to avoid YouTube throttling
+      final chunkSize = 512 * 1024; // 512 KB chunks
       int currentByte = start;
       final targetEndInclusive = effectiveEnd != null ? effectiveEnd - 1 : null;
+      final baseUri = Uri.parse(resolvedStream.url);
+      final matchedUa = resolvedStream.matchedUserAgent;
 
       while (targetEndInclusive == null || currentByte <= targetEndInclusive) {
         final chunkEnd = targetEndInclusive != null
@@ -1265,14 +1459,28 @@ class YoutubeAudioService {
               )
             : (currentByte + chunkSize - 1);
 
-        final req = http.Request('GET', Uri.parse(resolvedStream.url));
-        req.headers['User-Agent'] = resolvedStream.userAgent;
+        final isGoogleVideo = baseUri.host.contains('googlevideo.com');
+        final chunkUri = isGoogleVideo
+            ? baseUri.replace(
+                queryParameters: {
+                  ...baseUri.queryParameters,
+                  'range': '$currentByte-$chunkEnd',
+                },
+              )
+            : baseUri;
+
+        final req = http.Request('GET', chunkUri);
+        if (matchedUa != null && matchedUa.isNotEmpty) {
+          req.headers['User-Agent'] = matchedUa;
+        }
         req.headers['Accept'] = '*/*';
         req.headers['Connection'] = 'keep-alive';
         if (resolvedStream.referer != null) {
           req.headers['Referer'] = resolvedStream.referer!;
         }
-        req.headers['Range'] = 'bytes=$currentByte-$chunkEnd';
+        if (!isGoogleVideo) {
+          req.headers['Range'] = 'bytes=$currentByte-$chunkEnd';
+        }
 
         final streamedRes = await _httpClient
             .send(req)
@@ -1280,7 +1488,7 @@ class YoutubeAudioService {
         if (streamedRes.statusCode != 200 && streamedRes.statusCode != 206) {
           throw HttpException(
             'YouTube range request failed with HTTP ${streamedRes.statusCode}',
-            uri: Uri.parse(resolvedStream.url),
+            uri: chunkUri,
           );
         }
 
@@ -1293,7 +1501,7 @@ class YoutubeAudioService {
         if (bytesReceivedInChunk == 0) break;
         currentByte += bytesReceivedInChunk;
 
-        if (streamedRes.statusCode == 200) {
+        if (!isGoogleVideo && streamedRes.statusCode == 200) {
           break;
         }
       }
@@ -1304,59 +1512,103 @@ class YoutubeAudioService {
       contentLength: contentLength,
       offset: start,
       stream: byteStream(),
-      contentType: resolvedStream.mimeType,
+      contentType: 'audio/mp4',
     );
   }
 
-  /// Resolver 1: Multi-Client Unthrottled Manifest Resolution (`youtube_explode_dart`).
-  /// Explicitly passes `[YoutubeApiClient.androidVr, YoutubeApiClient.ios, YoutubeApiClient.androidMusic]`
-  /// with a 10-second timeout, and automatically recreates a fresh `YoutubeExplode()` instance
-  /// and retries with default clients if the primary call fails or returns empty audio streams.
+  /// Resolver 1: Fast Manifest Resolution (`youtube_explode_dart`) with `requireWatchPage: false`.
+  /// - NEVER uses `YoutubeApiClient.androidMusic` (which returns HTTP 400).
+  /// - Calls `streamsClient.getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr], requireWatchPage: false)`
+  ///   so it skips downloading the heavy HTML watch page and resolves in ~1 second.
+  /// - If that fails, tries `YoutubeApiClient.safari` and `YoutubeApiClient.tv` individually with `requireWatchPage: false`.
+  /// - Matches HTTP `User-Agent` dynamically to `streamInfo.url.queryParameters['c']`.
   Future<ResolvedAudioStream?> _resolveFastManifest(
     String videoId, {
     bool forceFreshClient = false,
+    int? requestToken,
   }) async {
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
     if (forceFreshClient) {
       resetYoutubeClient();
     }
 
     StreamInfo? bestStream;
 
+    // 1. Primary fast call: [ios, androidVr] with requireWatchPage: false (~1 second)
     try {
       final manifest = await _yt.videos.streamsClient
           .getManifest(
             videoId,
             ytClients: [
-              YoutubeApiClient.androidVr,
               YoutubeApiClient.ios,
-              YoutubeApiClient.androidMusic,
+              YoutubeApiClient.androidVr,
             ],
             requireWatchPage: false,
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 6));
 
       bestStream = selectBestAudioStream(manifest);
     } catch (e) {
       debugPrint(
-        '[YoutubeAudioService] Primary multi-client getManifest failed for $videoId: $e',
+        '[YoutubeAudioService] Primary [ios, androidVr] getManifest failed for $videoId: $e',
       );
     }
 
-    // Automatic fallback: recreate a fresh YoutubeExplode() instance (closing the old one)
-    // and retry with default clients so stale visitor sessions never block playback after 1-2 songs.
+    // 2. If primary failed, try safari and tv individually with requireWatchPage: false
     if (bestStream == null) {
+      final fallbackClients = [
+        (name: 'safari', client: YoutubeApiClient.safari),
+        (name: 'tv', client: YoutubeApiClient.tv),
+      ];
+      for (final entry in fallbackClients) {
+        if (!_isRequestActive(videoId, requestToken)) return null;
+        try {
+          final fallbackManifest = await _yt.videos.streamsClient
+              .getManifest(
+                videoId,
+                ytClients: [entry.client],
+                requireWatchPage: false,
+              )
+              .timeout(const Duration(seconds: 5));
+          bestStream = selectBestAudioStream(fallbackManifest);
+          if (bestStream != null) {
+            debugPrint(
+              '[YoutubeAudioService] Fallback getManifest (${entry.name}) succeeded for $videoId',
+            );
+            break;
+          }
+        } catch (e) {
+          debugPrint(
+            '[YoutubeAudioService] Fallback getManifest (${entry.name}) failed for $videoId: $e',
+          );
+        }
+      }
+    }
+
+    // 3. If still null and we haven't reset the client yet, recreate a fresh YoutubeExplode()
+    // and retry [ios, androidVr] with requireWatchPage: false
+    if (bestStream == null && !forceFreshClient) {
+      if (!_isRequestActive(videoId, requestToken)) return null;
       debugPrint(
-        '[YoutubeAudioService] Recreating fresh YoutubeExplode instance and retrying getManifest with default clients for $videoId...',
+        '[YoutubeAudioService] Recreating fresh YoutubeExplode instance and retrying [ios, androidVr] (requireWatchPage: false) for $videoId...',
       );
       resetYoutubeClient();
       try {
-        final fallbackManifest = await _yt.videos.streamsClient
-            .getManifest(videoId)
-            .timeout(const Duration(seconds: 10));
-        bestStream = selectBestAudioStream(fallbackManifest);
+        final freshManifest = await _yt.videos.streamsClient
+            .getManifest(
+              videoId,
+              ytClients: [
+                YoutubeApiClient.ios,
+                YoutubeApiClient.androidVr,
+              ],
+              requireWatchPage: false,
+            )
+            .timeout(const Duration(seconds: 6));
+        bestStream = selectBestAudioStream(freshManifest);
       } catch (e) {
         debugPrint(
-          '[YoutubeAudioService] Fallback getManifest with fresh YoutubeExplode failed for $videoId: $e',
+          '[YoutubeAudioService] Fresh YoutubeExplode getManifest failed for $videoId: $e',
         );
       }
     }
@@ -1364,12 +1616,14 @@ class YoutubeAudioService {
     if (bestStream != null) {
       final rawUrl = ensureHttps(bestStream.url.toString());
       if (rawUrl.isNotEmpty) {
+        final matchedUa = resolveUserAgentForUrl(bestStream.url);
+        final clientParam = bestStream.url.queryParameters['c'] ?? 'unknown';
         debugPrint(
-          '[YoutubeAudioService] Manifest resolved stream for $videoId (itag: ${bestStream.tag}, container: ${bestStream.container.name}, mime: ${bestStream.codec.mimeType})',
+          '[YoutubeAudioService] Manifest resolved stream for $videoId (itag: ${bestStream.tag}, c: $clientParam, container: ${bestStream.container.name}, mime: ${bestStream.codec.mimeType})',
         );
         return ResolvedAudioStream(
           url: rawUrl,
-          userAgent: kYouTubeVrUserAgent,
+          userAgent: matchedUa,
           mimeType: bestStream.codec.mimeType,
           contentLength: bestStream.size.totalBytes,
           streamInfo: bestStream,
@@ -1382,8 +1636,28 @@ class YoutubeAudioService {
 
   /// Resolver 2: Fast direct InnerTube player API using ANDROID_VR / IOS
   /// directly parsing adaptiveFormats for audio/mp4 (itag 140 / 139).
-  Future<ResolvedAudioStream?> _resolveFastInnerTube(String videoId) async {
+  Future<ResolvedAudioStream?> _resolveFastInnerTube(
+    String videoId, {
+    int? requestToken,
+  }) async {
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
     final clientConfigs = [
+      (
+        clientName: 'IOS',
+        userAgent: kYouTubeIosUserAgent,
+        context: {
+          'client': {
+            'clientName': 'IOS',
+            'clientVersion': '19.29.1',
+            'deviceMake': 'Apple',
+            'deviceModel': 'iPhone16,2',
+            'osVersion': '17.5.1.21F90',
+            'hl': 'en',
+            'gl': 'US',
+          },
+        },
+      ),
       (
         clientName: 'ANDROID_VR',
         userAgent: kYouTubeVrUserAgent,
@@ -1400,24 +1674,10 @@ class YoutubeAudioService {
           },
         },
       ),
-      (
-        clientName: 'IOS',
-        userAgent:
-            'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)',
-        context: {
-          'client': {
-            'clientName': 'IOS',
-            'clientVersion': '19.45.4',
-            'deviceMake': 'Apple',
-            'deviceModel': 'iPhone16,2',
-            'hl': 'en',
-            'gl': 'US',
-          },
-        },
-      ),
     ];
 
     for (final cfg in clientConfigs) {
+      if (!_isRequestActive(videoId, requestToken)) return null;
       try {
         final response = await _httpClient
             .post(
@@ -1440,6 +1700,7 @@ class YoutubeAudioService {
             )
             .timeout(const Duration(milliseconds: 3500));
 
+        if (!_isRequestActive(videoId, requestToken)) return null;
         if (response.statusCode != 200) continue;
 
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1496,19 +1757,27 @@ class YoutubeAudioService {
         });
 
         for (final format in candidateFormats) {
+          if (!_isRequestActive(videoId, requestToken)) return null;
           final rawUrl = format['url'] as String;
           final mime = (format['mimeType'] as String? ?? 'audio/mp4')
               .split(';')
               .first
               .trim();
           final clen = int.tryParse(format['contentLength']?.toString() ?? '');
+          final parsedUri = Uri.parse(rawUrl);
+          final matchedUa =
+              resolveUserAgentForUrl(
+                parsedUri,
+                fallbackUserAgent: cfg.userAgent,
+              ) ??
+              cfg.userAgent;
 
           try {
             final testReq = await _httpClient
                 .get(
-                  Uri.parse(rawUrl),
+                  parsedUri,
                   headers: {
-                    'User-Agent': cfg.userAgent,
+                    'User-Agent': matchedUa,
                     'Range': 'bytes=0-1024',
                   },
                 )
@@ -1520,7 +1789,7 @@ class YoutubeAudioService {
               );
               return ResolvedAudioStream(
                 url: rawUrl,
-                userAgent: cfg.userAgent,
+                userAgent: matchedUa,
                 mimeType: mime,
                 contentLength: clen,
               );
@@ -1533,14 +1802,16 @@ class YoutubeAudioService {
   }
 
   /// Resolves the best MP4 (`itag 140`) stream for [videoId], caching resolved stream info
-  /// per `videoId` in memory for 30 minutes so re-tapping a song starts immediately.
-  /// Pass [forceRefresh] = true when invalidating and re-fetching after a source error.
+  /// (including [AudioOnlyStreamInfo]) per `videoId` in memory for 30 minutes so re-tapping
+  /// a song starts immediately. Cancels any stale background resolution loops for older songs.
   Future<ResolvedAudioStream> resolveStream(
     String videoId, {
     String? title,
     String? artist,
     bool forceRefresh = false,
   }) async {
+    final requestToken = beginResolveRequest(videoId);
+
     if (forceRefresh) {
       invalidateStreamCache(videoId);
       resetYoutubeClient();
@@ -1557,6 +1828,7 @@ class YoutubeAudioService {
     final resolved = await _resolveAudioStream(
       videoId,
       fallback: forceRefresh,
+      requestToken: requestToken,
     );
     if (resolved == null) {
       throw Exception(
@@ -1568,11 +1840,25 @@ class YoutubeAudioService {
     return resolved;
   }
 
+  /// Returns a localhost proxy URL (`http://127.0.0.1:<port>/stream?id=<videoId>`)
+  /// backed by an already-resolved [resolved] stream in memory (zero re-fetch!).
+  Future<String> getProxyUrlForResolvedStream(
+    String videoId,
+    ResolvedAudioStream resolved,
+  ) async {
+    await _ensureProxyServer();
+    _cacheStream(videoId, resolved);
+    return 'http://127.0.0.1:${_proxyServer!.port}/stream?id=$videoId';
+  }
+
   /// Exact videoId audio resolver. NEVER queries third-party catalogs by text/title.
   Future<ResolvedAudioStream?> _resolveAudioStream(
     String videoId, {
     bool fallback = false,
+    int? requestToken,
   }) async {
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
     // 1. In-memory URL cache check (30-min TTL for re-tapped or recently played songs)
     if (!fallback) {
       final cached = _getCachedStream(videoId);
@@ -1589,8 +1875,8 @@ class YoutubeAudioService {
     if (_hasCustomHttpClient && !_hasCustomYtClient) {
       if (!fallback) {
         final fastResult = await _raceFirstNonNull([
-          () => _resolveFastInnerTube(videoId),
-          () => _resolveFastManifest(videoId),
+          () => _resolveFastInnerTube(videoId, requestToken: requestToken),
+          () => _resolveFastManifest(videoId, requestToken: requestToken),
         ]);
         if (fastResult != null) {
           _cacheStream(videoId, fastResult);
@@ -1598,60 +1884,81 @@ class YoutubeAudioService {
         }
       }
     } else {
-      // Primary: Multi-Client Unthrottled Manifest Resolution (androidVr, ios, androidMusic)
-      // with 10s timeout + automatic fresh YoutubeExplode() retry on failure/empty streams.
+      // Primary: Fast Manifest Resolution ([ios, androidVr] with requireWatchPage: false)
+      // + safari/tv fallback with requireWatchPage: false.
       final manifestStream = await _resolveFastManifest(
         videoId,
         forceFreshClient: fallback,
+        requestToken: requestToken,
       );
       if (manifestStream != null) {
         _cacheStream(videoId, manifestStream);
         return manifestStream;
       }
 
+      if (!_isRequestActive(videoId, requestToken)) return null;
+
       // Secondary fast InnerTube probe if manifest resolution returned null
-      final fastInnerTube = await _resolveFastInnerTube(videoId);
+      final fastInnerTube = await _resolveFastInnerTube(
+        videoId,
+        requestToken: requestToken,
+      );
       if (fastInnerTube != null) {
         _cacheStream(videoId, fastInnerTube);
         return fastInnerTube;
       }
     }
 
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
     // Fallback stages with full client sets if primary resolution did not resolve
     debugPrint(
       '[YoutubeAudioService] Primary resolution missed, executing secondary layers for $videoId...',
     );
-    final layer2Stream = await _resolveLayer2InnerTube(videoId);
+    final layer2Stream = await _resolveLayer2InnerTube(
+      videoId,
+      requestToken: requestToken,
+    );
     if (layer2Stream != null) {
       _cacheStream(videoId, layer2Stream);
       return layer2Stream;
     }
 
-    final layer3Stream = await _resolveLayer3PipedAndInvidious(videoId);
-    if (layer3Stream != null) {
-      _cacheStream(videoId, layer3Stream);
-      return layer3Stream;
-    }
+    if (!_isRequestActive(videoId, requestToken)) return null;
 
-    final layer1Stream = await _resolveLayer1YoutubeExplode(videoId);
+    final layer1Stream = await _resolveLayer1YoutubeExplode(
+      videoId,
+      requestToken: requestToken,
+    );
     if (layer1Stream != null) {
       _cacheStream(videoId, layer1Stream);
       return layer1Stream;
+    }
+
+    if (!_isRequestActive(videoId, requestToken)) return null;
+
+    final layer3Stream = await _resolveLayer3PipedAndInvidious(
+      videoId,
+      requestToken: requestToken,
+    );
+    if (layer3Stream != null) {
+      _cacheStream(videoId, layer3Stream);
+      return layer3Stream;
     }
 
     return null;
   }
 
   /// Resolves the audio stream for the exact [videoId] and returns the local loopback proxy URL for ExoPlayer.
-  /// ExoPlayer streams from our local proxy which handles Range requests, chunking,
-  /// and exact matching client User-Agents without HTTP 403 errors.
-  /// All streams strictly map to the tapped YouTube [videoId] (no title/text search fallbacks).
+  /// ExoPlayer streams from our local proxy which pipes `_yt.videos.streamsClient.get(streamInfo)`
+  /// (or Range requests with matched client User-Agents) without HTTP 403 errors.
   Future<String> getAudioStreamUrl(
     String videoId, {
     String? title,
     String? artist,
     bool fallback = false,
   }) async {
+    final requestToken = beginResolveRequest(videoId);
     await _ensureProxyServer();
 
     final cacheFile = File('${_cacheDir.path}/yt_$videoId.m4a');
@@ -1668,7 +1975,11 @@ class YoutubeAudioService {
 
     var resolved = _getCachedStream(videoId);
     if (resolved == null || fallback) {
-      resolved = await _resolveAudioStream(videoId, fallback: fallback);
+      resolved = await _resolveAudioStream(
+        videoId,
+        fallback: fallback,
+        requestToken: requestToken,
+      );
       if (resolved == null) {
         throw Exception(
           'Failed to resolve playable audio stream for YouTube video $videoId',
@@ -1681,6 +1992,7 @@ class YoutubeAudioService {
   }
 
   void dispose() {
+    cancelActiveResolutions();
     _yt.close();
     _httpClient.close();
     _proxyServer?.close(force: true);

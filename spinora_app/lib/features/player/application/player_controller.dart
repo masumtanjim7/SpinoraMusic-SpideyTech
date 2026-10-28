@@ -756,7 +756,9 @@ class PlayerController extends Notifier<PlayerState> {
   final Map<String, ResolvedAudioStream> _resolvedStreams = {};
   int _playbackRequestId = 0;
 
-  /// Resolves [ResolvedAudioStream] for online YouTube tracks (`yt://<videoId>`).
+  /// Resolves [ResolvedAudioStream] for online YouTube tracks (`yt://<videoId>`),
+  /// keeping the resolved [AudioOnlyStreamInfo] (`streamInfo`) in memory alongside
+  /// the track metadata.
   Future<ResolvedAudioStream> _resolveTrackStream(
     Track track, {
     bool forceFallback = false,
@@ -764,16 +766,8 @@ class PlayerController extends Notifier<PlayerState> {
     final videoId = track.uri.replaceFirst('yt://', '');
     final service = ref.read(youtubeAudioServiceProvider);
     if (!forceFallback && _resolvedStreams.containsKey(track.uri)) {
-      final cached = service.resolveStream(
-        videoId,
-        title: track.title,
-        artist: track.artist,
-        forceRefresh: false,
-      );
-      final resolved = await cached;
-      _resolvedStreams[track.uri] = resolved;
-      _resolvedStreamUrls[track.uri] = resolved.url;
-      return resolved;
+      final existing = _resolvedStreams[track.uri]!;
+      return existing;
     }
 
     final resolved = await service.resolveStream(
@@ -874,14 +868,18 @@ class PlayerController extends Notifier<PlayerState> {
       final parsed = (uriString.startsWith('/') && !uriString.startsWith('//'))
           ? Uri.file(uriString)
           : Uri.parse(uriString);
+      final resolved = _resolvedStreams[track.uri];
+      final ua = YoutubeAudioService.resolveUserAgentForUrl(parsed);
+      final headers =
+          resolved?.headers ??
+          {
+            'User-Agent': ?ua,
+            'Accept': '*/*',
+            'Connection': 'keep-alive',
+          };
       return AudioSource.uri(
         parsed,
-        headers: const {
-          'User-Agent':
-              'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)',
-          'Accept': '*/*',
-          'Connection': 'keep-alive',
-        },
+        headers: headers,
         tag: mediaItem,
       );
     }
@@ -1005,6 +1003,9 @@ class PlayerController extends Notifier<PlayerState> {
         final videoId = track.uri.replaceFirst('yt://', '');
         final service = ref.read(youtubeAudioServiceProvider);
 
+        // Immediately cancel any stale background resolution loops for older songs
+        service.cancelActiveResolutions();
+
         // Stop any active playback immediately to release any hanging ExoPlayer socket from the previous stream
         try {
           await _audioPlayer.stop();
@@ -1012,87 +1013,50 @@ class PlayerController extends Notifier<PlayerState> {
 
         final mediaItem = _createMediaItem(track);
 
-        try {
-          // 2) Resolve MP4 (itag 140) stream info (from 30-min cache or multi-client manifest)
-          final streamInfo = await _resolveTrackStream(track);
-          if (requestId != _playbackRequestId) {
-            debugPrint(
-              '[PlayerController] Discarding outdated playback request #$requestId for ${track.title}',
-            );
-            return;
-          }
-
-          // 3) Feed into just_audio with matching HTTP headers
-          final audioSource = AudioSource.uri(
-             streamInfo.uri,
-            headers: const {
-              'User-Agent':
-                  'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)',
-              'Accept': '*/*',
-              'Connection': 'keep-alive',
-            },
-            tag: mediaItem,
-          );
-
-          await _loadAndBufferOnlineSource(
-            audioSource,
-            requestId: requestId,
-            timeout: const Duration(seconds: 6),
-          );
-          if (requestId != _playbackRequestId) return;
-        } catch (initialError, initialStackTrace) {
-          if (requestId != _playbackRequestId) return;
-
+        // 2) Resolve MP4 (itag 140) stream info (from 30-min cache or fast [ios, androidVr] manifest with requireWatchPage: false)
+        // Keeps the resolved AudioOnlyStreamInfo in streamInfo.streamInfo in memory!
+        final streamInfo = await _resolveTrackStream(track);
+        if (requestId != _playbackRequestId) {
           debugPrint(
-            '[PlayerController] Direct AudioSource.uri failed or timed out ($initialError). Switching to YouTubeByteStreamSource / fresh client stream...',
+            '[PlayerController] Discarding outdated playback request #$requestId for ${track.title}',
           );
-          if (kDebugMode) {
-            debugPrint(initialStackTrace.toString());
-          }
+          return;
+        }
 
-          // Release hanging socket and invalidate cached stream URL
-          try {
-            await _audioPlayer.stop();
-          } catch (_) {}
-          _resolvedStreams.remove(track.uri);
-          _resolvedStreamUrls.remove(track.uri);
-          service.invalidateStreamCache(videoId);
-
-          // Re-resolve fresh stream info with fresh YoutubeExplode client
-          final freshStreamInfo = await _resolveTrackStream(
-            track,
-            forceFallback: true,
-          );
-          if (requestId != _playbackRequestId) return;
-
-          final byteStreamSource = YouTubeByteStreamSource(
+        // 3) Primary: Stream via YouTubeByteStreamSource (_yt.videos.streamsClient.get(streamInfo))
+        // so ExoPlayer reads a clean chunked byte stream without ever getting Response code: 403 from googlevideo.com!
+        try {
+          final primarySource = YouTubeByteStreamSource(
             videoId: videoId,
-            resolvedStream: freshStreamInfo,
+            resolvedStream: streamInfo,
             youtubeService: service,
             tag: mediaItem,
           );
 
+          await _loadAndBufferOnlineSource(
+            primarySource,
+            requestId: requestId,
+            timeout: const Duration(seconds: 6),
+          );
+          if (requestId != _playbackRequestId) return;
+        } catch (primaryError) {
+          if (requestId != _playbackRequestId) return;
+          debugPrint(
+            '[PlayerController] Primary YouTubeByteStreamSource failed ($primaryError). Switching to zero-re-fetch localhost proxy...',
+          );
+
           try {
-            await _loadAndBufferOnlineSource(
-              byteStreamSource,
-              requestId: requestId,
-              timeout: const Duration(seconds: 8),
-            );
-          } catch (byteStreamError) {
-            if (requestId != _playbackRequestId) return;
-            debugPrint(
-              '[PlayerController] YouTubeByteStreamSource fallback encountered error ($byteStreamError). Trying local loopback range proxy...',
-            );
-            try {
-              await _audioPlayer.stop();
-            } catch (_) {}
-            final proxyUrl = await service.getAudioStreamUrl(
+            await _audioPlayer.stop();
+          } catch (_) {}
+
+          // Immediate zero-re-fetch Fallback #1: Localhost HttpServer proxy piping the in-memory streamInfo
+          try {
+            final proxyUrl = await service.getProxyUrlForResolvedStream(
               videoId,
-              title: track.title,
-              artist: track.artist,
-              fallback: true,
+              streamInfo,
             );
             if (requestId != _playbackRequestId) return;
+
             final proxySource = AudioSource.uri(
               Uri.parse(proxyUrl),
               tag: mediaItem,
@@ -1100,11 +1064,64 @@ class PlayerController extends Notifier<PlayerState> {
             await _loadAndBufferOnlineSource(
               proxySource,
               requestId: requestId,
-              timeout: const Duration(seconds: 8),
+              timeout: const Duration(seconds: 6),
             );
-          }
+            if (requestId != _playbackRequestId) return;
+          } catch (proxyError) {
+            if (requestId != _playbackRequestId) return;
+            debugPrint(
+              '[PlayerController] Zero-re-fetch proxy failed ($proxyError). Trying direct AudioSource.uri with matched c= User-Agent...',
+            );
 
-          if (requestId != _playbackRequestId) return;
+            try {
+              await _audioPlayer.stop();
+            } catch (_) {}
+
+            // Immediate zero-re-fetch Fallback #2: Direct AudioSource.uri with dynamically matched User-Agent for c=
+            try {
+              final directSource = AudioSource.uri(
+                streamInfo.uri,
+                headers: streamInfo.headers,
+                tag: mediaItem,
+              );
+              await _loadAndBufferOnlineSource(
+                directSource,
+                requestId: requestId,
+                timeout: const Duration(seconds: 6),
+              );
+              if (requestId != _playbackRequestId) return;
+            } catch (directError) {
+              if (requestId != _playbackRequestId) return;
+              debugPrint(
+                '[PlayerController] Direct AudioSource.uri failed ($directError). Re-fetching fresh stream with requireWatchPage: false...',
+              );
+
+              try {
+                await _audioPlayer.stop();
+              } catch (_) {}
+              _resolvedStreams.remove(track.uri);
+              _resolvedStreamUrls.remove(track.uri);
+              service.invalidateStreamCache(videoId);
+
+              final freshStreamInfo = await _resolveTrackStream(
+                track,
+                forceFallback: true,
+              );
+              if (requestId != _playbackRequestId) return;
+
+              final freshByteSource = YouTubeByteStreamSource(
+                videoId: videoId,
+                resolvedStream: freshStreamInfo,
+                youtubeService: service,
+                tag: mediaItem,
+              );
+              await _loadAndBufferOnlineSource(
+                freshByteSource,
+                requestId: requestId,
+                timeout: const Duration(seconds: 8),
+              );
+            }
+          }
         }
 
         if (requestId != _playbackRequestId) return;

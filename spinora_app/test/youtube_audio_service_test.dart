@@ -640,5 +640,32 @@ void main() {
       expect(collected.length, 1024);
       service.dispose();
     });
+
+    test('resolveUserAgentForUrl dynamically matches User-Agent to c= query parameter', () {
+      expect(
+        YoutubeAudioService.resolveUserAgentForUrl(
+          Uri.parse('https://rr1---sn-abc.googlevideo.com/videoplayback?itag=140&c=IOS'),
+        ),
+        'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+      );
+      expect(
+        YoutubeAudioService.resolveUserAgentForUrl(
+          Uri.parse('https://rr1---sn-abc.googlevideo.com/videoplayback?itag=140&c=ANDROID_VR'),
+        ),
+        'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12; en_US; Quest 2; Build/SQ3A.220605.009.A1; Cronet/107.0.5284.2)',
+      );
+      expect(
+        YoutubeAudioService.resolveUserAgentForUrl(
+          Uri.parse('https://rr1---sn-abc.googlevideo.com/videoplayback?itag=140&c=WEB'),
+        ),
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+      );
+      expect(
+        YoutubeAudioService.resolveUserAgentForUrl(
+          Uri.parse('https://rr1---sn-abc.googlevideo.com/videoplayback?itag=140&c=SAFARI'),
+        ),
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+      );
+    });
   });
 }
