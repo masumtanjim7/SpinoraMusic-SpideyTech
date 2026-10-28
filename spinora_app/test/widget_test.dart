@@ -1,10 +1,3 @@
-// Smoke tests for Spinora widgets.
-//
-// These tests run without a native Firebase environment – they exercise pure
-// Flutter/Dart code only (GlassCard, theme tokens, etc.).  Firebase init is
-// intentionally NOT called here; CI runs `flutter test` without an Android
-// device or google-services.json.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

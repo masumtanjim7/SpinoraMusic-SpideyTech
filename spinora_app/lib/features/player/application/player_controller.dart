@@ -737,7 +737,7 @@ class PlayerController extends Notifier<PlayerState> {
         !listEquals(queue, state.originalQueue);
 
     if (isNewQueue) {
-      if (state.isShuffled && queue.length > 1) {
+      if (state.isShuffled && queue.length > 1 && !_isLocalOnly(queue)) {
         originalQueue = List<Track>.unmodifiable(queue);
         final others = List<Track>.from(queue)
           ..removeWhere((t) => t.id == track.id);
@@ -865,7 +865,13 @@ class PlayerController extends Notifier<PlayerState> {
       if (activeQueue.length > 1 && !hasOnlineInQueue) {
         final sources = activeQueue.map(_buildAudioSource).toList();
         await player.setAudioSources(sources, initialIndex: index);
+        // Keep just_audio's native shuffle order in sync with shuffle state.
+        await player.setShuffleModeEnabled(state.isShuffled);
+        if (state.isShuffled) {
+          await player.shuffle();
+        }
       } else {
+        await player.setShuffleModeEnabled(false);
         final audioSource = _buildAudioSource(track);
         await player.setAudioSource(audioSource);
       }
@@ -915,7 +921,14 @@ class PlayerController extends Notifier<PlayerState> {
     final tracks = songs.map(Track.fromSong).toList();
     final safeIndex = initialIndex.clamp(0, tracks.length - 1);
 
-    if (shuffle) {
+    if (shuffle && _isLocalOnly(tracks)) {
+      // Native just_audio shuffle: keep the queue in original order.
+      state = state.copyWith(
+        isShuffled: true,
+        originalQueue: List.unmodifiable(tracks),
+      );
+      await playTrack(tracks[safeIndex], queue: tracks);
+    } else if (shuffle) {
       final initialTrack = tracks[safeIndex];
       final others = List<Track>.from(tracks)..removeAt(safeIndex);
       final shuffledQueue = [
@@ -1155,6 +1168,38 @@ class PlayerController extends Notifier<PlayerState> {
           : 0;
       final activeTrack = state.currentTrack ?? state.queue[currentIdx];
 
+      // Local-only queues: let just_audio own the shuffle order natively so the
+      // native (AudioService) queue and Next/auto-advance stay in sync.
+      if (_isLocalOnly(original) && original.length > 1) {
+        _shuffledQueue = const [];
+        final foundIndex = original.indexWhere((t) => t.id == activeTrack.id);
+        final newIndex = foundIndex != -1 ? foundIndex : 0;
+        final needsRebuild = !listEquals(state.queue, original);
+
+        state = state.copyWith(
+          isShuffled: true,
+          originalQueue: List.unmodifiable(original),
+          queue: List.unmodifiable(original),
+          currentIndex: newIndex,
+          clearShuffledIndices: true,
+        );
+
+        try {
+          if (needsRebuild) {
+            await player.setAudioSources(
+              original.map(_buildAudioSource).toList(),
+              initialIndex: newIndex,
+              initialPosition: state.position,
+            );
+          }
+          await player.setShuffleModeEnabled(true);
+          await player.shuffle();
+        } catch (e) {
+          debugPrint('[PlayerController] Native shuffle enable failed: $e');
+        }
+        return;
+      }
+
       // Current song stays first (keeps playing); the rest are randomized.
       final remaining = List<Track>.from(state.queue)..removeAt(currentIdx);
       remaining.shuffle();
@@ -1190,6 +1235,11 @@ class PlayerController extends Notifier<PlayerState> {
       }
     } else {
       _shuffledQueue = const [];
+      try {
+        await player.setShuffleModeEnabled(false);
+      } catch (e) {
+        debugPrint('[PlayerController] Native shuffle disable failed: $e');
+      }
       final original = state.originalQueue ?? state.queue;
       final current = state.currentTrack;
       final foundIndex = current != null
@@ -1310,9 +1360,28 @@ class PlayerController extends Notifier<PlayerState> {
     );
   }
 
+  bool _isLocalOnly(List<Track> tracks) =>
+      !tracks.any((t) => t.uri.startsWith('yt://'));
+
   /// Skips to the next song in the active queue.
   Future<void> next() async {
     if (state.queue.isEmpty) return;
+
+    // Native shuffle: just_audio decides the next index from its shuffle order.
+    if (state.isShuffled &&
+        player.shuffleModeEnabled &&
+        state.queue.length > 1 &&
+        _isLocalOnly(state.queue) &&
+        player.currentIndex == state.currentIndex) {
+      if (player.hasNext) {
+        await player.seekToNext();
+        return;
+      }
+      // End of the shuffle order: reshuffle and continue endlessly.
+      await player.shuffle();
+      await player.seekToNext();
+      return;
+    }
 
     if (state.isShuffled) {
       // Keep the shuffled order in sync with the live queue (playNext/remove).
