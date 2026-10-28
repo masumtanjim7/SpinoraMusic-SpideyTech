@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
+import '../core/database/app_database.dart';
 import '../firebase_options.dart';
 import 'app_flavor.dart';
 import 'spidey_app.dart';
@@ -17,6 +18,10 @@ import 'spidey_app.dart';
 /// channel or BuildConfig access.
 Future<void> bootstrap(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Cache-First Library & Playback Session Hydration ──────────────────────
+  await LibraryCache.warmUp();
+  // ──────────────────────────────────────────────────────────────────────────
 
   // ── Background Audio & Media3 ─────────────────────────────────────────────
   await JustAudioBackground.init(

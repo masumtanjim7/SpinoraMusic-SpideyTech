@@ -75,6 +75,41 @@ class Track {
     );
   }
 
+  /// Creates a [Track] from a JSON map stored in persistent cache.
+  factory Track.fromJson(Map<String, dynamic> json) {
+    final sourceStr = json['source'] as String? ?? 'local';
+    final source = TrackSource.values.firstWhere(
+      (s) => s.name == sourceStr,
+      orElse: () => TrackSource.local,
+    );
+    return Track(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Unknown Track',
+      artist: json['artist'] as String? ?? 'Unknown Artist',
+      album: json['album'] as String?,
+      durationMs: (json['durationMs'] as num?)?.toInt() ?? 0,
+      artworkUri: json['artworkUri'] as String?,
+      source: source,
+      uri: json['uri'] as String? ?? '',
+      isFavorite: json['isFavorite'] as bool? ?? false,
+    );
+  }
+
+  /// Serializes this [Track] to a JSON-compatible map.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'artist': artist,
+      'album': album,
+      'durationMs': durationMs,
+      'artworkUri': artworkUri,
+      'source': source.name,
+      'uri': uri,
+      'isFavorite': isFavorite,
+    };
+  }
+
   Track copyWith({
     String? id,
     String? title,

@@ -199,6 +199,21 @@ class PlayerController extends Notifier<PlayerState> {
   String? _lastRecordedTrackId;
   DateTime? _lastRecordedTime;
   DateTime? _lastPersistedTime;
+  DateTime? _lastPositionStateEmitTime;
+
+  /// Lightweight position notifier exclusively for seekbars and progress bars
+  /// so high-frequency 50ms position ticks never force full-tree Riverpod rebuilds.
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier<Duration>(
+    Duration.zero,
+  );
+
+  ValueListenable<Duration> get positionListenable {
+    if (_positionNotifier.value == Duration.zero &&
+        state.position != Duration.zero) {
+      _positionNotifier.value = state.position;
+    }
+    return _positionNotifier;
+  }
 
   /// Randomized play order used while shuffle is ON (current song first).
   List<Track> _shuffledQueue = const [];
@@ -234,6 +249,24 @@ class PlayerController extends Notifier<PlayerState> {
       _player?.dispose();
     });
 
+    // Synchronously hydrate from pre-warmed SharedPreferences cache on frame 1
+    // so MiniPlayer appears immediately with zero waiting on app reopen.
+    final cachedSession = LibraryCache.cachedPlaybackSession;
+    if (cachedSession != null) {
+      final safePos = cachedSession.safePosition;
+      _positionNotifier.value = safePos;
+      return PlayerState(
+        currentTrack: cachedSession.currentTrack,
+        queue: cachedSession.queue,
+        originalQueue: cachedSession.queue,
+        currentIndex: cachedSession.currentIndex,
+        isShuffled: cachedSession.isShuffleEnabled,
+        position: safePos,
+        duration: Duration(milliseconds: cachedSession.currentTrack.durationMs),
+        isPlaying: false,
+      );
+    }
+
     return const PlayerState();
   }
 
@@ -244,9 +277,41 @@ class PlayerController extends Notifier<PlayerState> {
     _isFadingOut = false;
   }
 
-  /// Restores the last active track and playback position from local database on startup.
+  /// Restores the last active track, queue, shuffle state, and playback position on startup.
   Future<void> _restoreSavedSession() async {
     try {
+      final cachedSession = LibraryCache.cachedPlaybackSession;
+      if (cachedSession != null) {
+        final track = cachedSession.currentTrack;
+        final queue = cachedSession.queue;
+        final safeIdx = cachedSession.currentIndex.clamp(0, queue.length - 1);
+        final safePosition = cachedSession.safePosition;
+        final isOnline = track.uri.startsWith('yt://');
+
+        if (!isOnline) {
+          final hasOnlineInQueue = queue.any((t) => t.uri.startsWith('yt://'));
+          if (queue.length > 1 && !hasOnlineInQueue) {
+            final sources = queue.map(_buildAudioSource).toList();
+            await player.setAudioSources(
+              sources,
+              initialIndex: safeIdx,
+              initialPosition: safePosition,
+            );
+            await player.setShuffleModeEnabled(cachedSession.isShuffleEnabled);
+            if (cachedSession.isShuffleEnabled) {
+              await player.shuffle();
+            }
+          } else {
+            final audioSource = _buildAudioSource(track);
+            await player.setAudioSource(
+              audioSource,
+              initialPosition: safePosition,
+            );
+          }
+        }
+        return;
+      }
+
       final db = ref.read(appDatabaseProvider);
       final session = await db.getPlaybackSession();
       if (session == null || session.lastSongId == null) return;
@@ -270,6 +335,7 @@ class PlayerController extends Notifier<PlayerState> {
       final audioSource = _buildAudioSource(track);
       await player.setAudioSource(audioSource, initialPosition: safePosition);
 
+      _positionNotifier.value = safePosition;
       state = state.copyWith(
         currentTrack: track,
         queue: [track],
@@ -278,6 +344,7 @@ class PlayerController extends Notifier<PlayerState> {
         duration: trackDuration,
         isPlaying: false,
       );
+      _persistCurrentSession(immediate: true, updateQueueJson: true);
     } catch (e, st) {
       debugPrint('[PlayerController] Error restoring saved session: $e');
       FirebaseCrashlytics.instance.recordError(
@@ -328,7 +395,7 @@ class PlayerController extends Notifier<PlayerState> {
         debugPrint('[PlayerController] Error triggering auto lyrics fetch: $e');
       }
     }
-    _persistCurrentSession(immediate: true);
+    _persistCurrentSession(immediate: true, updateQueueJson: true);
   }
 
   /// Manually triggers an online lyrics search/refetch for the active track.
@@ -350,8 +417,12 @@ class PlayerController extends Notifier<PlayerState> {
         .refetchLyrics(song, customQuery: customQuery);
   }
 
-  /// Persists active playback session state to Drift database.
-  void _persistCurrentSession({bool immediate = false}) {
+  /// Persists active playback session state (`lastPlayedTrackId`, `lastPositionMs`,
+  /// `isShuffleEnabled`, and queue state) to SharedPreferences (`LibraryCache`) and Drift.
+  void _persistCurrentSession({
+    bool immediate = false,
+    bool updateQueueJson = false,
+  }) {
     final currentTrack = state.currentTrack;
     if (currentTrack == null) return;
 
@@ -362,6 +433,19 @@ class PlayerController extends Notifier<PlayerState> {
       return;
     }
     _lastPersistedTime = now;
+
+    final positionMs = _positionNotifier.value.inMilliseconds > 0
+        ? _positionNotifier.value.inMilliseconds
+        : state.position.inMilliseconds;
+
+    LibraryCache.savePlaybackSession(
+      currentTrack: currentTrack,
+      queue: state.queue,
+      currentIndex: state.currentIndex,
+      positionMs: positionMs,
+      isShuffleEnabled: state.isShuffled,
+      updateQueueJson: updateQueueJson,
+    );
 
     final songId =
         (currentTrack.source == TrackSource.local &&
@@ -377,7 +461,7 @@ class PlayerController extends Notifier<PlayerState> {
       db.savePlaybackSession(
         songId: songId,
         trackId: currentTrack.id,
-        positionMs: state.position.inMilliseconds,
+        positionMs: positionMs,
       );
     } catch (e) {
       debugPrint('[PlayerController] Failed to persist session: $e');
@@ -415,11 +499,17 @@ class PlayerController extends Notifier<PlayerState> {
 
         final wasPlaying = state.isPlaying;
 
-        state = state.copyWith(isPlaying: isPlaying, isBuffering: isBuffering);
+        state = state.copyWith(
+          isPlaying: isPlaying,
+          isBuffering: isBuffering,
+          position: _positionNotifier.value,
+        );
         _syncWidgetState();
 
         if (isPlaying && !wasPlaying && state.currentTrack != null) {
           _recordPlayback(state.currentTrack!);
+        } else if (!isPlaying && wasPlaying && state.currentTrack != null) {
+          _persistCurrentSession(immediate: true);
         }
 
         if (playerState.processingState == ProcessingState.completed) {
@@ -447,7 +537,17 @@ class PlayerController extends Notifier<PlayerState> {
 
     _subscriptions.add(
       player.positionStream.listen((pos) {
-        state = state.copyWith(position: pos);
+        // Update lightweight ValueNotifier for 60fps progress bars without rebuilding screens
+        _positionNotifier.value = pos;
+
+        // Throttle full Riverpod state emissions to 800ms to prevent UI stutters/hangs
+        final now = DateTime.now();
+        if (_lastPositionStateEmitTime == null ||
+            now.difference(_lastPositionStateEmitTime!).inMilliseconds >= 800) {
+          _lastPositionStateEmitTime = now;
+          state = state.copyWith(position: pos);
+        }
+
         _persistCurrentSession();
         _handleCrossfadeOnPosition(pos);
       }),
@@ -468,8 +568,15 @@ class PlayerController extends Notifier<PlayerState> {
             index < state.queue.length &&
             index != state.currentIndex) {
           final nextTrack = state.queue[index];
-          state = state.copyWith(currentIndex: index, currentTrack: nextTrack);
+          _positionNotifier.value = Duration.zero;
+          state = state.copyWith(
+            currentIndex: index,
+            currentTrack: nextTrack,
+            position: Duration.zero,
+            duration: Duration(milliseconds: nextTrack.durationMs),
+          );
           _syncWidgetState();
+          _persistCurrentSession(immediate: true);
           if (state.isPlaying) {
             _recordPlayback(nextTrack);
           }
@@ -769,16 +876,20 @@ class PlayerController extends Notifier<PlayerState> {
     final isOnline = track.uri.startsWith('yt://');
 
     // 1) Immediately update UI state to show selected currentTrack and set isBuffering = true
+    _positionNotifier.value = Duration.zero;
     state = state.copyWith(
       currentTrack: track,
       queue: List.unmodifiable(activeQueue),
       originalQueue: originalQueue,
       currentIndex: index,
+      position: Duration.zero,
+      duration: Duration(milliseconds: track.durationMs),
       isBuffering: isOnline,
       isPlaying: false,
       clearError: true,
     );
     _syncWidgetState();
+    _persistCurrentSession(immediate: true, updateQueueJson: true);
 
     try {
       if (isOnline) {
@@ -1144,6 +1255,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   Future<void> seek(Duration position) async {
+    _positionNotifier.value = position;
     state = state.copyWith(position: position);
     _cancelFadeTransitions();
     player.setVolume(1.0);
@@ -1197,6 +1309,7 @@ class PlayerController extends Notifier<PlayerState> {
         } catch (e) {
           debugPrint('[PlayerController] Native shuffle enable failed: $e');
         }
+        _persistCurrentSession(immediate: true, updateQueueJson: true);
         return;
       }
 
@@ -1268,6 +1381,7 @@ class PlayerController extends Notifier<PlayerState> {
         }
       }
     }
+    _persistCurrentSession(immediate: true, updateQueueJson: true);
   }
 
   /// Cycles repeat mode: off -> all -> one -> off.
@@ -1769,8 +1883,17 @@ class PlayerController extends Notifier<PlayerState> {
 }
 
 // ---------------------------------------------------------------------------
-// Riverpod Provider
+// Riverpod Providers
 // ---------------------------------------------------------------------------
 
 final playerControllerProvider =
     NotifierProvider<PlayerController, PlayerState>(PlayerController.new);
+
+/// Lightweight [ValueListenable<Duration>] provider for the Now Playing seekbar
+/// and MiniPlayer progress bar so high-frequency 50ms position ticks never
+/// trigger full-screen Riverpod rebuilds.
+final playerPositionListenableProvider = Provider<ValueListenable<Duration>>((
+  ref,
+) {
+  return ref.watch(playerControllerProvider.notifier).positionListenable;
+});

@@ -28,15 +28,29 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
-    final track = playerState.currentTrack;
-
-    if (!playerState.hasTrack || track == null) {
+    final track = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack),
+    );
+    if (track == null) {
       return const SizedBox.shrink();
     }
 
-    final tt = Theme.of(context).textTheme;
+    final isPlaying = ref.watch(
+      playerControllerProvider.select((s) => s.isPlaying),
+    );
+    final isBuffering = ref.watch(
+      playerControllerProvider.select((s) => s.isBuffering),
+    );
+    final canSkipNext = ref.watch(
+      playerControllerProvider.select(
+        (s) => s.hasNext || (s.isShuffled && s.queue.length > 1),
+      ),
+    );
+    final durationMs = ref.watch(
+      playerControllerProvider.select((s) => s.duration.inMilliseconds),
+    );
 
+    final tt = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
@@ -70,20 +84,17 @@ class MiniPlayer extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Subtle progress indicator line along the top curved edge
+                // Isolated into a lightweight ValueListenableBuilder so only this
+                // 3px bar repaints on position ticks.
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(24),
                   ),
                   child: SizedBox(
                     height: 3,
-                    child: LinearProgressIndicator(
-                      value: playerState.progressRatio,
-                      backgroundColor: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.black.withValues(alpha: 0.06),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isDark ? AppColors.cyanAccent : const Color(0xFF7C3AED),
-                      ),
+                    child: _MiniPlayerProgressBar(
+                      durationMs: durationMs > 0 ? durationMs : track.durationMs,
+                      isDark: isDark,
                     ),
                   ),
                 ),
@@ -101,7 +112,7 @@ class MiniPlayer extends ConsumerWidget {
                         track,
                         size: 46,
                         borderRadius: BorderRadius.circular(12),
-                        isCurrent: playerState.isPlaying,
+                        isCurrent: isPlaying,
                         iconSize: 24,
                         heroTag: 'mini_player_art_${track.id}',
                       ),
@@ -186,7 +197,7 @@ class MiniPlayer extends ConsumerWidget {
                           onPressed: () => ref
                               .read(playerControllerProvider.notifier)
                               .togglePlayPause(),
-                          icon: playerState.isBuffering
+                          icon: isBuffering
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
@@ -196,25 +207,25 @@ class MiniPlayer extends ConsumerWidget {
                                   ),
                                 )
                               : Icon(
-                                  playerState.isPlaying
+                                  isPlaying
                                       ? Icons.pause_rounded
                                       : Icons.play_arrow_rounded,
                                   color: Colors.white,
                                   size: 24,
                                 ),
-                          tooltip: playerState.isPlaying ? 'Pause' : 'Play',
+                          tooltip: isPlaying ? 'Pause' : 'Play',
                         ),
                       ),
 
                       // Next Button
                       IconButton(
-                        onPressed: playerState.hasNext
+                        onPressed: canSkipNext
                             ? () => ref
                                   .read(playerControllerProvider.notifier)
                                   .next()
                             : null,
                         icon: const Icon(Icons.skip_next_rounded),
-                        color: playerState.hasNext
+                        color: canSkipNext
                             ? (isDark
                                   ? Colors.white.withValues(alpha: 0.85)
                                   : const Color(0xFF0F111A)
@@ -235,6 +246,46 @@ class MiniPlayer extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MiniPlayerProgressBar extends ConsumerWidget {
+  const _MiniPlayerProgressBar({
+    required this.durationMs,
+    required this.isDark,
+  });
+
+  final int durationMs;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final posListenable = ref.watch(playerPositionListenableProvider);
+    final fallbackPositionMs = ref.watch(
+      playerControllerProvider.select((s) => s.position.inMilliseconds),
+    );
+
+    return ValueListenableBuilder<Duration>(
+      valueListenable: posListenable,
+      builder: (context, pos, _) {
+        final effectivePosMs = pos.inMilliseconds > 0
+            ? pos.inMilliseconds
+            : fallbackPositionMs;
+        final ratio = durationMs > 0
+            ? (effectivePosMs / durationMs).clamp(0.0, 1.0)
+            : 0.0;
+
+        return LinearProgressIndicator(
+          value: ratio,
+          backgroundColor: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            isDark ? AppColors.cyanAccent : const Color(0xFF7C3AED),
+          ),
+        );
+      },
     );
   }
 }

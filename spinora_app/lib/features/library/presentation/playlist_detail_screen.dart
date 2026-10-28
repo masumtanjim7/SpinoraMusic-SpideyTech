@@ -19,7 +19,12 @@ class PlaylistDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(playlistSongsStreamProvider(playlist.id));
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -343,16 +348,14 @@ class PlaylistDetailScreen extends ConsumerWidget {
                           20,
                           8,
                           20,
-                          playerState.hasTrack ? 110 : 40,
+                          hasTrack ? 110 : 40,
                         ),
                         itemCount: songs.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final song = songs[index];
-                          final isCurrent =
-                              playerState.currentTrack?.id ==
-                              'local_${song.id}';
+                          final isCurrent = currentTrackId == 'local_${song.id}';
 
                           return Material(
                             color: isCurrent

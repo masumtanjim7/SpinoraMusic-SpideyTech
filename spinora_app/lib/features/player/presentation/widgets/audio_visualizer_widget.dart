@@ -71,22 +71,36 @@ class _AudioVisualizerWidgetState extends State<AudioVisualizerWidget>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimationState();
+  }
+
+  @override
   void didUpdateWidget(covariant AudioVisualizerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isPlaying != oldWidget.isPlaying ||
         widget.enabled != oldWidget.enabled) {
-      if (widget.isPlaying && widget.enabled) {
-        if (!_controller.isAnimating) {
-          _startAnimation();
-        }
-      } else {
-        if (_controller.isAnimating) {
-          _controller.animateTo(
-            0.0,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOut,
-          );
-        }
+      _syncAnimationState();
+    }
+  }
+
+  void _syncAnimationState() {
+    final shouldTick =
+        widget.isPlaying &&
+        widget.enabled &&
+        TickerMode.valuesOf(context).enabled;
+    if (shouldTick) {
+      if (!_controller.isAnimating) {
+        _startAnimation();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        _controller.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
       }
     }
   }
@@ -311,21 +325,32 @@ class _MiniAudioVisualizerState extends State<MiniAudioVisualizer>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncMiniAnimationState();
+  }
+
+  @override
   void didUpdateWidget(covariant MiniAudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.isPlaying) {
-        if (!_controller.isAnimating) {
-          _startAnimation();
-        }
-      } else {
-        if (_controller.isAnimating) {
-          _controller.animateTo(
-            0.0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
+      _syncMiniAnimationState();
+    }
+  }
+
+  void _syncMiniAnimationState() {
+    final shouldTick = widget.isPlaying && TickerMode.valuesOf(context).enabled;
+    if (shouldTick) {
+      if (!_controller.isAnimating) {
+        _startAnimation();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        _controller.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
     }
   }

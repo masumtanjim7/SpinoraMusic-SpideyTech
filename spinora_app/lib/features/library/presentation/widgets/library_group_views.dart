@@ -346,7 +346,9 @@ class ArtistsGroupedView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
     final tt = Theme.of(context).textTheme;
 
     // Group songs by artist name
@@ -404,7 +406,7 @@ class ArtistsGroupedView extends ConsumerWidget {
 
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(20, 8, 20, playerState.hasTrack ? 110 : 80),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, hasTrack ? 110 : 80),
       itemCount: filteredArtists.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
@@ -505,7 +507,9 @@ class _ArtistDetailSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerController = ref.read(playerControllerProvider.notifier);
-    final playerState = ref.watch(playerControllerProvider);
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
     final tt = Theme.of(context).textTheme;
     final isLight = context.isLight;
 
@@ -668,8 +672,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (context, index) {
                 final song = songs[index];
-                final isCurrent =
-                    playerState.currentTrack?.id == 'local_${song.id}';
+                final isCurrent = currentTrackId == 'local_${song.id}';
 
                 return InkWell(
                   onTap: () {
@@ -775,7 +778,9 @@ class AlbumsGroupedView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
     final tt = Theme.of(context).textTheme;
 
     // Group songs by album name
@@ -839,7 +844,7 @@ class AlbumsGroupedView extends ConsumerWidget {
 
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(20, 8, 20, playerState.hasTrack ? 110 : 80),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, hasTrack ? 110 : 80),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 14,
@@ -964,7 +969,9 @@ class _AlbumDetailSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerController = ref.read(playerControllerProvider.notifier);
-    final playerState = ref.watch(playerControllerProvider);
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
     final tt = Theme.of(context).textTheme;
     final isLight = context.isLight;
 
@@ -1131,8 +1138,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (context, index) {
                 final song = songs[index];
-                final isCurrent =
-                    playerState.currentTrack?.id == 'local_${song.id}';
+                final isCurrent = currentTrackId == 'local_${song.id}';
 
                 return InkWell(
                   onTap: () {

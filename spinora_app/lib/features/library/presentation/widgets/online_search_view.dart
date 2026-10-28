@@ -21,7 +21,24 @@ class OnlineSearchView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
+    final currentTrackUri = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.uri),
+    );
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
+    final isPlayerPlaying = ref.watch(
+      playerControllerProvider.select((s) => s.isPlaying),
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F111A);
+    final secondaryText = isDark
+        ? const Color(0xFFB4B0C8)
+        : const Color(0xFF5C6275);
+    final accentColor = isDark ? AppColors.cyanAccent : AppColors.lightAccent;
     final tt = Theme.of(context).textTheme;
 
     if (searchQuery.trim().isEmpty) {
@@ -39,19 +56,19 @@ class OnlineSearchView extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 38,
                 height: 38,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.8,
-                  color: AppColors.cyanAccent,
+                  color: accentColor,
                 ),
               ),
               const SizedBox(height: 18),
               Text(
                 'Searching YouTube audio streams...',
                 style: tt.titleSmall?.copyWith(
-                  color: Colors.white,
+                  color: primaryText,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -59,7 +76,7 @@ class OnlineSearchView extends ConsumerWidget {
               Text(
                 'Fetching live metadata & stream manifests',
                 style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: secondaryText,
                 ),
               ),
             ],
@@ -88,7 +105,7 @@ class OnlineSearchView extends ConsumerWidget {
               Text(
                 'Failed to load search results',
                 style: tt.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: primaryText,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -97,7 +114,7 @@ class OnlineSearchView extends ConsumerWidget {
                 'Please check your internet connection and try again.',
                 textAlign: TextAlign.center,
                 style: tt.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: secondaryText,
                 ),
               ),
               const SizedBox(height: 18),
@@ -108,9 +125,9 @@ class OnlineSearchView extends ConsumerWidget {
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('Try Again'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.cyanAccent,
+                  foregroundColor: accentColor,
                   side: BorderSide(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.5),
+                    color: accentColor.withValues(alpha: 0.5),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -133,19 +150,21 @@ class OnlineSearchView extends ConsumerWidget {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.05),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : Colors.black.withValues(alpha: 0.05),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.music_off_rounded,
                       size: 32,
-                      color: Colors.white54,
+                      color: secondaryText,
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     'No online streams found',
                     style: tt.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: primaryText,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -154,7 +173,7 @@ class OnlineSearchView extends ConsumerWidget {
                     'Try searching with a different track title or artist.',
                     textAlign: TextAlign.center,
                     style: tt.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: secondaryText,
                     ),
                   ),
                 ],
@@ -169,19 +188,19 @@ class OnlineSearchView extends ConsumerWidget {
             20,
             8,
             20,
-            playerState.hasTrack ? 110 : 80,
+            hasTrack ? 110 : 80,
           ),
           itemCount: songs.length,
           separatorBuilder: (context, index) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final song = songs[index];
             final isCurrent =
-                playerState.currentTrack?.uri == song.filePath ||
-                playerState.currentTrack?.id == 'online_${song.id}';
+                currentTrackUri == song.filePath ||
+                currentTrackId == 'online_${song.id}';
             return _OnlineSongCard(
               song: song,
               isCurrent: isCurrent,
-              isPlaying: isCurrent && playerState.isPlaying,
+              isPlaying: isCurrent && isPlayerPlaying,
               onTap: () async {
                 final messenger = ScaffoldMessenger.maybeOf(context);
                 await ref
@@ -191,7 +210,9 @@ class OnlineSearchView extends ConsumerWidget {
                 if (error != null && error.isNotEmpty) {
                   messenger?.showSnackBar(
                     SnackBar(
-                      backgroundColor: const Color(0xFF2A1520),
+                      backgroundColor: isDark
+                          ? const Color(0xFF2A1520)
+                          : Colors.white.withValues(alpha: 0.95),
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -208,8 +229,8 @@ class OnlineSearchView extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               error,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: primaryText,
                                 fontSize: 13,
                               ),
                             ),
@@ -225,17 +246,25 @@ class OnlineSearchView extends ConsumerWidget {
                 ref.read(playerControllerProvider.notifier).playSongNext(song);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    backgroundColor: const Color(0xFF1E1A2E),
+                    backgroundColor: isDark
+                        ? const Color(0xFF1E1A2E)
+                        : Colors.white.withValues(alpha: 0.95),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(
-                        color: AppColors.cyanAccent.withValues(alpha: 0.4),
+                        color: accentColor.withValues(alpha: 0.4),
                       ),
                     ),
-                    content: Text(
-                      'Playing next: "${song.title}"',
-                      style: const TextStyle(color: Colors.white),
+                    content: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Playing next: "${song.title}"',
+                            style: TextStyle(color: primaryText),
+                          ),
+                        ),
+                      ],
                     ),
                     duration: const Duration(seconds: 2),
                   ),
@@ -265,6 +294,12 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F111A);
+    final secondaryText = isDark
+        ? const Color(0xFFB4B0C8)
+        : const Color(0xFF5C6275);
+    final accentColor = isDark ? AppColors.cyanAccent : AppColors.lightAccent;
     final tt = Theme.of(context).textTheme;
 
     return Center(
@@ -278,14 +313,16 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE50914), AppColors.cyanAccent],
+                gradient: LinearGradient(
+                  colors: [const Color(0xFFE50914), accentColor],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.redAccent.withValues(alpha: 0.3),
+                    color: Colors.redAccent.withValues(
+                      alpha: isDark ? 0.3 : 0.2,
+                    ),
                     blurRadius: 28,
                     spreadRadius: 2,
                   ),
@@ -301,7 +338,7 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
             Text(
               'Online Audio Search & Stream',
               style: tt.titleMedium?.copyWith(
-                color: Colors.white,
+                color: primaryText,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
               ),
@@ -311,7 +348,7 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
               'Stream millions of tracks directly with auto-synced lyrics, hardware equalizer, and zero ads.',
               textAlign: TextAlign.center,
               style: tt.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.65),
+                color: secondaryText,
                 height: 1.4,
               ),
             ),
@@ -321,7 +358,7 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
-                color: Colors.white.withValues(alpha: 0.4),
+                color: secondaryText.withValues(alpha: 0.75),
                 letterSpacing: 1.2,
               ),
             ),
@@ -340,27 +377,44 @@ class _OnlineSearchEmptyPrompt extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : Colors.white.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.12)
+                            : Colors.black.withValues(alpha: 0.08),
                       ),
+                      boxShadow: isDark
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.search_rounded,
                           size: 13,
-                          color: AppColors.cyanAccent,
+                          color: accentColor,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          suggestion,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            suggestion,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: primaryText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -393,27 +447,46 @@ class _OnlineSongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F111A);
+    final secondaryText = isDark
+        ? const Color(0xFFB4B0C8)
+        : const Color(0xFF5C6275);
+    final accentColor = isDark ? AppColors.cyanAccent : AppColors.lightAccent;
+
     return Container(
       decoration: BoxDecoration(
         color: isCurrent
-            ? AppColors.cyanAccent.withValues(alpha: 0.12)
-            : Colors.white.withValues(alpha: 0.05),
+            ? accentColor.withValues(alpha: isDark ? 0.14 : 0.10)
+            : (isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.white.withValues(alpha: 0.88)),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isCurrent
-              ? AppColors.cyanAccent.withValues(alpha: 0.6)
-              : Colors.white.withValues(alpha: 0.09),
+              ? accentColor.withValues(alpha: 0.65)
+              : (isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.08)),
           width: isCurrent ? 1.4 : 1.0,
         ),
         boxShadow: isCurrent
             ? [
                 BoxShadow(
-                  color: AppColors.cyanAccent.withValues(alpha: 0.2),
+                  color: accentColor.withValues(alpha: isDark ? 0.2 : 0.14),
                   blurRadius: 16,
                   spreadRadius: 1,
                 ),
               ]
-            : null,
+            : (isDark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]),
       ),
       child: Material(
         color: Colors.transparent,
@@ -450,9 +523,7 @@ class _OnlineSongCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: isCurrent
-                                    ? AppColors.cyanAccent
-                                    : Colors.white,
+                                color: isCurrent ? accentColor : primaryText,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13.5,
                               ),
@@ -493,19 +564,24 @@ class _OnlineSongCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: secondaryText,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            formatDuration(song.duration),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.45),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                          Flexible(
+                            flex: 0,
+                            child: Text(
+                              formatDuration(song.duration),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: secondaryText.withValues(alpha: 0.8),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
@@ -518,11 +594,11 @@ class _OnlineSongCard extends StatelessWidget {
 
                 // Equalizer wave indicator if currently playing
                 if (isCurrent && isPlaying) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Icon(
                       Icons.graphic_eq_rounded,
-                      color: AppColors.cyanAccent,
+                      color: accentColor,
                       size: 20,
                     ),
                   ),
@@ -530,7 +606,7 @@ class _OnlineSongCard extends StatelessWidget {
 
                 IconButton(
                   icon: const Icon(Icons.playlist_play_rounded),
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: secondaryText,
                   tooltip: 'Play Next',
                   onPressed: onPlayNext,
                   iconSize: 22,

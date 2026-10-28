@@ -66,25 +66,29 @@ class _LiveAudioWaveformState extends State<LiveAudioWaveform>
 
     if (_isTestEnvironment) {
       _animController.value = 0.5;
-    } else if (widget.isPlaying) {
-      _animController.repeat();
     }
+  }
+
+  void _syncTicker() {
+    if (_isTestEnvironment) return;
+    final shouldTick = widget.isPlaying && TickerMode.valuesOf(context).enabled;
+    if (shouldTick && !_animController.isAnimating) {
+      _animController.repeat();
+    } else if (!shouldTick && _animController.isAnimating) {
+      _animController.stop();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTicker();
   }
 
   @override
   void didUpdateWidget(covariant LiveAudioWaveform oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_isTestEnvironment) return;
-
-    if (widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.isPlaying) {
-        if (!_animController.isAnimating) {
-          _animController.repeat();
-        }
-      } else {
-        _animController.stop();
-      }
-    }
+    _syncTicker();
   }
 
   @override

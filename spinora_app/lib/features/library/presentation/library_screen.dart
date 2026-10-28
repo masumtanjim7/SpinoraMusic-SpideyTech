@@ -198,7 +198,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final filteredSongsAsync = ref.watch(filteredSongsProvider);
     final recentSongsAsync = ref.watch(recentlyPlayedSongsStreamProvider);
     final scanState = ref.watch(audioScannerStateProvider);
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
     final selectedFilter = ref.watch(libraryFilterProvider);
     final searchQuery = ref.watch(librarySearchQueryProvider);
     final tt = Theme.of(context).textTheme;
@@ -535,7 +537,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 showRecentlyPlayed ? 4 : 8,
                                 20,
                                 MediaQuery.of(context).padding.bottom +
-                                    (playerState.hasTrack ? 150.0 : 100.0),
+                                    (hasTrack ? 150.0 : 100.0),
                               ),
                               sliver: SliverList.separated(
                                 itemCount: filteredSongs.length,
@@ -587,7 +589,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
         ],
       ),
-      floatingActionButton: playerState.hasTrack
+      floatingActionButton: hasTrack
           ? null
           : FloatingActionButton.extended(
               onPressed: scanState.isScanning
@@ -635,32 +637,44 @@ class _GlassSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F111A);
+    final secondaryText = isDark
+        ? const Color(0xFFB4B0C8)
+        : const Color(0xFF5C6275);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        color: context.searchBarBg,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.07)
+            : Colors.white.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.searchBarBorder),
-        boxShadow: context.isLight
-            ? [
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.95),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
-              ]
-            : null,
+              ],
       ),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         textInputAction: TextInputAction.search,
-        style: TextStyle(color: context.primaryText, fontSize: 14),
+        style: TextStyle(color: primaryText, fontSize: 14),
         cursorColor: context.primaryAccent,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: context.searchBarHint, fontSize: 14),
+          hintStyle: TextStyle(color: secondaryText, fontSize: 14),
           prefixIcon: Icon(
             Icons.search_rounded,
             color: context.primaryAccent,
@@ -669,7 +683,7 @@ class _GlassSearchBar extends StatelessWidget {
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.close_rounded, size: 18),
-                  color: context.secondaryText,
+                  color: secondaryText,
                   onPressed: onClear,
                 )
               : null,
@@ -987,9 +1001,13 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = context.isLight;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isLight = !isDark;
     final effectiveColor =
         activeColor ?? (isLight ? AppColors.lightAccent : AppColors.cyanAccent);
+    final unselectedText = isDark
+        ? const Color(0xFFB4B0C8)
+        : const Color(0xFF5C6275);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1004,7 +1022,7 @@ class _FilterChip extends StatelessWidget {
                     : effectiveColor.withValues(alpha: 0.18))
               : (isLight
                     ? Colors.white.withValues(alpha: 0.85)
-                    : Colors.white.withValues(alpha: 0.05)),
+                    : Colors.white.withValues(alpha: 0.07)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
@@ -1013,7 +1031,7 @@ class _FilterChip extends StatelessWidget {
                       : effectiveColor.withValues(alpha: 0.7))
                 : (isLight
                       ? Colors.black.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.08)),
+                      : Colors.white.withValues(alpha: 0.10)),
             width: isSelected ? 1.4 : 1.0,
           ),
           boxShadow: isSelected
@@ -1042,23 +1060,21 @@ class _FilterChip extends StatelessWidget {
             Icon(
               icon,
               size: 14,
-              color: isSelected
-                  ? effectiveColor
-                  : (isLight
-                        ? context.secondaryText
-                        : Colors.white.withValues(alpha: 0.6)),
+              color: isSelected ? effectiveColor : unselectedText,
             ),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? (isLight ? effectiveColor : Colors.white)
-                    : (isLight
-                          ? context.secondaryText
-                          : Colors.white.withValues(alpha: 0.7)),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? (isLight ? effectiveColor : Colors.white)
+                      : unselectedText,
+                ),
               ),
             ),
           ],
@@ -1080,7 +1096,12 @@ class _RecentlyPlayedSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
+    final isPlayerPlaying = ref.watch(
+      playerControllerProvider.select((s) => s.isPlaying),
+    );
     final tt = Theme.of(context).textTheme;
 
     return Padding(
@@ -1154,9 +1175,8 @@ class _RecentlyPlayedSection extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final song = recentSongs[index];
-                final isCurrent =
-                    playerState.currentTrack?.id == 'local_${song.id}';
-                final isPlaying = isCurrent && playerState.isPlaying;
+                final isCurrent = currentTrackId == 'local_${song.id}';
+                final isPlaying = isCurrent && isPlayerPlaying;
 
                 return _RecentlyPlayedCard(
                   song: song,
@@ -1326,9 +1346,13 @@ class _SongListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
-    final isCurrent = playerState.currentTrack?.id == 'local_${song.id}';
-    final isPlaying = isCurrent && playerState.isPlaying;
+    final targetId = 'local_${song.id}';
+    final isCurrent = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id == targetId),
+    );
+    final isPlaying =
+        isCurrent &&
+        ref.watch(playerControllerProvider.select((s) => s.isPlaying));
     final tt = Theme.of(context).textTheme;
 
     return Container(
@@ -1511,21 +1535,27 @@ class _EqualizerIndicatorState extends State<_EqualizerIndicator>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    if (widget.isPlaying) {
+  }
+
+  void _syncTicker() {
+    final shouldTick = widget.isPlaying && TickerMode.valuesOf(context).enabled;
+    if (shouldTick && !_controller.isAnimating) {
       _controller.repeat(reverse: true);
+    } else if (!shouldTick && _controller.isAnimating) {
+      _controller.stop();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTicker();
   }
 
   @override
   void didUpdateWidget(covariant _EqualizerIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.isPlaying) {
-        _controller.repeat(reverse: true);
-      } else {
-        _controller.stop();
-      }
-    }
+    _syncTicker();
   }
 
   @override
@@ -1615,7 +1645,9 @@ class _PlaylistsView extends ConsumerWidget {
         .watch(librarySearchQueryProvider)
         .trim()
         .toLowerCase();
-    final playerState = ref.watch(playerControllerProvider);
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
     final tt = Theme.of(context).textTheme;
 
     return playlistsAsync.when(
@@ -1631,7 +1663,7 @@ class _PlaylistsView extends ConsumerWidget {
             20,
             8,
             20,
-            playerState.hasTrack ? 110 : 80,
+            hasTrack ? 110 : 80,
           ),
           children: [
             // Glassmorphic "+ New Playlist" action card

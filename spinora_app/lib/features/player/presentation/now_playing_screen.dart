@@ -37,9 +37,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final tt = Theme.of(context).textTheme;
     final isLight = context.isLight;
     final totalDurationMs = playerState.duration.inMilliseconds;
-    final currentPositionMs =
-        _dragPosition?.toInt() ??
-        playerState.position.inMilliseconds.clamp(0, totalDurationMs);
 
     final screenSize = MediaQuery.of(context).size;
     final shortest = screenSize.height < screenSize.width
@@ -517,76 +514,97 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
                           SizedBox(height: _showLyrics ? 8 : 14),
 
-                          // Interactive Seek Slider & Timestamps
-                          Column(
-                            children: [
-                              SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 4,
-                                  thumbShape: const RoundSliderThumbShape(
-                                    enabledThumbRadius: 6,
-                                  ),
-                                  overlayShape: const RoundSliderOverlayShape(
-                                    overlayRadius: 14,
-                                  ),
-                                  activeTrackColor: context.primaryAccent,
-                                  inactiveTrackColor: isLight
-                                      ? Colors.black.withValues(alpha: 0.08)
-                                      : Colors.white.withValues(alpha: 0.12),
-                                  thumbColor: context.primaryAccent,
-                                  overlayColor: context.primaryAccent
-                                      .withValues(alpha: 0.2),
-                                ),
-                                child: Slider(
-                                  value: totalDurationMs > 0
-                                      ? currentPositionMs
-                                            .clamp(0, totalDurationMs)
-                                            .toDouble()
-                                      : 0.0,
-                                  max: totalDurationMs > 0
-                                      ? totalDurationMs.toDouble()
-                                      : 1.0,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _dragPosition = val;
-                                    });
-                                  },
-                                  onChangeEnd: (val) {
-                                    ref
-                                        .read(playerControllerProvider.notifier)
-                                        .seek(
-                                          Duration(milliseconds: val.toInt()),
-                                        );
-                                    setState(() {
-                                      _dragPosition = null;
-                                    });
-                                  },
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      formatDuration(currentPositionMs),
-                                      style: tt.labelSmall?.copyWith(
-                                        color: context.secondaryText,
+                          // Interactive Seek Slider & Timestamps (isolated via ValueListenableBuilder)
+                          ValueListenableBuilder<Duration>(
+                            valueListenable: ref.watch(
+                              playerPositionListenableProvider,
+                            ),
+                            builder: (context, livePos, _) {
+                              final livePosMs = livePos.inMilliseconds > 0
+                                  ? livePos.inMilliseconds
+                                  : playerState.position.inMilliseconds;
+                              final effectivePositionMs =
+                                  _dragPosition?.toInt() ??
+                                  livePosMs.clamp(0, totalDurationMs);
+
+                              return Column(
+                                children: [
+                                  SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 4,
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 6,
                                       ),
+                                      overlayShape:
+                                          const RoundSliderOverlayShape(
+                                            overlayRadius: 14,
+                                          ),
+                                      activeTrackColor: context.primaryAccent,
+                                      inactiveTrackColor: isLight
+                                          ? Colors.black.withValues(alpha: 0.08)
+                                          : Colors.white.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                      thumbColor: context.primaryAccent,
+                                      overlayColor: context.primaryAccent
+                                          .withValues(alpha: 0.2),
                                     ),
-                                    Text(
-                                      formatDuration(totalDurationMs),
-                                      style: tt.labelSmall?.copyWith(
-                                        color: context.secondaryText,
-                                      ),
+                                    child: Slider(
+                                      value: totalDurationMs > 0
+                                          ? effectivePositionMs
+                                                .clamp(0, totalDurationMs)
+                                                .toDouble()
+                                          : 0.0,
+                                      max: totalDurationMs > 0
+                                          ? totalDurationMs.toDouble()
+                                          : 1.0,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _dragPosition = val;
+                                        });
+                                      },
+                                      onChangeEnd: (val) {
+                                        ref
+                                            .read(
+                                              playerControllerProvider.notifier,
+                                            )
+                                            .seek(
+                                              Duration(
+                                                milliseconds: val.toInt(),
+                                              ),
+                                            );
+                                        setState(() {
+                                          _dragPosition = null;
+                                        });
+                                      },
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          formatDuration(effectivePositionMs),
+                                          style: tt.labelSmall?.copyWith(
+                                            color: context.secondaryText,
+                                          ),
+                                        ),
+                                        Text(
+                                          formatDuration(totalDurationMs),
+                                          style: tt.labelSmall?.copyWith(
+                                            color: context.secondaryText,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
 
                           SizedBox(height: _showLyrics ? 8 : 12),

@@ -277,7 +277,9 @@ class _DashboardBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(localSongsStreamProvider);
     final recentAsync = ref.watch(recentlyPlayedSongsStreamProvider);
-    final playerState = ref.watch(playerControllerProvider);
+    final hasMiniplayer = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
     final smartMixes = ref.watch(smartMixesProvider);
     final tick = ref.watch(tabEntryTicksProvider.select((t) => t[0]));
 
@@ -285,7 +287,6 @@ class _DashboardBody extends ConsumerWidget {
     final recentSongs = recentAsync.value ?? [];
 
     final rotation = recentSongs.take(8).toList();
-    final hasMiniplayer = playerState.hasTrack;
 
     // Top artists: group songs by artist and pick a representative
     final artistMap = <String, Song>{};
@@ -1079,7 +1080,16 @@ class _HeroCardState extends ConsumerState<_HeroCard>
     _tickerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
-    )..repeat();
+    );
+  }
+
+  void _syncTickerState({required bool isPlaying, required bool isVisible}) {
+    final shouldTick = isPlaying && isVisible;
+    if (shouldTick && !_tickerCtrl.isAnimating) {
+      _tickerCtrl.repeat();
+    } else if (!shouldTick && _tickerCtrl.isAnimating) {
+      _tickerCtrl.stop();
+    }
   }
 
   @override
@@ -1111,18 +1121,33 @@ class _HeroCardState extends ConsumerState<_HeroCard>
     final slotData = _HeroSlotData.resolve(now);
     final headline = slotData.headlineFor(now);
 
-    final playerState = ref.watch(playerControllerProvider);
-    final currentTrack = playerState.currentTrack;
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
+    final currentTrackUri = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.uri),
+    );
+    final isPlaying = ref.watch(
+      playerControllerProvider.select((s) => s.isPlaying),
+    );
+    final hasTrack = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
+
     final isTrackFromMix =
-        currentTrack != null &&
+        currentTrackId != null &&
         widget.allSongs.any(
           (s) =>
-              currentTrack.id == 'local_${s.id}' ||
-              currentTrack.id == 'online_${s.id}' ||
-              currentTrack.uri == s.filePath ||
-              currentTrack.uri == Uri.file(s.filePath).toString(),
+              currentTrackId == 'local_${s.id}' ||
+              currentTrackId == 'online_${s.id}' ||
+              currentTrackUri == s.filePath ||
+              currentTrackUri == Uri.file(s.filePath).toString(),
         );
-    final isHeroActive = playerState.isPlaying && isTrackFromMix;
+    final isHeroActive = isPlaying && isTrackFromMix;
+    _syncTickerState(
+      isPlaying: isPlaying,
+      isVisible: TickerMode.valuesOf(context).enabled,
+    );
 
     void handlePlayAction() {
       if (widget.allSongs.isEmpty) {
@@ -1131,7 +1156,7 @@ class _HeroCardState extends ConsumerState<_HeroCard>
       }
       if (isHeroActive) {
         ref.read(playerControllerProvider.notifier).togglePlayPause();
-      } else if (playerState.hasTrack && isTrackFromMix) {
+      } else if (hasTrack && isTrackFromMix) {
         ref.read(playerControllerProvider.notifier).togglePlayPause();
       } else {
         ref
@@ -1684,15 +1709,13 @@ class _SmartPickCard extends StatelessWidget {
   }
 }
 
-bool _isSongActive(PlayerState playerState, Song song) {
-  if (!playerState.isPlaying) return false;
-  final current = playerState.currentTrack;
-  if (current == null) return false;
-  return current.id == 'local_${song.id}' ||
-      current.id == '${song.id}' ||
-      current.id == 'online_${song.id}' ||
-      current.uri == song.filePath ||
-      current.uri == Uri.file(song.filePath).toString();
+bool _isSongActiveById(String? activeId, String? activeUri, Song song) {
+  if (activeId == null) return false;
+  return activeId == 'local_${song.id}' ||
+      activeId == '${song.id}' ||
+      activeId == 'online_${song.id}' ||
+      activeUri == song.filePath ||
+      activeUri == Uri.file(song.filePath).toString();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1711,6 +1734,17 @@ class _RotationCarousel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final activeTrackId = ref.watch(
+      playerControllerProvider.select(
+        (s) => s.isPlaying ? s.currentTrack?.id : null,
+      ),
+    );
+    final activeTrackUri = ref.watch(
+      playerControllerProvider.select(
+        (s) => s.isPlaying ? s.currentTrack?.uri : null,
+      ),
+    );
+
     return SizedBox(
       height: 220,
       child: ListView.separated(
@@ -1720,8 +1754,11 @@ class _RotationCarousel extends ConsumerWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (_, i) {
           final s = songs[i];
-          final playerState = ref.watch(playerControllerProvider);
-          final isTrackActive = _isSongActive(playerState, s);
+          final isTrackActive = _isSongActiveById(
+            activeTrackId,
+            activeTrackUri,
+            s,
+          );
 
           return LucidPressableCard(
             borderRadius: 20,
@@ -1993,11 +2030,24 @@ class _RecentList extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
     final display = songs.take(8).toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeTrackId = ref.watch(
+      playerControllerProvider.select(
+        (s) => s.isPlaying ? s.currentTrack?.id : null,
+      ),
+    );
+    final activeTrackUri = ref.watch(
+      playerControllerProvider.select(
+        (s) => s.isPlaying ? s.currentTrack?.uri : null,
+      ),
+    );
 
     return Column(
       children: display.map((s) {
-        final playerState = ref.watch(playerControllerProvider);
-        final isTrackActive = _isSongActive(playerState, s);
+        final isTrackActive = _isSongActiveById(
+          activeTrackId,
+          activeTrackUri,
+          s,
+        );
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           child: LucidPressableCard(

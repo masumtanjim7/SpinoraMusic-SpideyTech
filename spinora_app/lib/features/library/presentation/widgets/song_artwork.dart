@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -137,12 +138,55 @@ class SongArtwork extends StatefulWidget {
   /// Image fit. Defaults to [BoxFit.cover].
   final BoxFit fit;
 
-  // ── Global In-Memory Artwork Cache ──────────────────────────────────────────
-  static final Map<String, Uint8List?> _artworkBytesCache = {};
+  // ── Global In-Memory Artwork LRU Cache ─────────────────────────────────────
+  static const int _maxLruEntries = 300;
+
+  /// Static in-memory LRU cache keyed by integer [songId] (`Map<int, Uint8List>`)
+  /// so scrolling lists or changing tracks never blocks the UI thread querying disk.
+  static final LinkedHashMap<int, Uint8List> artworkMemoryCache =
+      LinkedHashMap<int, Uint8List>();
+
+  static final LinkedHashMap<String, Uint8List?> _artworkBytesCache =
+      LinkedHashMap<String, Uint8List?>();
   static final Map<String, Future<Uint8List?>> _activeRequests = {};
+  static final Map<String, bool> _fileExistsCache = {};
   static const MethodChannel _channel = MethodChannel(
     'com.spideytech.spinora/media_store',
   );
+
+  static Uint8List? _getFromIntLru(int id) {
+    final bytes = artworkMemoryCache.remove(id);
+    if (bytes != null) {
+      artworkMemoryCache[id] = bytes;
+    }
+    return bytes;
+  }
+
+  static void _putInIntLru(int id, Uint8List bytes) {
+    artworkMemoryCache.remove(id);
+    artworkMemoryCache[id] = bytes;
+    while (artworkMemoryCache.length > _maxLruEntries) {
+      artworkMemoryCache.remove(artworkMemoryCache.keys.first);
+    }
+  }
+
+  static void _putInStringLru(String key, Uint8List? bytes) {
+    _artworkBytesCache.remove(key);
+    _artworkBytesCache[key] = bytes;
+    while (_artworkBytesCache.length > _maxLruEntries) {
+      _artworkBytesCache.remove(_artworkBytesCache.keys.first);
+    }
+  }
+
+  static bool _cachedFileExists(String path) {
+    return _fileExistsCache.putIfAbsent(path, () {
+      try {
+        return File(path).existsSync();
+      } catch (_) {
+        return false;
+      }
+    });
+  }
 
   @override
   State<SongArtwork> createState() => _SongArtworkState();
@@ -179,11 +223,25 @@ class _SongArtworkState extends State<SongArtwork> {
   }
 
   void _checkAndLoadArtwork() {
+    // 1. Fast synchronous check in integer LRU cache
+    if (widget.songId != null) {
+      final cachedById = SongArtwork._getFromIntLru(widget.songId!);
+      if (cachedById != null) {
+        _bytes = cachedById;
+        return;
+      }
+    }
+
     final key = _cacheKey;
-    if (key == null) return;
+    if (key == null) {
+      _bytes = null;
+      return;
+    }
 
     if (SongArtwork._artworkBytesCache.containsKey(key)) {
-      _bytes = SongArtwork._artworkBytesCache[key];
+      final cached = SongArtwork._artworkBytesCache.remove(key);
+      SongArtwork._artworkBytesCache[key] = cached;
+      _bytes = cached;
       return;
     }
 
@@ -201,7 +259,7 @@ class _SongArtworkState extends State<SongArtwork> {
       final path = artUri.startsWith('file://')
           ? Uri.parse(artUri).toFilePath()
           : artUri;
-      if (File(path).existsSync()) {
+      if (SongArtwork._cachedFileExists(path)) {
         return;
       }
     }
@@ -225,14 +283,17 @@ class _SongArtworkState extends State<SongArtwork> {
 
     try {
       final bytes = await future;
-      SongArtwork._artworkBytesCache[key] = bytes;
+      SongArtwork._putInStringLru(key, bytes);
+      if (bytes != null && bytes.isNotEmpty && widget.songId != null) {
+        SongArtwork._putInIntLru(widget.songId!, bytes);
+      }
       if (mounted) {
         setState(() {
           _bytes = bytes;
         });
       }
     } catch (_) {
-      SongArtwork._artworkBytesCache[key] = null;
+      SongArtwork._putInStringLru(key, null);
     } finally {
       SongArtwork._activeRequests.remove(key);
     }
@@ -270,6 +331,7 @@ class _SongArtworkState extends State<SongArtwork> {
         width: w,
         height: h,
         fit: widget.fit,
+        gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) =>
             _buildFallback(w, h, radius),
       );
@@ -283,6 +345,7 @@ class _SongArtworkState extends State<SongArtwork> {
         width: w,
         height: h,
         fit: widget.fit,
+        gaplessPlayback: true,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return _buildFallback(w, h, radius);
@@ -300,13 +363,13 @@ class _SongArtworkState extends State<SongArtwork> {
       final path = widget.artworkUri!.startsWith('file://')
           ? Uri.parse(widget.artworkUri!).toFilePath()
           : widget.artworkUri!;
-      final file = File(path);
-      if (file.existsSync()) {
+      if (SongArtwork._cachedFileExists(path)) {
         content = Image.file(
-          file,
+          File(path),
           width: w,
           height: h,
           fit: widget.fit,
+          gaplessPlayback: true,
           errorBuilder: (context, error, stackTrace) =>
               _buildFallback(w, h, radius),
         );

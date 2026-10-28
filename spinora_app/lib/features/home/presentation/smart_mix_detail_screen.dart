@@ -52,9 +52,12 @@ class SmartMixDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(playerControllerProvider);
-    final hasMiniplayer = playerState.hasTrack;
-    final currentTrackId = playerState.currentTrack?.id;
+    final hasMiniplayer = ref.watch(
+      playerControllerProvider.select((s) => s.hasTrack),
+    );
+    final currentTrackId = ref.watch(
+      playerControllerProvider.select((s) => s.currentTrack?.id),
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(

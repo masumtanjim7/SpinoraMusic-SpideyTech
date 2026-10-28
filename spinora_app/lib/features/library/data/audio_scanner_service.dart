@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -93,7 +94,7 @@ class AudioScannerService {
   }
 
   /// Queries audio from device storage, deduplicates against existing records,
-  /// and updates/inserts into the Drift database.
+  /// and updates/inserts/removes in the Drift database ONLY if songs changed.
   Future<int> scanAndIndexSongs() async {
     final permission = await checkAudioPermission();
     if (!permission.isGranted) {
@@ -108,89 +109,127 @@ class AudioScannerService {
     // Load existing records to prevent duplicate entries for the same file.
     final existingSongs = await db.select(db.songs).get();
     final existingPaths = {for (final s in existingSongs) s.filePath: s};
+    final scannedPaths = <String>{};
 
-    int newlyInserted = 0;
+    final toInsert = <SongsCompanion>[];
+    final toUpdate = <SongsCompanion>[];
 
-    await db.batch((batch) {
-      for (final raw in rawSongs) {
-        final filePath = raw['filePath'] as String? ?? '';
-        if (filePath.isEmpty) continue;
+    for (final raw in rawSongs) {
+      final filePath = raw['filePath'] as String? ?? '';
+      if (filePath.isEmpty) continue;
+      scannedPaths.add(filePath);
 
-        final title = (raw['title'] as String?)?.trim().isNotEmpty == true
-            ? (raw['title'] as String).trim()
-            : 'Unknown';
-        final artist = (raw['artist'] as String?)?.trim().isNotEmpty == true
-            ? (raw['artist'] as String).trim()
-            : 'Unknown Artist';
-        final album = raw['album'] as String?;
-        final duration = (raw['duration'] as num?)?.toInt() ?? 0;
-        final albumArtPath = raw['albumArtPath'] as String?;
+      final title = (raw['title'] as String?)?.trim().isNotEmpty == true
+          ? (raw['title'] as String).trim()
+          : 'Unknown';
+      final artist = (raw['artist'] as String?)?.trim().isNotEmpty == true
+          ? (raw['artist'] as String).trim()
+          : 'Unknown Artist';
+      final album = raw['album'] as String?;
+      final duration = (raw['duration'] as num?)?.toInt() ?? 0;
+      final albumArtPath = raw['albumArtPath'] as String?;
 
-        final existing = existingPaths[filePath];
+      final existing = existingPaths[filePath];
 
-        if (existing == null) {
-          batch.insert(
-            db.songs,
-            SongsCompanion.insert(
-              title: title,
-              artist: artist,
-              album: Value(album),
-              duration: duration,
-              filePath: filePath,
+      if (existing == null) {
+        toInsert.add(
+          SongsCompanion.insert(
+            title: title,
+            artist: artist,
+            album: Value(album),
+            duration: duration,
+            filePath: filePath,
+            albumArtPath: Value(albumArtPath),
+            isCustomEdited: const Value(false),
+            isHidden: const Value(false),
+          ),
+        );
+      } else {
+        // If song was custom edited by user, preserve user-edited title, artist, album.
+        final effectiveTitle = existing.isCustomEdited ? existing.title : title;
+        final effectiveArtist = existing.isCustomEdited
+            ? existing.artist
+            : artist;
+        final effectiveAlbum = existing.isCustomEdited ? existing.album : album;
+
+        // Update metadata if it has changed.
+        if (existing.title != effectiveTitle ||
+            existing.artist != effectiveArtist ||
+            existing.album != effectiveAlbum ||
+            existing.duration != duration ||
+            existing.albumArtPath != albumArtPath) {
+          toUpdate.add(
+            SongsCompanion(
+              id: Value(existing.id),
+              title: Value(effectiveTitle),
+              artist: Value(effectiveArtist),
+              album: Value(effectiveAlbum),
+              duration: Value(duration),
+              filePath: Value(filePath),
               albumArtPath: Value(albumArtPath),
-              isCustomEdited: const Value(false),
-              isHidden: const Value(false),
+              isFavorite: Value(existing.isFavorite),
+              lyrics: Value(existing.lyrics),
+              isCustomEdited: Value(existing.isCustomEdited),
+              isHidden: Value(existing.isHidden),
             ),
           );
-          newlyInserted++;
-        } else {
-          // If song was custom edited by user, preserve user-edited title, artist, album.
-          final effectiveTitle = existing.isCustomEdited
-              ? existing.title
-              : title;
-          final effectiveArtist = existing.isCustomEdited
-              ? existing.artist
-              : artist;
-          final effectiveAlbum = existing.isCustomEdited
-              ? existing.album
-              : album;
-
-          // Update metadata if it has changed.
-          if (existing.title != effectiveTitle ||
-              existing.artist != effectiveArtist ||
-              existing.album != effectiveAlbum ||
-              existing.duration != duration ||
-              existing.albumArtPath != albumArtPath) {
-            batch.update(
-              db.songs,
-              SongsCompanion(
-                id: Value(existing.id),
-                title: Value(effectiveTitle),
-                artist: Value(effectiveArtist),
-                album: Value(effectiveAlbum),
-                duration: Value(duration),
-                filePath: Value(filePath),
-                albumArtPath: Value(albumArtPath),
-                isFavorite: Value(existing.isFavorite),
-                lyrics: Value(existing.lyrics),
-                isCustomEdited: Value(existing.isCustomEdited),
-                isHidden: Value(existing.isHidden),
-              ),
-            );
-          }
         }
+      }
+    }
+
+    // Identify local files that were deleted from device storage
+    final removedIds = <int>[];
+    for (final existing in existingSongs) {
+      final path = existing.filePath;
+      final isOnline =
+          path.startsWith('yt://') ||
+          path.startsWith('http://') ||
+          path.startsWith('https://');
+      if (!isOnline && !scannedPaths.contains(path)) {
+        try {
+          if (!File(path).existsSync()) {
+            removedIds.add(existing.id);
+          }
+        } catch (_) {}
+      }
+    }
+
+    final hasChanges =
+        toInsert.isNotEmpty || toUpdate.isNotEmpty || removedIds.isNotEmpty;
+
+    if (!hasChanges) {
+      debugPrint(
+        '[AudioScanner] Background scan complete: 0 changes (${existingSongs.length} songs).',
+      );
+      return existingSongs.length;
+    }
+
+    await db.batch((batch) {
+      for (final insertItem in toInsert) {
+        batch.insert(db.songs, insertItem);
+      }
+      for (final updateItem in toUpdate) {
+        batch.replace(db.songs, updateItem);
+      }
+      if (removedIds.isNotEmpty) {
+        batch.deleteWhere(db.songs, (s) => s.id.isIn(removedIds));
       }
     });
 
-    final totalCount =
-        await (db.selectOnly(db.songs)..addColumns([db.songs.id.count()]))
-            .map((row) => row.read(db.songs.id.count()) ?? 0)
-            .getSingle();
+    final updatedSongs =
+        await (db.select(db.songs)
+              ..where((s) => s.isHidden.equals(false))
+              ..orderBy([
+                (s) =>
+                    OrderingTerm(expression: s.title, mode: OrderingMode.asc),
+              ]))
+            .get();
+    LibraryCache.saveSongs(updatedSongs);
 
     debugPrint(
-      '[AudioScanner] Indexed $newlyInserted new songs. Total in DB: $totalCount',
+      '[AudioScanner] Indexed ${toInsert.length} new, ${toUpdate.length} updated, ${removedIds.length} removed. Total visible: ${updatedSongs.length}',
     );
-    return totalCount;
+    return updatedSongs.length;
   }
 }
 
@@ -204,10 +243,36 @@ final audioScannerServiceProvider = Provider<AudioScannerService>((ref) {
 });
 
 class AudioScannerNotifier extends Notifier<AudioScanState> {
+  bool _backgroundScanTriggered = false;
+
   @override
   AudioScanState build() => const AudioScanState();
 
-  /// Triggers a scan of device audio files and indexes them in Drift.
+  /// Runs a silent background microtask scan once per app session so newly added
+  /// or deleted songs are synced without blocking startup or showing a spinner.
+  void ensureBackgroundScanTriggered() {
+    if (_backgroundScanTriggered) return;
+    _backgroundScanTriggered = true;
+
+    unawaited(
+      Future.microtask(() async {
+        try {
+          if (!Platform.isAndroid) return;
+          final permission = await checkAudioPermission();
+          if (!permission.isGranted) return;
+          final service = ref.read(audioScannerServiceProvider);
+          final count = await service.scanAndIndexSongs();
+          if (count > 0 && state.status == AudioScanStatus.idle) {
+            state = state.copyWith(scannedCount: count);
+          }
+        } catch (e) {
+          debugPrint('[AudioScanner] Silent background scan skipped: $e');
+        }
+      }),
+    );
+  }
+
+  /// Triggers an explicit user-initiated scan of device audio files.
   Future<int> scan() async {
     state = state.copyWith(
       status: AudioScanStatus.scanning,
@@ -246,12 +311,35 @@ final audioScannerStateProvider =
     );
 
 /// Reactive stream of all non-hidden songs currently indexed in the local Drift database.
-final localSongsStreamProvider = StreamProvider<List<Song>>((ref) {
+/// Immediately yields cached songs from [LibraryCache] on frame 1 so the UI renders
+/// with zero reload delay, then streams live updates from Drift and triggers a silent
+/// background device scan microtask.
+final localSongsStreamProvider = StreamProvider<List<Song>>((ref) async* {
+  final cached = LibraryCache.cachedSongs;
+  if (cached.isNotEmpty) {
+    yield cached;
+  }
+
+  // Kick off silent background MediaStore diff scan in a microtask
+  Future.microtask(() {
+    try {
+      ref
+          .read(audioScannerStateProvider.notifier)
+          .ensureBackgroundScanTriggered();
+    } catch (_) {}
+  });
+
   final db = ref.watch(appDatabaseProvider);
-  return (db.select(db.songs)
-        ..where((s) => s.isHidden.equals(false))
-        ..orderBy([
-          (s) => OrderingTerm(expression: s.title, mode: OrderingMode.asc),
-        ]))
-      .watch();
+  final stream =
+      (db.select(db.songs)
+            ..where((s) => s.isHidden.equals(false))
+            ..orderBy([
+              (s) => OrderingTerm(expression: s.title, mode: OrderingMode.asc),
+            ]))
+          .watch();
+
+  await for (final songs in stream) {
+    LibraryCache.saveSongs(songs);
+    yield songs;
+  }
 });

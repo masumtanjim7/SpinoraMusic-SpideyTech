@@ -1,11 +1,266 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../audio/track.dart';
 
 part 'app_database.g.dart';
+
+// ---------------------------------------------------------------------------
+// Synchronous Frame-1 Library & Playback Cache (SharedPreferences + In-Memory)
+// ---------------------------------------------------------------------------
+
+/// Snapshot of the last active playback session stored in [SharedPreferences].
+@immutable
+class CachedPlaybackSession {
+  const CachedPlaybackSession({
+    required this.currentTrack,
+    required this.queue,
+    required this.currentIndex,
+    required this.positionMs,
+    required this.isShuffleEnabled,
+  });
+
+  final Track currentTrack;
+  final List<Track> queue;
+  final int currentIndex;
+  final int positionMs;
+  final bool isShuffleEnabled;
+
+  Duration get safePosition {
+    final trackDuration = Duration(milliseconds: currentTrack.durationMs);
+    final pos = Duration(milliseconds: positionMs);
+    if (pos < Duration.zero ||
+        (trackDuration > Duration.zero && pos > trackDuration)) {
+      return Duration.zero;
+    }
+    return pos;
+  }
+}
+
+/// High-speed synchronous cache for local library metadata and playback state
+/// so that all songs, Smart Picks, Hero mixes, and MiniPlayer hydrate on Frame 1
+/// with zero reload delay.
+class LibraryCache {
+  LibraryCache._();
+
+  static const String _kCachedSongsKey = 'spinora_cached_songs_v1';
+  static const String _kLastPlayedTrackIdKey = 'lastPlayedTrackId';
+  static const String _kLastPositionMsKey = 'lastPositionMs';
+  static const String _kIsShuffleEnabledKey = 'isShuffleEnabled';
+  static const String _kLastCurrentIndexKey = 'lastCurrentIndex';
+  static const String _kLastTrackJsonKey = 'lastPlayedTrackJson';
+  static const String _kLastQueueJsonKey = 'lastPlayedQueueJson';
+
+  static SharedPreferences? _prefs;
+  static List<Song> _cachedSongs = const [];
+  static CachedPlaybackSession? _cachedPlaybackSession;
+  static bool _initialized = false;
+
+  /// Current synchronously available list of cached non-hidden songs.
+  static List<Song> get cachedSongs => _cachedSongs;
+
+  /// Current synchronously available playback session snapshot.
+  static CachedPlaybackSession? get cachedPlaybackSession =>
+      _cachedPlaybackSession;
+
+  /// Current synchronously available list of recently played songs derived from cache.
+  static List<Song> get cachedRecentSongs {
+    if (_cachedSongs.isEmpty) return const [];
+    final recent =
+        _cachedSongs
+            .where((s) => s.lastPlayedAt != null && !s.isHidden)
+            .toList()
+          ..sort((a, b) => b.lastPlayedAt!.compareTo(a.lastPlayedAt!));
+    return recent.take(15).toList();
+  }
+
+  /// Pre-warms SharedPreferences and hydrates the in-memory song list and
+  /// playback session before frame 1.
+  static Future<void> warmUp({SharedPreferences? prefs}) async {
+    try {
+      _prefs = prefs ?? await SharedPreferences.getInstance();
+      hydrateFromPrefs(_prefs!);
+      _initialized = true;
+    } catch (e) {
+      debugPrint('[LibraryCache] Warm-up fallback: $e');
+    }
+  }
+
+  /// Synchronously parses cached songs and playback state from [SharedPreferences].
+  static void hydrateFromPrefs(SharedPreferences prefs) {
+    _prefs = prefs;
+    final rawJson = prefs.getString(_kCachedSongsKey);
+    if (rawJson != null && rawJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawJson) as List<dynamic>;
+        final songs = decoded
+            .whereType<Map<String, dynamic>>()
+            .map(Song.fromJson)
+            .where((s) => !s.isHidden)
+            .toList();
+        if (songs.isNotEmpty) {
+          _cachedSongs = List<Song>.unmodifiable(songs);
+        }
+      } catch (e) {
+        debugPrint('[LibraryCache] Error decoding cached songs JSON: $e');
+      }
+    }
+
+    _hydratePlaybackSessionFromPrefs(prefs);
+  }
+
+  static void _hydratePlaybackSessionFromPrefs(SharedPreferences prefs) {
+    try {
+      final lastTrackId = prefs.getString(_kLastPlayedTrackIdKey);
+      final lastTrackJson = prefs.getString(_kLastTrackJsonKey);
+      final positionMs = prefs.getInt(_kLastPositionMsKey) ?? 0;
+      final isShuffleEnabled = prefs.getBool(_kIsShuffleEnabledKey) ?? false;
+      final savedIndex = prefs.getInt(_kLastCurrentIndexKey) ?? 0;
+      final queueJson = prefs.getString(_kLastQueueJsonKey);
+
+      Track? resolvedTrack;
+      if (lastTrackJson != null && lastTrackJson.isNotEmpty) {
+        final map = jsonDecode(lastTrackJson) as Map<String, dynamic>;
+        resolvedTrack = Track.fromJson(map);
+      } else if (lastTrackId != null &&
+          lastTrackId.startsWith('local_') &&
+          _cachedSongs.isNotEmpty) {
+        final songId = int.tryParse(lastTrackId.replaceFirst('local_', ''));
+        if (songId != null) {
+          for (final s in _cachedSongs) {
+            if (s.id == songId) {
+              resolvedTrack = Track.fromSong(s);
+              break;
+            }
+          }
+        }
+      }
+
+      if (resolvedTrack == null || resolvedTrack.id.isEmpty) return;
+
+      List<Track> resolvedQueue = const [];
+      if (queueJson != null && queueJson.isNotEmpty) {
+        try {
+          final decodedQueue = jsonDecode(queueJson) as List<dynamic>;
+          resolvedQueue = decodedQueue
+              .whereType<Map<String, dynamic>>()
+              .map(Track.fromJson)
+              .where((t) => t.id.isNotEmpty)
+              .toList();
+        } catch (_) {}
+      }
+
+      if (resolvedQueue.isEmpty) {
+        resolvedQueue = [resolvedTrack];
+      }
+
+      var effectiveIndex = savedIndex.clamp(0, resolvedQueue.length - 1);
+      if (resolvedQueue[effectiveIndex].id != resolvedTrack.id) {
+        final found = resolvedQueue.indexWhere((t) => t.id == resolvedTrack!.id);
+        if (found != -1) {
+          effectiveIndex = found;
+        } else {
+          resolvedQueue = [resolvedTrack, ...resolvedQueue];
+          effectiveIndex = 0;
+        }
+      }
+
+      _cachedPlaybackSession = CachedPlaybackSession(
+        currentTrack: resolvedTrack,
+        queue: List<Track>.unmodifiable(resolvedQueue),
+        currentIndex: effectiveIndex,
+        positionMs: positionMs,
+        isShuffleEnabled: isShuffleEnabled,
+      );
+    } catch (e) {
+      debugPrint('[LibraryCache] Error hydrating playback session: $e');
+    }
+  }
+
+  /// Persists active playback state (`lastPlayedTrackId`, `lastPositionMs`,
+  /// `isShuffleEnabled`, and queue state) to [SharedPreferences].
+  static void savePlaybackSession({
+    required Track currentTrack,
+    required List<Track> queue,
+    required int currentIndex,
+    required int positionMs,
+    required bool isShuffleEnabled,
+    bool updateQueueJson = true,
+  }) {
+    final safeIdx = queue.isEmpty ? 0 : currentIndex.clamp(0, queue.length - 1);
+    final effectiveQueue = queue.isEmpty ? <Track>[currentTrack] : queue;
+
+    _cachedPlaybackSession = CachedPlaybackSession(
+      currentTrack: currentTrack,
+      queue: List<Track>.unmodifiable(effectiveQueue),
+      currentIndex: safeIdx,
+      positionMs: positionMs,
+      isShuffleEnabled: isShuffleEnabled,
+    );
+
+    Future.microtask(() async {
+      try {
+        final prefs = _prefs ?? await SharedPreferences.getInstance();
+        _prefs = prefs;
+        await prefs.setString(_kLastPlayedTrackIdKey, currentTrack.id);
+        await prefs.setInt(_kLastPositionMsKey, positionMs);
+        await prefs.setBool(_kIsShuffleEnabledKey, isShuffleEnabled);
+        await prefs.setInt(_kLastCurrentIndexKey, safeIdx);
+        await prefs.setString(
+          _kLastTrackJsonKey,
+          jsonEncode(currentTrack.toJson()),
+        );
+        if (updateQueueJson) {
+          final serializedQueue = effectiveQueue
+              .map((t) => t.toJson())
+              .toList();
+          await prefs.setString(_kLastQueueJsonKey, jsonEncode(serializedQueue));
+        }
+      } catch (e) {
+        debugPrint('[LibraryCache] Failed to persist playback session: $e');
+      }
+    });
+  }
+
+  /// Updates the in-memory song cache and asynchronously writes to [SharedPreferences].
+  static void saveSongs(List<Song> songs) {
+    final visible = songs.where((s) => !s.isHidden).toList();
+    _cachedSongs = List<Song>.unmodifiable(visible);
+
+    Future.microtask(() async {
+      try {
+        final prefs = _prefs ?? await SharedPreferences.getInstance();
+        _prefs = prefs;
+        // Strip bulky lyrics text from the fast startup cache to keep JSON small
+        final compactList = visible.map((s) {
+          final map = s.toJson();
+          map['lyrics'] = null;
+          return map;
+        }).toList();
+        await prefs.setString(_kCachedSongsKey, jsonEncode(compactList));
+      } catch (e) {
+        debugPrint('[LibraryCache] Failed to persist song cache: $e');
+      }
+    });
+  }
+
+  /// Clears in-memory cache (useful in isolated test runs).
+  @visibleForTesting
+  static void clear() {
+    _cachedSongs = const [];
+    _cachedPlaybackSession = null;
+    _initialized = false;
+  }
+
+  static bool get isInitialized => _initialized;
+}
 
 /// Drift table storing cached song metadata.
 class Songs extends Table {
@@ -375,10 +630,17 @@ final playlistSongCountStreamProvider =
 });
 
 /// Reactive stream of recently played songs ordered by last played timestamp descending.
+/// Hydrates synchronously from [LibraryCache] on frame 1 when available.
 final recentlyPlayedSongsStreamProvider =
-    StreamProvider<List<Song>>((ref) {
+    StreamProvider<List<Song>>((ref) async* {
+  final cachedRecent = LibraryCache.cachedRecentSongs;
+  if (cachedRecent.isNotEmpty) {
+    yield cachedRecent;
+  }
   final db = ref.watch(appDatabaseProvider);
-  return db.watchRecentlyPlayedSongs();
+  await for (final songs in db.watchRecentlyPlayedSongs()) {
+    yield songs;
+  }
 });
 
 /// Fetches a specific [Song] by its ID.
